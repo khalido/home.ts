@@ -17,24 +17,30 @@ Every integration keeps its own state current, by event stream or on its own tim
 
 ```mermaid
 flowchart LR
-  subgraph apps [Your code]
-    J[jaldi sidecar · Bun]
-    B[chota-bot · Node]
-    C[home CLI]
+  subgraph mac [Mac]
+    J["jaldi sidecar · Bun<br/>always on, live snapshot"]
+    C["home CLI · Bun<br/>one read, then exits"]
   end
-  subgraph core [createHome]
-    S[(snapshot: one Part per connector)]
+  B["chota-bot · Node<br/>weather only; not wired yet"]
+  subgraph lan [Home network]
+    HB[Hue bridge]
+    AC[Daikin AC]
+    IQ[Enphase IQ Gateway]
+    CD[Cast speakers, screens, TVs]
+    PR[AirPrint printers]
   end
-  J & B & C -->|snapshot, refresh, writes| S
-  S --- hue & daikin & enphase & cast & printers & amber & weather
-  hue -->|CLIP v2 event stream| HB[Hue bridge]
-  daikin -->|dsiot JSON, 120 s| AC[Daikin AC]
-  enphase -->|meter readings, 60 s| IQ[IQ Gateway]
-  cast -->|CastV2 over TLS| CD[speakers, displays, TVs]
-  printers -->|IPP, 120 s| PR[AirPrint printers]
-  amber -->|HTTPS, 60 s| AM[Amber Electric]
-  weather -->|BOM FTP, Open-Meteo, Google, 15 min| WX[weather sources]
+  subgraph net [Internet]
+    AM[Amber Electric]
+    WX[BOM, Open-Meteo, Google]
+  end
+  J --> lan
+  J --> net
+  C --> lan
+  C --> net
+  B -.-> net
 ```
+
+There is no server. Each app imports the library, runs its own `createHome`, and talks to the devices itself; each keeps its own snapshot in memory. Nothing passes between the apps.
 
 ```
 src/
