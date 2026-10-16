@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { BALANCED_W, createHome, energyNow, gridText, solarLevel, type Clock } from "../src/index.ts";
-import { amber, amberClient, POLL_MS, toPrices } from "../src/connectors/amber/index.ts";
+import { createHome, energyNow, gridText, solarLevel, type Clock } from "../src/index.ts";
+import { BALANCED_W } from "../src/energy.ts";
+import { amber, amberClient, POLL_MS } from "../src/connectors/amber/index.ts";
+import { toPrices } from "../src/connectors/amber/client.ts";
 
 // Shapes from a live reply on 2026-10-13, ids removed.
 const current = JSON.parse(await Bun.file(new URL("./fixtures/amber/current.json", import.meta.url)).text());

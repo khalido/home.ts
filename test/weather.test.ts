@@ -1,21 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { type Clock, createHome } from "../src/index.ts";
-import {
-  bom,
-  google,
-  nextPoll,
-  openMeteo,
-  rainSoon,
-  rainText,
-  type SourceReading,
-  sunDisagrees,
-  sunNow,
-  toForecast,
-  toNow,
-  weather,
-  type WeatherSource,
-  weatherNow,
-} from "../src/connectors/weather/index.ts";
+import { bom, google, openMeteo, rainSoon, rainText, type SourceReading, sunNow, weather, type WeatherSource, mergeWeather } from "../src/connectors/weather/index.ts";
+import { nextPoll } from "../src/connectors/weather/source.ts";
+import { sunDisagrees } from "../src/connectors/weather/sun.ts";
+import { toForecast, toNow } from "../src/connectors/weather/bom.ts";
 import { toRain, toSlices as googleSlices } from "../src/connectors/weather/google.ts";
 import { toSlices as openMeteoSlices } from "../src/connectors/weather/open-meteo.ts";
 
@@ -410,8 +398,8 @@ describe("Google (the docs' examples; checked live 2026-10-13)", () => {
     expect(r.rain?.segments).toHaveLength(10);
     expect(r.problem).toMatch(/minute forecast/);
     const readings = [{ source: g, reading: r }];
-    expect(weatherNow(readings, t0 + 15 * 60_000, 15).rain).toBeDefined();
-    expect(weatherNow(readings, t0 + 60 * 60_000, 15).rain).toBeUndefined(); // older than 15 + 15 min: dropped, not served
+    expect(mergeWeather(readings, t0 + 15 * 60_000, 15).rain).toBeDefined();
+    expect(mergeWeather(readings, t0 + 60 * 60_000, 15).rain).toBeUndefined(); // older than 15 + 15 min: dropped, not served
   });
 
   test("a rejected key stops the source", async () => {
@@ -474,14 +462,14 @@ const fake = (name: string, reading: Omit<SourceReading, "nextAt">, owns: Weathe
 });
 const meta = (source: string, modelled: boolean, iso: string) => ({ source, modelled, at: iso, fetchedAt: iso });
 
-describe("weatherNow", () => {
+describe("mergeWeather", () => {
   const bomNow = { ...meta("bom", false, "2026-10-13T09:10:00Z"), tempC: 16.4 };
   const omNow = { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), tempC: 16.3 };
   const omSky = { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), cloudPct: 100, hours: [] };
   const sources = [fake("bom", { now: bomNow }), fake("open-meteo", { now: omNow, sky: omSky })];
 
   test("each slice from the first source that has it, in preference order", () => {
-    const w = weatherNow(sources.map((source) => ({ source, reading: { now: source.name === "bom" ? bomNow : omNow, sky: source.name === "bom" ? undefined : omSky, nextAt: 0 } })), at);
+    const w = mergeWeather(sources.map((source) => ({ source, reading: { now: source.name === "bom" ? bomNow : omNow, sky: source.name === "bom" ? undefined : omSky, nextAt: 0 } })), at);
     expect(w.now?.source).toBe("bom");
     expect(w.sky?.source).toBe("open-meteo");
     expect(w.forecast).toBeUndefined();
@@ -489,7 +477,7 @@ describe("weatherNow", () => {
 
   test("a slice older than its source allows falls through to the next source", () => {
     const later = Date.parse("2026-10-13T10:30:00Z"); // 80 minutes: past the fake's hour plus one 15-minute poll
-    const w = weatherNow([{ source: sources[0]!, reading: { now: bomNow, nextAt: 0 } }, { source: sources[1]!, reading: { now: { ...omNow, at: "2026-10-13T10:00:00Z" }, nextAt: 0 } }], later);
+    const w = mergeWeather([{ source: sources[0]!, reading: { now: bomNow, nextAt: 0 } }, { source: sources[1]!, reading: { now: { ...omNow, at: "2026-10-13T10:00:00Z" }, nextAt: 0 } }], later);
     expect(w.now).toMatchObject({ source: "open-meteo", modelled: true });
   });
 });

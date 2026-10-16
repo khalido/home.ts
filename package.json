@@ -71,12 +71,8 @@
       "import": "./dist/connectors/cast/serve.js"
     },
     "./finders": {
-      "types": "./dist/finders.d.ts",
-      "import": "./dist/finders.js"
-    },
-    "./config": {
-      "types": "./dist/config.d.ts",
-      "import": "./dist/config.js"
+      "types": "./dist/finders-entry.d.ts",
+      "import": "./dist/finders-entry.js"
     }
   },
   "bin": {

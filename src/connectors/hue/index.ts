@@ -8,10 +8,9 @@ import { hueEvents, isRejectedKey } from "./events.ts";
 import type { HueEvent } from "./schemas.ts";
 import { groups, type HueSnapshot, lights, reduce, snapshotFrom } from "./state.ts";
 
-export * from "./client.ts";
-export * from "./events.ts";
-export * from "./schemas.ts";
-export * from "./state.ts";
+export { bunPinnedFetch, type HueClient, HueError, type HueOptions, hueClient, pair } from "./client.ts";
+export type { HueEvent, Resource } from "./schemas.ts";
+export { type GroupView, groups, type HueSnapshot, homeGroupedLightId, type LightView, lights, scenes } from "./state.ts";
 
 /** A Hue bridge in a home config: what it takes to reach it. Its model and software come live into the snapshot. */
 export const configSchema = z.looseObject({

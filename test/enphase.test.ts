@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createHome, type Clock } from "../src/index.ts";
-import { daysLeft, enphase, enphaseClient, fromReadings, gatewayHost, mintToken, POLL_MS, tokenExpiry, toState } from "../src/connectors/enphase/index.ts";
+import { enphase, enphaseClient, mintToken, POLL_MS, tokenExpiry } from "../src/connectors/enphase/index.ts";
+import { daysLeft } from "../src/connectors/enphase/client.ts";
+import { fromReadings, gatewayHost, toState } from "../src/connectors/enphase/client.ts";
 
 // Gateway replies recorded by pyenphase (MIT, github.com/pyenphase/pyenphase, tests/fixtures):
 // ct-* from software 8.3.5167 with production and consumption meters, noct-* from 8.2.4264 metered without CTs.

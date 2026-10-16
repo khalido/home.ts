@@ -9,10 +9,9 @@ import { CastPayload, KNOWN_TYPES } from "./schemas.ts";
 import { type CastDevice, type CastSnapshot, castKey, connection, found, mediaApp, reduce, type Resolved } from "./state.ts";
 import { type CastActions, castActions, type CastSession, type Listener, type RawPayload, type ServeClip } from "./writes.ts";
 
-export * from "./codec.ts";
-export * from "./schemas.ts";
-export * from "./state.ts";
-export * from "./writes.ts";
+export type { CastConnect } from "./codec.ts";
+export type { CastDevice, CastSnapshot, Resolved } from "./state.ts";
+export type { AnnounceResult, CastActions, CastClip, ServeClip } from "./writes.ts";
 
 /** A Cast device or speaker group in a home config. No host: a group's moves with its leader, so every address comes from discovery. */
 export const configSchema = z.looseObject({

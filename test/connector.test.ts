@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { asOf, ConnectorError, fetchTimeout, getJson } from "../src/index.ts";
+import { asOf, ConnectorError } from "../src/index.ts";
+import { fetchTimeout, getJson } from "../src/connector.ts";
 import { AmberError } from "../src/connectors/amber/index.ts";
 import { manualClock } from "./clock.ts";
 

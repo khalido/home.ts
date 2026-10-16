@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
 import { manualClock } from "./clock.ts";
-import { cast, type CastChannel, type CastConnect, type CastMessage, type CastSnapshot, NS, type Resolved } from "../src/connectors/cast/index.ts";
+import { cast, type CastConnect, type CastSnapshot } from "../src/connectors/cast/index.ts";
+import { type CastChannel, type CastMessage, NS } from "../src/connectors/cast/codec.ts";
+import { type Resolved } from "../src/connectors/cast/state.ts";
 import { serveClip } from "../src/connectors/cast/serve.ts";
 
 // Writes on a scripted fake: every device answers as the live ones do for reads (docs/cast.md), and LAUNCH, LOAD,

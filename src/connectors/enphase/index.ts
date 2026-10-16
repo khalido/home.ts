@@ -6,13 +6,12 @@ import { kw, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { daysLeft, enphaseClient, EnphaseError, type EnphaseState, gatewayHost, tokenExpiry } from "./client.ts";
 
-export * from "./client.ts";
-export * from "./schemas.ts";
+export { bunGatewayFetch, EnphaseError, type EnphaseOptions, type EnphaseState, enphaseClient, mintToken, tokenExpiry } from "./client.ts";
 
 /** Poll every 60 s, as Home Assistant's enphase_envoy does. */
 export const POLL_MS = 60_000;
 /** Warn when the token has fewer days left than this (Home Assistant's threshold). */
-export const TOKEN_WARN_DAYS = 30;
+const TOKEN_WARN_DAYS = 30;
 
 /** An IQ Gateway in a home config: its last known address, its serial (its identity), and the owner token's file. */
 export const configSchema = z.looseObject({

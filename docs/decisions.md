@@ -102,3 +102,10 @@ KO's decisions on this package, newest block last. They override every other doc
 
 - **Rain soon from Google's minute forecast, two hours.** A `rain` slice on the weather connector, owned by Google alone, kept to 2 hours of 15-minute segments. `rainSoon` is the one function that says when rain starts and ends. Google's floor drops from 30 to 15 minutes; current conditions stay at 30 inside that read. The endpoint is Experimental, so its failure never stops the other slices. The hourly rain chance as a fallback, an `hourly` slice and one condition word come next, not now.
 - **Calendar later, Google first.** A calendar connector reads Google Calendar; an ICS source (laggy) can come too. Google is not one connector: Weather and Calendar share a name only, and a shared Google helper comes when a third service needs it. The calendar waits. Design and open calls: `docs/google.md`.
+
+# 2026-10-16
+
+- **Going public: one squashed commit, a private repo first.** `khalido/home.ts` starts private with `main` as one commit under the GitHub noreply address; KO flips it public after a look. The history before it stays local.
+- **Every export is named.** No `export *` anywhere: each entry point lists what it offers, and `test/exports.test.ts` fails when that list changes. The root drops `fetchTimeout`, `getJson`, `TIMEOUT_MS`, `MANIFESTS` and `manifestOf` (internals and CLI concerns); connectors drop their codecs, schemas, parsers and event streams. Done before npm, while no one imports it.
+- **`weatherNow` is now `mergeWeather`**: it merges source readings into every slice, and the type `WeatherNow` is only the now slice. The old name does not come back with another meaning.
+- **Up Bank's token works from the repo's `.env`.** A session whose environment holds an older `UP_TOKEN` wins over `.env` in Bun; unset it for live reads.

@@ -8,10 +8,7 @@ import { getPrinterAttributes, printerUrl } from "./client.ts";
 import { attributesOf } from "./codec.ts";
 import { type Printer, printerKey, printerText, type PrintersState, type Reading, toState } from "./state.ts";
 
-export * from "./client.ts";
-export * from "./codec.ts";
-export { printersFound } from "./found.ts";
-export * from "./state.ts";
+export { type Marker, type Printer, type PrintersState, type PrinterStatus, printerText } from "./state.ts";
 
 /** One printer in a home config. Everything the printer reports about itself (model, markers, state) comes live; `host` and `port` are only where it last answered. */
 export const configSchema = z.looseObject({
@@ -41,7 +38,7 @@ export type PrintersConfig = {
 
 export const POLL_MS = 120_000;
 /** A printer unreachable this many days gets a note in `anomaly`, unless its config says otherwise. */
-export const OFFLINE_DAYS = 14;
+const OFFLINE_DAYS = 14;
 
 /** What the integration knows about one printer between polls. */
 type Target = {

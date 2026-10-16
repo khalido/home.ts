@@ -4,20 +4,36 @@ import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { openMeteo } from "./open-meteo.ts";
 import { type RainSoon, rainSoon } from "./rain.ts";
-import { DEFAULT_POLL_MINUTES, type ForecastDay, RAIN_HORIZON_MINUTES, type Slices, sourcePollMinutes, type SourceReading, weatherNow, type WeatherSource } from "./source.ts";
+import { DEFAULT_POLL_MINUTES, type ForecastDay, RAIN_HORIZON_MINUTES, type Slices, sourcePollMinutes, type SourceReading, mergeWeather, type WeatherSource } from "./source.ts";
 import { type SunNow, sunNow } from "./sun.ts";
 
-export * from "./source.ts";
-export * from "./sun.ts";
-export * from "./rain.ts";
-export { bom, type BomOptions, distanceKm, FTP_BASE, toForecast, toNow } from "./bom.ts";
+export {
+  type ForecastDay,
+  mergeWeather,
+  nextPoll,
+  type Place,
+  type RainSegment,
+  type ReadRequest,
+  type SkyHour,
+  type SliceMeta,
+  type Slices,
+  type SourceReading,
+  type WeatherForecast,
+  type WeatherNow,
+  type WeatherRain,
+  type WeatherSky,
+  type WeatherSource,
+} from "./source.ts";
+export { type SunNext, type SunNow, sunNow } from "./sun.ts";
+export { type RainSoon, rainSoon } from "./rain.ts";
+export { bom, type BomOptions } from "./bom.ts";
 export { openMeteo, type OpenMeteoOptions } from "./open-meteo.ts";
 export { google, type GoogleOptions } from "./google.ts";
 
 /** The sun moves about a degree every four minutes; recompute it this often between source reads. */
-export const SUN_MS = 5 * 60_000;
+const SUN_MS = 5 * 60_000;
 /** However soon a source asks to be called again, never sooner than this. */
-export const MIN_POLL_MS = 60_000;
+const MIN_POLL_MS = 60_000;
 
 /**
  * Where the home is, and the sources in preference order: each slice comes from the first source with a fresh one.
@@ -55,7 +71,7 @@ export function weather(config: WeatherConfig): Integration<WeatherState> {
     async run(signal, update) {
       const emit = () => {
         const at = clock.now();
-        const slices = weatherNow(sources.map((source) => ({ source, reading: readings.get(source.name) })), at, pollMinutes);
+        const slices = mergeWeather(sources.map((source) => ({ source, reading: readings.get(source.name) })), at, pollMinutes);
         const report = Object.fromEntries(
           sources.map((s) => {
             const r = readings.get(s.name);

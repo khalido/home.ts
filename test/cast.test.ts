@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
 import { manualClock } from "./clock.ts";
-import {
-  cast, type CastChannel, type CastConnect, type CastMessage, CastPayload, type CastSnapshot, castKey, connection, decode, encode, found, framer, NS, reduce, type Resolved,
-} from "../src/connectors/cast/index.ts";
+import { cast, type CastConnect, type CastSnapshot } from "../src/connectors/cast/index.ts";
+import { type CastChannel, type CastMessage, decode, encode, framer, NS } from "../src/connectors/cast/codec.ts";
+import { CastPayload } from "../src/connectors/cast/schemas.ts";
+import { castKey, connection, found, reduce, type Resolved } from "../src/connectors/cast/state.ts";
 
 // Recorded from seven live devices (2026-10-13, Bun 1.4.2, read-only), ids, names, ports and sessions replaced.
 const dir = new URL("./fixtures/cast/", import.meta.url);

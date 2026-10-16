@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createHome, type Clock } from "../src/index.ts";
-import { daikin, daikinClient, hexLE, POLL_MS, setFan, setMode, setPower, setTarget, toState, type WriteRequest } from "../src/connectors/daikin/index.ts";
+import { daikin, daikinClient, POLL_MS, setFan, setMode, setPower, setTarget, type WriteRequest } from "../src/connectors/daikin/index.ts";
+import { hexLE, toState } from "../src/connectors/daikin/client.ts";
 
 // KO's unit, one read-only multireq on 2026-10-13 (adr_0100, adr_0200, adp_i); MAC, SSID, edid and the unit's ids removed.
 const status = JSON.parse(await Bun.file(new URL("./fixtures/daikin/status.json", import.meta.url)).text());

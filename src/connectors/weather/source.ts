@@ -1,6 +1,6 @@
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
 
-// The one place a weather provider plugs in: a `WeatherSource` returns slices, and `weatherNow` picks one per slice.
+// The one place a weather provider plugs in: a `WeatherSource` returns slices, and `mergeWeather` picks one per slice.
 
 /** Sent on every request, so each service can see who is calling rather than a runtime's default string. */
 export const USER_AGENT = "home (+https://github.com/khalido/home)";
@@ -96,7 +96,7 @@ export const HOURLY_MINUTES = 60;
  * One owner for which source fills each slice, so the integration and `home status` show the same thing.
  * `readings` are in preference order; a slice older than its source's `owns` age plus one polling interval falls through.
  */
-export function weatherNow(readings: { source: WeatherSource; reading?: SourceReading }[], at: number, pollMinutes = DEFAULT_POLL_MINUTES): Slices {
+export function mergeWeather(readings: { source: WeatherSource; reading?: SourceReading }[], at: number, pollMinutes = DEFAULT_POLL_MINUTES): Slices {
   const pick = <K extends SliceName>(name: K): Slices[K] => {
     for (const { source, reading } of readings) {
       const slice = reading?.[name];

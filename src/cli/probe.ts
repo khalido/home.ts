@@ -2,9 +2,10 @@
 // /info, each Cast device's status, each printer's status, each weather source.
 import { type CastSnapshot, castDevices } from "../connectors/cast/index.ts";
 import { type PrintersState, printerList } from "../connectors/printers/index.ts";
-import { gatewayHost } from "../connectors/enphase/index.ts";
+import { gatewayHost } from "../connectors/enphase/client.ts";
 import { bunPinnedFetch } from "../connectors/hue/index.ts";
-import { DEFAULT_POLL_MINUTES, sourcePollMinutes, type WeatherSource } from "../connectors/weather/index.ts";
+import { type WeatherSource } from "../connectors/weather/index.ts";
+import { DEFAULT_POLL_MINUTES, sourcePollMinutes } from "../connectors/weather/source.ts";
 import { checkHome } from "../config.ts";
 import { daikinFields, findDaikins } from "../finders.ts";
 import { castNow } from "./cast.ts";

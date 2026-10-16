@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createHome, type Clock, type HomeSnapshot, type Integration, type Part } from "../src/index.ts";
-import {
-  groups, homeGroupedLightId, hue, hueClient, HueError, hueEvents, IDLE_MS, lights, pair, parseSse, reduce, Resource, scenes,
-  snapshotFrom, type HueSnapshot,
-} from "../src/connectors/hue/index.ts";
+import { groups, homeGroupedLightId, hue, hueClient, HueError, lights, pair, scenes, type HueSnapshot } from "../src/connectors/hue/index.ts";
+import { hueEvents, IDLE_MS, parseSse } from "../src/connectors/hue/events.ts";
+import { reduce, snapshotFrom } from "../src/connectors/hue/state.ts";
+import { Resource } from "../src/connectors/hue/schemas.ts";
 import { manualClock } from "./clock.ts";
 
 // Fixtures follow the shapes in openhue-api's spec and its event-stream example; ids are made up.

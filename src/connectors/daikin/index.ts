@@ -6,7 +6,7 @@ import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { daikinClient, DaikinError, type DaikinState } from "./client.ts";
 
-export * from "./client.ts";
+export { DaikinError, type DaikinState, daikinClient, type Fan, type Mode, setFan, setMode, setPower, setTarget, type WriteRequest } from "./client.ts";
 
 /** Poll every 120 s, as Home Assistant's daikin integration does (its coordinator's update_interval). */
 export const POLL_MS = 120_000;

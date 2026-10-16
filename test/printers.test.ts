@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { checkHome, loadHome } from "../src/config.ts";
 import { applyFound, DISCOVERY_GAP_MS, type Found, matchFound } from "../src/discover.ts";
 import { type Clock, type Part } from "../src/index.ts";
-import {
-  attributesOf, decodeMessage, encodeMessage, getPrinterAttributes, getPrinterAttributesRequest, type IppMessage, manifest, mediaName, type Printer, printers, printersFound, type PrintersState,
-  printerKey, printerUrl, REQUESTED, TAG, toState,
-} from "../src/connectors/printers/index.ts";
+import { manifest, type Printer, printers, type PrintersState } from "../src/connectors/printers/index.ts";
+import { attributesOf, decodeMessage, encodeMessage, getPrinterAttributesRequest, type IppMessage, TAG } from "../src/connectors/printers/codec.ts";
+import { getPrinterAttributes, printerUrl, REQUESTED } from "../src/connectors/printers/client.ts";
+import { mediaName, printerKey, toState } from "../src/connectors/printers/state.ts";
+import { printersFound } from "../src/connectors/printers/found.ts";
 import { parseResolve } from "../src/discover.ts";
 import { manualClock } from "./clock.ts";
 

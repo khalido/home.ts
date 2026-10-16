@@ -1,6 +1,7 @@
 // `home enphase login`: mint the owner token once a year and keep it owner-only.
 import { readFileSync } from "node:fs";
-import { bunGatewayFetch, daysLeft, enphase, mintToken, tokenExpiry } from "../connectors/enphase/index.ts";
+import { bunGatewayFetch, enphase, mintToken, tokenExpiry } from "../connectors/enphase/index.ts";
+import { daysLeft } from "../connectors/enphase/client.ts";
 import { writePrivate } from "../finders.ts";
 import { env, fail, TOKEN_FILE, type Verbs } from "./context.ts";
 

@@ -1,7 +1,8 @@
 // `home lights off`, `home room`, `home scene`, `home pair` (also as `home hue <verb>`): one write to the bridge each.
 import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { bunPinnedFetch, groups, homeGroupedLightId, hue, hueClient, pair, scenes, snapshotFrom } from "../connectors/hue/index.ts";
+import { bunPinnedFetch, groups, homeGroupedLightId, hue, hueClient, pair, scenes } from "../connectors/hue/index.ts";
+import { snapshotFrom } from "../connectors/hue/state.ts";
 import { FINDERS } from "../finders.ts";
 import { die, env, fail, type Verbs } from "./context.ts";
 

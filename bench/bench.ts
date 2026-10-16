@@ -1,6 +1,10 @@
 // Performance of the parts that need no bridge. `bun run bench`; numbers go in the README with the Bun version.
 import { bench, run, summary } from "mitata";
-import { parseSse, reduce, Resource, snapshotFrom, groups, writeQueue, type HueEvent } from "../src/connectors/hue/index.ts";
+import { groups } from "../src/connectors/hue/index.ts";
+import { parseSse } from "../src/connectors/hue/events.ts";
+import { reduce, snapshotFrom } from "../src/connectors/hue/state.ts";
+import { Resource, type HueEvent } from "../src/connectors/hue/schemas.ts";
+import { writeQueue } from "../src/connectors/hue/client.ts";
 
 const resources = Resource.array().parse(JSON.parse(await Bun.file(new URL("../test/fixtures/resources.json", import.meta.url)).text()).data);
 const start = snapshotFrom(resources, "t");

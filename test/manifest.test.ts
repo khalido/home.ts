@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { manifest as amber, toPrices } from "../src/connectors/amber/index.ts";
+import { manifest as amber } from "../src/connectors/amber/index.ts";
+import { toPrices } from "../src/connectors/amber/client.ts";
 import { manifest as cast, type CastSnapshot } from "../src/connectors/cast/index.ts";
-import { manifest as daikin, toState } from "../src/connectors/daikin/index.ts";
+import { manifest as daikin } from "../src/connectors/daikin/index.ts";
+import { toState } from "../src/connectors/daikin/client.ts";
 import { manifest as enphase, type EnphaseSnapshot } from "../src/connectors/enphase/index.ts";
-import { manifest as hue, Resource, snapshotFrom } from "../src/connectors/hue/index.ts";
+import { manifest as hue } from "../src/connectors/hue/index.ts";
+import { Resource } from "../src/connectors/hue/schemas.ts";
+import { snapshotFrom } from "../src/connectors/hue/state.ts";
 import { manifest as weather, sunNow, type WeatherState } from "../src/connectors/weather/index.ts";
 import { MANIFESTS } from "../src/manifests.ts";
 import { envExampleText } from "../scripts/gen.ts";
