@@ -49,7 +49,7 @@ describe("schema", () => {
 
   test("an unknown connector is refused, naming the field", () => {
     const bad = { ...example, devices: [{ id: "tv", connector: "sonos", host: "192.0.2.9" }] };
-    expect(checkPlan(bad).problems).toEqual(["devices[0] (tv).connector: Invalid discriminator value. Expected 'hue' | 'daikin' | 'enphase' | 'amber' | 'cast' | 'printers'"]);
+    expect(checkPlan(bad).problems).toEqual(["devices[0] (tv).connector: Invalid discriminator value. Expected 'hue' | 'daikin' | 'enphase' | 'amber' | 'up' | 'cast' | 'printers'"]);
   });
 
   test("a pasted secret is refused: keys are env names", () => {

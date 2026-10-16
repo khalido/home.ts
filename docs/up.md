@@ -1,6 +1,6 @@
 # Up Bank: the money connector
 
-Proposed 2026-10-14 from two Sonnet research passes over [Up's API](https://developer.up.com.au/), its [OpenAPI spec](https://github.com/up-banking/api/blob/master/v1/openapi.json), [fane-ye/up-bank-mcp](https://github.com/fane-ye/up-bank-mcp), [xaviershay/up-finance-skills](https://github.com/xaviershay/up-finance-skills) and [edkranz/up-mcp](https://github.com/edkranz/up-mcp). Not built; KO decides. Anything marked **unconfirmed** needs one live read to settle.
+Proposed 2026-10-14 from two Sonnet research passes over [Up's API](https://developer.up.com.au/), its [OpenAPI spec](https://github.com/up-banking/api/blob/master/v1/openapi.json), [fane-ye/up-bank-mcp](https://github.com/fane-ye/up-bank-mcp), [xaviershay/up-finance-skills](https://github.com/xaviershay/up-finance-skills) and [edkranz/up-mcp](https://github.com/edkranz/up-mcp). Built 2026-10-16 as `src/connectors/up/`; its README says what the live read found and what is still unverified. This page stays as the design.
 
 **Short answer.** A connector like the others: `src/connectors/up/`, `iot_class` cloud_polling every 15 minutes, one token (`UP_TOKEN`) over `fetch`, zod schemas, about 150 lines plus pure helpers. It reads; the two writes Up allows (category, tags) are methods on the object and explicit `home up` verbs, never called by the integration, the same gate as Cast. No MCP: an agent drives it through the library or the CLI, which already exist.
 

@@ -1,6 +1,6 @@
 # @khalido/home
 
-My house as a TypeScript import. Philips Hue, a Daikin AC, Enphase solar and the Google Cast speakers and screens and AirPrint printers on the local network, Amber Electric's live prices and the weather from the cloud. One small library plus a `home` command, used by a Mac launcher (Bun) and a Telegram bot (Node).
+My house as a TypeScript import. Philips Hue, a Daikin AC, Enphase solar and the Google Cast speakers and screens and AirPrint printers on the local network, Amber Electric's live prices, Up Bank's spending and the weather from the cloud. One small library plus a `home` command, used by a Mac launcher (Bun) and a Telegram bot (Node).
 
 ```ts
 import { createHome } from "@khalido/home";
@@ -31,6 +31,7 @@ flowchart LR
   end
   subgraph net [Internet]
     AM[Amber Electric]
+    UB[Up Bank]
     WX[BOM, Open-Meteo, Google]
   end
   J --> lan
@@ -68,6 +69,7 @@ skills/         draw-home: an agent draws your home as an SVG
 | `cast` | every Cast device and speaker group over its own socket (`local_push`) | volume, mute, stop, announcements; tested on a fake socket only | [cast](src/connectors/cast/README.md) |
 | `printers` | AirPrint printers over IPP every 120 s: state, toner, paper, last seen (`local_polling`) | none; untried on a live printer | [printers](src/connectors/printers/README.md) |
 | `amber` | live import and feed-in prices every 60 s (`cloud_polling`) | none | [amber](src/connectors/amber/README.md) |
+| `up` | two months of spending by Up's categories, top merchants, what needs a category, every 15 min (`cloud_polling`) | a category or a tag on one transaction, webhooks; only as `home up` verbs, untried | [up](src/connectors/up/README.md) |
 | `weather` | now, forecast, sky and the sun from BOM, Open-Meteo and Google every 15 min (`cloud_polling`) | none | [weather](src/connectors/weather/README.md) |
 
 `energyNow` combines Enphase and Amber into cost or earnings per hour and the grid flow. Each connector exports a factory returning an `Integration` (`src/home.ts`): a name and a `run(signal, update)` that keeps its state current. `createHome` runs them side by side; one failing marks itself `unavailable` and the rest carry on. To add one, follow [AGENTS.md](AGENTS.md).

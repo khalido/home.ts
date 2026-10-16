@@ -46,6 +46,10 @@
       "types": "./dist/connectors/amber/index.d.ts",
       "import": "./dist/connectors/amber/index.js"
     },
+    "./up": {
+      "types": "./dist/connectors/up/index.d.ts",
+      "import": "./dist/connectors/up/index.js"
+    },
     "./weather": {
       "types": "./dist/connectors/weather/index.d.ts",
       "import": "./dist/connectors/weather/index.js"

@@ -17,6 +17,7 @@ import { printersNow } from "./printers.ts";
 import { addresses, configPathOf, env, fail, fromConfig, type Options, printJson, readConfig, settle, TOKEN_FILE } from "./context.ts";
 import { enphaseFromEnv } from "./enphase.ts";
 import { hueFromEnv } from "./hue.ts";
+import { upFromEnv } from "./up.ts";
 
 /** One connector's row: its part, or "not set up" with the env names (and steps) it still needs. */
 type Row = Omit<Part, "status"> & { status: Status | "not set up"; needs: string[] };
@@ -44,6 +45,7 @@ const FROM_ENV: Record<string, { needs?: () => string[]; build: () => Integratio
   daikin: { build: () => daikin({ host: env.DAIKIN_HOST!, fetch }) },
   enphase: { needs: () => (existsSync(TOKEN_FILE) ? [] : ["`home enphase login`"]), build: enphaseFromEnv },
   amber: { build: () => amber({ key: env.AMBER_KEY!, siteId: env.AMBER_SITE_ID, fetch }) },
+  up: { build: upFromEnv },
   weather: { build: () => weather({ ...place(), sources: weatherSources() }) },
   cast: { build: castNow },
   printers: { build: printersNow },

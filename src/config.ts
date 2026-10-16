@@ -10,6 +10,7 @@ import type { Integration } from "./home.ts";
 import { envName, filePath } from "./home.ts";
 import { hue, configSchema as hueDevice } from "./connectors/hue/index.ts";
 import { printers, configSchema as printersDevice } from "./connectors/printers/index.ts";
+import { up, configSchema as upDevice } from "./connectors/up/index.ts";
 import { manifestOf } from "./manifests.ts";
 import { bom, google, openMeteo, weather, type WeatherSource } from "./connectors/weather/index.ts";
 
@@ -41,6 +42,7 @@ export const Device = z.discriminatedUnion("connector", [
   daikinDevice.extend(placed),
   enphaseDevice.extend(placed),
   amberDevice.extend(placed),
+  upDevice.extend(placed),
   castDevice.extend({ id: placed.id, room: placed.room }), // its name is required: the Google Home name
   printersDevice.extend({ id: placed.id, room: placed.room }), // likewise: the printer's own name
 ]);
@@ -226,6 +228,8 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
       }
       case "amber":
         return amber({ key: env(d.key), siteId: d.siteId, fetch: net });
+      case "up":
+        return up({ token: env(d.key), account: d.account, fetch: net, timeZone: config!.location?.timezone });
     }
   }
   function castAll(): Integration<any> {
