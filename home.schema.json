@@ -267,6 +267,58 @@
             "properties": {
               "connector": {
                 "type": "string",
+                "const": "up"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                "description": "env name holding the Up personal access token"
+              },
+              "account": {
+                "description": "which accounts to read, by type and ownership; every account when left out",
+                "type": "object",
+                "properties": {
+                  "accountType": {
+                    "type": "string",
+                    "enum": [
+                      "TRANSACTIONAL",
+                      "SAVER",
+                      "HOME_LOAN"
+                    ]
+                  },
+                  "ownershipType": {
+                    "type": "string",
+                    "enum": [
+                      "INDIVIDUAL",
+                      "JOINT"
+                    ]
+                  }
+                }
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "key",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
                 "const": "cast"
               },
               "name": {

@@ -12,6 +12,7 @@ import { hueVerbs } from "./hue.ts";
 import { locate } from "./locate.ts";
 import { probe } from "./probe.ts";
 import { status } from "./status.ts";
+import { UP_OPTIONS, UP_USAGE, upVerbs } from "./up.ts";
 
 const HUE_HELP: Record<string, string> = {
   lights: "lights off: one write to the whole-home group",
@@ -25,6 +26,7 @@ const VERBS: Record<string, { verbs: Verbs; usage: string; options?: [string, st
   hue: { verbs: hueVerbs, usage: `usage: home hue ${Object.values(HUE_HELP).map((h) => h.split(":")[0]).join(" | ")}` },
   enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
   cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
+  up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
 };
 
 const cli = cac("home");

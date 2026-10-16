@@ -16,6 +16,7 @@ const PUBLIC: Record<string, string[]> = {
   "./cast/tls": ["tlsConnect"],
   "./cast/serve": ["SERVE_MS", "lanAddress", "serveClip"],
   "./finders": ["FINDERS", "fileCache"],
+  "./up": ["POLL_MS", "SIGNATURE_HEADER", "UpError", "categoryLines", "configSchema", "dollars", "isSpend", "manifest", "merchantKey", "notSpend", "parseWebhookEvent", "readTransactions", "recurring", "spendByCategory", "spendByMerchant", "toSnapshot", "uncategorised", "unusual", "up", "upClient", "upText", "verifyWebhook"],
 };
 
 describe("exports", () => {
