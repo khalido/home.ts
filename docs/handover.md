@@ -16,6 +16,7 @@
 
 ## Waiting on KO
 
+- **Hue pairing** (KO, 2026-10-17): press the bridge button, `home pair`, put the three lines in `.env`; then set `HUE_CA_FILE` to Signify's root CA (`src/connectors/hue/README.md`) and run `home hue` read-only. Its rooms feed the house definition (`draw-home` from the floor plan PDF, into `private/`). Chota copies the same env lines plus the CA file; on the Pi set `HUE_BRIDGE_HOST`, since mDNS discovery is macOS-only for now.
 - **Matter**: waits for a first device (a TIMMERFLOTTE). Plan in `docs/matter.md`. Recording home events is in `docs/ideas.md` for later, in chota.
 - **Fans**: pair the Martec Fresno in Smart Life. Then extract its local key (a Tuya IoT developer account, once) and build a `tuya` connector, `local_push`. The Claro Whisper fans need Claro's SMART Connect module (check the model and purchase date first) or an RF bridge.
 - **First Up write**: `home up categorise <id> <category>` on one transaction; the next purchase from that merchant answers whether Up learns from an API category.
