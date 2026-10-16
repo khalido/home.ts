@@ -4,6 +4,7 @@ import type { Clock, Part } from "../src/index.ts";
 import { loadHome } from "../src/index.ts";
 import {
   dollars,
+  type Household,
   isSpend,
   manifest,
   merchantKey,
@@ -225,10 +226,10 @@ describe("the integration", () => {
     resource({ id: "sep1", amount: -4000, createdAt: "2026-09-12T09:00:00+10:00", category: "utilities", parent: "home" }),
     resource({ id: "aug1", amount: -100000, createdAt: "2026-08-20T09:00:00+10:00", category: "groceries", parent: "home" }),
   ];
-  function run(routes: Parameters<typeof fakeUp>[0], account?: { accountType?: "TRANSACTIONAL"; ownershipType?: "JOINT" }) {
+  function run(routes: Parameters<typeof fakeUp>[0], account?: { accountType?: "TRANSACTIONAL"; ownershipType?: "JOINT" }, household?: Household) {
     const clock: Clock = { now: () => NOW, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
     const { f, calls } = fakeUp(routes);
-    const integration = up({ token: "t", fetch: f, clock, account, timeZone: "Australia/Sydney" });
+    const integration = up({ token: "t", fetch: f, clock, account, household, timeZone: "Australia/Sydney" });
     const stop = new AbortController();
     const parts: Part<UpSnapshot>[] = [];
     const done = new Promise<void>((resolve) => void integration.run(stop.signal, (p) => (parts.push(p), stop.abort(), resolve())));
@@ -246,6 +247,22 @@ describe("the integration", () => {
     expect(Object.keys(s.recent[0]!).sort()).toEqual(["amountCents", "categoryId", "createdAt", "description", "id", "parentCategoryId", "status", "tags"]);
     expect(r.calls.find((c) => c.url.pathname.endsWith("/transactions"))!.url.searchParams.get("filter[since]")).toBe(new Date(NOW - 63 * 86_400_000).toISOString());
     expect(manifest.lines(r.parts[0]!)).toEqual(["Oct so far $69 · Sep $40 · 1 to categorise", "Home $60: groceries $60"]);
+  });
+
+  test("a household filter counts its categories and tags only; to categorise still looks at every purchase", async () => {
+    const mixed = [
+      ...txs,
+      resource({ id: "oct3", amount: -5000, createdAt: "2026-10-11T09:00:00+11:00", category: "booze", parent: "good-life" }),
+      resource({ id: "oct4", amount: -2000, createdAt: "2026-10-12T09:00:00+11:00", category: "booze", parent: "good-life", tags: ["home"] }),
+    ];
+    const r = run({ "GET /api/v1/categories": () => json(categoriesBody), "GET /api/v1/transactions": () => json({ data: mixed, links: { next: null } }) }, undefined, { categories: ["home", "nope"], tags: ["home"] });
+    await r.done;
+    const s = r.parts[0]!.state!;
+    expect(s.thisMonth).toMatchObject({ cents: 8000, count: 2 }); // groceries and the tagged one; not the untagged booze nor the uncategorised
+    expect(s.recent.map((t) => t.id).sort()).toEqual(["aug1", "oct1", "oct4", "sep1"]); // not oct2 (no category) nor oct3 (untagged booze)
+    expect(s.uncategorised).toEqual(["oct2"]);
+    expect(s.household).toEqual({ categories: ["home", "nope"], tags: ["home"] });
+    expect(r.parts[0]!.anomaly).toBe("household category nope is not an Up category");
   });
 
   test("an account filter reads only those accounts; none matching says so", async () => {

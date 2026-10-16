@@ -3,7 +3,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { writePrivate } from "../finders.ts";
-import { type AccountFilter, type Category, dollars, readTransactions, recurring, spendByCategory, spendByMerchant, type Transaction, type TransactionQuery, uncategorised, up, upClient } from "../connectors/up/index.ts";
+import { type AccountFilter, type Category, dollars, type Household, inHousehold, readTransactions, recurring, spendByCategory, spendByMerchant, type Transaction, type TransactionQuery, uncategorised, up, upClient } from "../connectors/up/index.ts";
 import { die, env, fail, type Options, printJson, text, type Verbs } from "./context.ts";
 
 export const UP_USAGE =
@@ -40,7 +40,14 @@ const token = () => env.UP_TOKEN ?? fail("set UP_TOKEN");
 const client = () => upClient({ token: token(), fetch });
 
 /** Up as an integration from UP_TOKEN and UP_ACCOUNT, for `home status`. */
-export const upFromEnv = () => up({ token: token(), account: accountFromEnv(), fetch });
+/** UP_HOUSEHOLD, e.g. "home groceries tag:home": category ids, and tags as tag:label. */
+export function householdFromEnv(): Household | undefined {
+  const words = env.UP_HOUSEHOLD?.split(/[\s,]+/).filter(Boolean);
+  if (!words?.length) return undefined;
+  return { categories: words.filter((w) => !w.startsWith("tag:")), tags: words.filter((w) => w.startsWith("tag:")).map((w) => w.slice(4)) };
+}
+
+export const upFromEnv = () => up({ token: token(), account: accountFromEnv(), household: householdFromEnv(), fetch });
 
 /** A date argument as ISO; "2026-10-01" is midnight in this machine's zone. */
 const iso = (v: string | undefined, name: string) => {
@@ -114,7 +121,8 @@ export const upVerbs: Verbs = {
     if (by !== "category" && by !== "merchant" && by !== "recurring") die(UP_USAGE);
     // Recurring needs three distinct months, so its default window is six.
     const window = { since: iso(text(o.since), "since") ?? daysAgo(by === "recurring" ? 180 : 30), until: iso(text(o.until), "until") };
-    const txs = await read({ ...window, status: "SETTLED", limit: 5000, pageCap: 60 });
+    const household = householdFromEnv();
+    const txs = (await read({ ...window, status: "SETTLED", limit: 5000, pageCap: 60 })).filter((t) => inHousehold(t, household));
     if (by === "merchant") {
       const list = spendByMerchant(txs);
       if (o.json) return printJson(list);

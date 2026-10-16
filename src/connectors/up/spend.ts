@@ -99,6 +99,20 @@ export function spendByMerchant(txs: Transaction[], window?: Window): MerchantSp
   return [...by.values()].sort((a, b) => b.cents - a.cents);
 }
 
+/** What the household shares: Up category ids (a parent takes in its children) and tag labels. */
+export type Household = { categories?: string[]; tags?: string[] };
+
+/** The one rule for what counts as the household's: a listed category or its parent, or a listed tag. Everything counts without a list. */
+export function inHousehold(t: Transaction, h: Household | undefined): boolean {
+  if (!h?.categories?.length && !h?.tags?.length) return true;
+  const byCategory = h.categories?.some((c) => c === t.categoryId || c === t.parentCategoryId) ?? false;
+  return byCategory || (t.tags?.some((tag) => h.tags?.includes(tag)) ?? false);
+}
+
+/** Household categories Up does not have, said in words: a typo would otherwise count nothing, silently. */
+export const unknownCategories = (h: Household | undefined, categories: Category[]) =>
+  (h?.categories ?? []).filter((c) => !categories.some((k) => k.id === c)).map((c) => `household category ${c} is not an Up category`);
+
 /** Spend Up lets you categorise that has no category yet. Money in (salary, a payment received) is categorisable too, but is not spend. */
 export const uncategorised = (txs: Transaction[]) => txs.filter((t) => t.isCategorizable && !t.categoryId && isSpend(t));
 

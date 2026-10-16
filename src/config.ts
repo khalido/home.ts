@@ -229,7 +229,7 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
       case "amber":
         return amber({ key: env(d.key), siteId: d.siteId, fetch: net });
       case "up":
-        return up({ token: env(d.key), account: d.account, fetch: net, timeZone: config!.location?.timezone });
+        return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone });
     }
   }
   function castAll(): Integration<any> {

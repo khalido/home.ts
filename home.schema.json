@@ -295,6 +295,24 @@
                   }
                 }
               },
+              "household": {
+                "description": "what counts as the household's: Up category ids (a parent takes in its children, e.g. home) and tag labels; everything when left out",
+                "type": "object",
+                "properties": {
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
               "id": {
                 "type": "string"
               },

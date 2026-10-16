@@ -4,12 +4,14 @@ import { envName, type Integration } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { type Category, type Transaction, type TransactionQuery, type UpClient, upClient, UpError } from "./client.ts";
-import { anomalies, dollars, isSpend, type MerchantSpend, type SpendSummary, spendByCategory, spendByMerchant, uncategorised } from "./spend.ts";
+import { anomalies, dollars, type Household, inHousehold, isSpend, type MerchantSpend, type SpendSummary, spendByCategory, spendByMerchant, uncategorised, unknownCategories } from "./spend.ts";
 
 export { type Account, type Category, type Transaction, type TransactionQuery, type UpClient, upClient, UpError, type Webhook, type WebhookLog } from "./client.ts";
 export {
   type CategorySpend,
   dollars,
+  type Household,
+  inHousehold,
   isSpend,
   merchantKey,
   type MerchantSpend,
@@ -41,9 +43,13 @@ export const configSchema = z.looseObject({
   connector: z.literal("up"),
   key: envName.describe("env name holding the Up personal access token"),
   account: AccountFilter.optional().describe("which accounts to read, by type and ownership; every account when left out"),
+  household: z
+    .object({ categories: z.array(z.string()).optional(), tags: z.array(z.string()).optional() })
+    .optional()
+    .describe("what counts as the household's: Up category ids (a parent takes in its children, e.g. home) and tag labels; everything when left out"),
 });
 
-export type UpConfig = { token: string; account?: AccountFilter; fetch: typeof fetch; clock?: Clock; timeZone?: string }; // timeZone: where a month starts (IANA), the runtime's by default
+export type UpConfig = { token: string; account?: AccountFilter; household?: Household; fetch: typeof fetch; clock?: Clock; timeZone?: string }; // timeZone: where a month starts (IANA), the runtime's by default
 
 /** One month's spend: Up's figures through `spendByCategory`, plus the top merchants. */
 export type MonthSpend = SpendSummary & { month: string; topMerchants: MerchantSpend[] }; // month: "2026-10" in the home's zone
@@ -58,6 +64,7 @@ export type UpSnapshot = {
   uncategorised: string[]; // ids of spend, both months, with no category yet
   recent: RecentTransaction[]; // the latest 20 purchases: movements between your own accounts would name them
   accounts: number; // how many accounts the filter matched; 0 without a filter (every account)
+  household?: Household; // what the totals and recent rows count; everything when absent
   truncated: boolean; // the read stopped at its page cap: totals are short
 };
 
@@ -81,21 +88,24 @@ const monthBefore = (month: string) => {
 };
 
 /** The snapshot from two months of transactions: pure, so tests and a consumer's own reads build the same thing. */
-export function toSnapshot(txs: Transaction[], categories: Category[], at: { now: number; asOf: string; timeZone?: string; accounts: number; truncated: boolean }): UpSnapshot {
+export function toSnapshot(txs: Transaction[], categories: Category[], at: { now: number; asOf: string; timeZone?: string; accounts: number; truncated: boolean; household?: Household }): UpSnapshot {
   const monthOf = monthIn(at.timeZone);
   const thisMonth = monthOf(at.now);
   const lastMonth = monthBefore(thisMonth);
-  const byMonth = Map.groupBy(txs, (t) => (t.createdAt === undefined ? "" : monthOf(Date.parse(t.createdAt))));
+  const shared = txs.filter((t) => inHousehold(t, at.household));
+  const byMonth = Map.groupBy(shared, (t) => (t.createdAt === undefined ? "" : monthOf(Date.parse(t.createdAt))));
   const of = (month: string) => byMonth.get(month) ?? [];
   const month = (m: string): MonthSpend => ({ month: m, ...spendByCategory(of(m), categories), topMerchants: spendByMerchant(of(m)).slice(0, 5) });
-  const both = [...of(thisMonth), ...of(lastMonth)];
+  // To categorise looks at every purchase in the accounts: a category is how one joins the household.
+  const both = txs.filter((t) => t.createdAt !== undefined && [thisMonth, lastMonth].includes(monthOf(Date.parse(t.createdAt))));
   return {
     asOf: at.asOf,
     thisMonth: month(thisMonth),
     lastMonth: month(lastMonth),
     uncategorised: uncategorised(both).map((t) => t.id),
-    recent: txs.filter(isSpend).slice(0, 20).map(({ id, createdAt, description, amountCents, categoryId, parentCategoryId, status, tags }) => ({ id, createdAt, description, amountCents, categoryId, parentCategoryId, status, tags })),
+    recent: shared.filter(isSpend).slice(0, 20).map(({ id, createdAt, description, amountCents, categoryId, parentCategoryId, status, tags }) => ({ id, createdAt, description, amountCents, categoryId, parentCategoryId, status, tags })),
     accounts: at.accounts,
+    household: at.household,
     truncated: at.truncated,
   };
 }
@@ -117,8 +127,8 @@ export function up(config: UpConfig): Integration<UpSnapshot> {
           const since = new Date(now - 63 * 86_400_000).toISOString();
           const categories = await client.categories(signal);
           const read = await readTransactions(client, config.account, { since }, signal);
-          last = toSnapshot(read.transactions, categories, { now, asOf: asOf(clock), timeZone: config.timeZone, accounts: read.accounts, truncated: read.truncated });
-          const odd = [...anomalies(read.transactions), last.truncated ? "read stopped at its page cap; totals are short" : ""].filter(Boolean);
+          last = toSnapshot(read.transactions, categories, { now, asOf: asOf(clock), timeZone: config.timeZone, accounts: read.accounts, truncated: read.truncated, household: config.household });
+          const odd = [...anomalies(read.transactions), ...unknownCategories(config.household, categories), last.truncated ? "read stopped at its page cap; totals are short" : ""].filter(Boolean);
           update({ status: "connected", anomaly: odd.length ? odd.join("; ") : undefined, state: last });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
@@ -156,6 +166,7 @@ export const manifest: Manifest<UpSnapshot> = {
   env: [
     { name: "UP_TOKEN", example: "up:yeah:xxxxxxxx", what: "Up personal access token (api.up.com.au/getting_started)" },
     { name: "UP_ACCOUNT", example: "JOINT TRANSACTIONAL", optional: true, what: "which accounts count, by ownership and type; every account when unset" },
+    { name: "UP_HOUSEHOLD", example: "home tag:home", optional: true, what: "what counts as the household's: Up category ids and tag:labels; everything when unset" },
   ],
   lines: ({ state }) => (state ? [upText(state), ...categoryLines(state.thisMonth)] : []),
 };
