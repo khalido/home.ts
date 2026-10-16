@@ -1,0 +1,26 @@
+# draw-home: references
+
+Good drawing references to read before drawing a home, newest idea first. All are skills or kits for coding agents; read for craft, keep this skill's contract (`SKILL.md` section 3) where they disagree. Local clones live in `~/code/refs/`.
+
+| Reference | What it is | Use it for | Licence |
+|---|---|---|---|
+| [iso-glow](https://isoglow.dev/) (April Zhu; local `~/code/refs/iso-glow/iso-glow/`) | A skill that turns a description of an object, device or building into one HTML file: a fine-line isometric drawing where active parts glow and interactive parts respond, with optional orbitable 3D | A live home view: devices that glow when on, pulses when a reading lands; "Glow kit" and "Lessons" sections | MIT |
+| [Anatomy](https://skills.wheresryan.sh/anatomy) ([wheresryan22/anatomy](https://github.com/wheresryan22/anatomy); local `~/code/refs/anatomy/`) | Solid-figure isometric explanatory drawings, with an iso kit and six worked examples | An isometric cutaway of the house: craft rules, `kit/iso-kit.mjs` (in the Anatomy repo), `examples/desk-computer/` (in the Anatomy repo) | MIT |
+| [Hairline](https://github.com/lucasmarkes/hairline) (local `~/code/refs/hairline/`) | Line-sketch drawings with a small kernel and a validator | A light, hand-drawn plan style | MIT |
+| [ai-iso-skill](https://github.com/MrBongoC/ai-iso-skill) `iso-figure` (local `~/code/refs/ai-iso-skill/`) | Flat-faced isometric figures on a box, ~10 KB pages | The lightest isometric option | MIT |
+| [casa-serra](https://github.com/Sam1983Aing/casa-serra) (Sam1983Aing; live demo linked from the README, three.js + GSAP ScrollTrigger + Lenis, no build step) | "A flat floor plan that becomes a house as you scroll": the plan "is not a picture. It is the real 3D model, cut at 1.2 m and seen from straight above through a very long lens"; scrolling raises the cut so the walls rise, rooms stay a line drawing until the camera reaches them, geometry built in code, a still and a clip for weak devices | The strongest version of the "SVG with a camera" option (`SKILL.md`): one model in metres, the flat plan as the top view of it, zoom and orbit as a redraw. Added by KO 2026-10-13. | No licence file (checked 2026-10-13): approach only, never paste |
+| sfl-mes `device-drawing` (`~/code/sfl-mes/.claude/skills/device-drawing/`, private) | KO's skill for drawing one machine that moves with its live reading | Sources-first discipline, the live contract (no data, never clamp, fit the host), the review step | KO's |
+
+Default stays a flat plan (`examples/home.svg`): it is the fastest to draw, reads at card size, and is easy for an app to draw state on. Pick iso-glow or Anatomy when the home view is the point rather than a panel beside it.
+
+## The casa-serra starting prompt (the author's, for the camera option)
+
+The casa-serra author's own starting prompt, kept here because its last paragraph is the working method this skill also uses: propose before building, checkpoints with a recording, nothing finished that KO did not choose. Swap the brackets for the home.
+
+> I want to build a scroll-driven landing page for [a house]. The idea: the page opens on a flat floor plan, like a sheet an architect prints. Black ink on paper, room names, dimensions. Nothing looks 3D. When the visitor scrolls, the walls rise out of the drawing, the camera comes down to the front door and walks through [the rooms you want, in order] at eye height. Each room stays a line drawing until the camera gets there, then the real materials sweep across it.
+>
+> What I care about: the floor plan is not a picture. It is the real 3D model, cut at about 1.2 m and seen from straight above through a very long lens. The drawing and the building are the same thing. The camera travels deep into the space, room after room; it does not orbit the building from outside. It should feel like [your level of ambition]: big rooms, real furniture, late afternoon light. three.js, GSAP ScrollTrigger and Lenis, plain files, no build step. Free CC0 materials for the textures.
+>
+> Before you write any code, propose the layout of the building with sizes I can picture, and the camera path stop by stop. Give me two or three directions to choose from and wait for my answer. Then build in checkpoints. First checkpoint only: the plan sheet, the walls rising, and the walk to the first room. Record it and show me before you go further.
+
+For a home with live state, the plan sheet is `plan.svg` from the config and the walk's stops are the rooms with devices; the camera option in `SKILL.md` says how the state is drawn at each stop.

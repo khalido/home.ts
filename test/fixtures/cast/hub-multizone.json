@@ -1,0 +1,18 @@
+{
+  "requestId": 2,
+  "status": {
+    "devices": [
+      {
+        "capabilities": 229381,
+        "deviceId": "00000000-0000-4000-8000-000000000005",
+        "name": "Nest Hub",
+        "volume": {
+          "level": 0.4699999988079071,
+          "muted": false
+        }
+      }
+    ],
+    "isMultichannel": false
+  },
+  "type": "MULTIZONE_STATUS"
+}

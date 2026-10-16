@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- INVENTED VALUES in the shape of BOM's IDN60920 (NSW observations, anonymous FTP, 2026-10-13). BOM's default terms do
+     not allow redistributing its files, so every station, id, coordinate and reading here is made up. -->
+<product version="v1.7.1" xsi:noNamespaceSchemaLocation="http://www.bom.gov.au/schema/v1.7/product.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <amoc>
+    <source>
+      <sender>Australian Government Bureau of Meteorology</sender>
+      <region>New South Wales</region>
+      <office>NSWRO</office>
+      <copyright>http://www.bom.gov.au/other/copyright.shtml</copyright>
+      <disclaimer>http://www.bom.gov.au/other/disclaimer.shtml</disclaimer>
+    </source>
+    <identifier>IDN60920</identifier>
+    <issue-time-utc>2026-10-13T09:11:02+00:00</issue-time-utc>
+    <issue-time-local tz="EDT">2026-10-13T20:11:02+11:00</issue-time-local>
+    <sent-time>2026-10-13T09:13:40+00:00</sent-time>
+    <status>O</status>
+    <service>WSP</service>
+    <product-type>O</product-type>
+    <phase>NEW</phase>
+  </amoc>
+  <observations>
+    <station wmo-id="90001" bom-id="000001" tz="Australia/Sydney" stn-name="HARBOUR POINT" stn-height="40.00" type="AWS" lat="-33.8600" lon="151.2050" forecast-district-id="NSW_PW005" description="Sydney - Harbour Point">
+      <period index="0" time-utc="2026-10-13T09:10:00+00:00" time-local="2026-10-13T20:10:00+11:00" wind-src="metar_10">
+        <level index="0" type="surface">
+          <element units="Celsius" type="apparent_temp">17.1</element>
+          <element units="Celsius" type="air_temperature">16.4</element>
+          <element units="%" type="rel-humidity">88</element>
+          <element type="wind_dir">ESE</element>
+          <element units="deg" type="wind_dir_deg">112</element>
+          <element units="km/h" type="wind_spd_kmh">11</element>
+          <element units="knots" type="wind_spd">6</element>
+          <element units="km/h" type="gust_kmh">20</element>
+          <element start-time-local="2026-10-13T09:00:00+11:00" end-time-local="2026-10-13T20:13:00+11:00" duration="673" start-time-utc="2026-10-12T22:00:00+00:00" end-time-utc="2026-10-13T09:13:00+00:00" units="mm" type="rainfall">12.6</element>
+        </level>
+      </period>
+    </station>
+    <station wmo-id="90002" bom-id="000002" tz="Australia/Sydney" stn-name="RAIN GAUGE HILL" stn-height="20.00" type="AWS" lat="-33.8690" lon="151.2095" forecast-district-id="NSW_PW005" description="Rain Gauge Hill">
+      <period index="0" time-utc="2026-10-13T09:10:00+00:00" time-local="2026-10-13T20:10:00+11:00">
+        <level index="0" type="surface">
+          <element start-time-local="2026-10-13T09:00:00+11:00" end-time-local="2026-10-13T20:13:00+11:00" duration="673" start-time-utc="2026-10-12T22:00:00+00:00" end-time-utc="2026-10-13T09:13:00+00:00" units="mm" type="rainfall">11.0</element>
+        </level>
+      </period>
+    </station>
+    <station wmo-id="90003" bom-id="000003" tz="Australia/Sydney" stn-name="OLD MANUAL STATION" stn-height="10.00" type="MAN" lat="-33.8680" lon="151.2090" forecast-district-id="NSW_PW005" description="Old Manual Station">
+      <period index="0" time-utc="2026-10-11T22:00:00+00:00" time-local="2026-10-12T09:00:00+11:00">
+        <level index="0" type="surface">
+          <element units="Celsius" type="air_temperature">14.0</element>
+        </level>
+      </period>
+    </station>
+    <station wmo-id="90004" bom-id="000004" tz="Australia/Sydney" stn-name="WESTERN PLAINS" stn-height="25.00" type="AWS" lat="-33.8000" lon="150.9000" forecast-district-id="NSW_PW005" description="Western Plains">
+      <period index="0" time-utc="2026-10-13T09:10:00+00:00" time-local="2026-10-13T20:10:00+11:00" wind-src="metar_10">
+        <level index="0" type="surface">
+          <element units="Celsius" type="air_temperature">15.2</element>
+          <element type="wind_dir">CALM</element>
+          <element units="km/h" type="wind_spd_kmh">0</element>
+        </level>
+      </period>
+    </station>
+  </observations>
+</product>

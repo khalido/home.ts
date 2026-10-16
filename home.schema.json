@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "bomForecast": {
+          "description": "BOM précis location by name or aac, e.g. Sydney",
+          "type": "string"
+        },
+        "timezone": {
+          "description": "the home's IANA time zone, where its day starts (Enphase's today); the runtime's when left out",
+          "type": "string"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude"
+      ],
+      "additionalProperties": {}
+    },
+    "weather": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "description": "preference order; default open-meteo",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "bom",
+              "open-meteo",
+              "google"
+            ]
+          }
+        },
+        "pollMinutes": {
+          "type": "number",
+          "minimum": 1
+        },
+        "googleKey": {
+          "description": "env name holding a Maps Platform key, when sources has google",
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]*$"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "starts_with",
+            "pattern": "^room-.*"
+          },
+          "name": {
+            "type": "string"
+          },
+          "floor": {
+            "type": "string"
+          },
+          "hueRoom": {
+            "description": "the Hue room, zone or grouped_light id whose lights this room's marker shows",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "devices": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "hue"
+              },
+              "host": {
+                "type": "string",
+                "description": "the bridge's last known address"
+              },
+              "bridgeId": {
+                "type": "string",
+                "description": "the bridge id, the CN its certificate must carry: its identity"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                "description": "env name holding the application key from `home pair`"
+              },
+              "ca": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Signify's root CA (PEM), relative to the config file"
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "host",
+              "bridgeId",
+              "key",
+              "ca",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "daikin"
+              },
+              "host": {
+                "type": "string",
+                "description": "the unit's last known address"
+              },
+              "mac": {
+                "description": "the unit's MAC as its UDP discovery reports it: its identity",
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "host",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "enphase"
+              },
+              "host": {
+                "type": "string",
+                "description": "the gateway's last known address"
+              },
+              "serial": {
+                "description": "the gateway's serial, as mDNS `serialnum` (and /info) report it: its identity",
+                "type": "string"
+              },
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the owner token file: JSON with a `token` field (what `home enphase login` writes), or the bare token"
+              },
+              "marker": {
+                "description": "the plan's marker where the solar array is drawn, on the roof outside any room",
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^marker-.*"
+              },
+              "capacityW": {
+                "description": "the array's rated size in watts, from the installer's paperwork; never guessed from the gateway",
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "host",
+              "token",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "amber"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                "description": "env name holding the Amber API key"
+              },
+              "siteId": {
+                "description": "the site; the first active one when left out",
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "key",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "cast"
+              },
+              "name": {
+                "type": "string",
+                "description": "the device's or group's name in the Google Home app (mDNS fn), for display; `home discover --write` fills it and refreshes it after a rename"
+              },
+              "castId": {
+                "type": "string",
+                "description": "the mDNS id, the stable identity; `home discover --write` fills it"
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              }
+            },
+            "required": [
+              "connector",
+              "name",
+              "castId",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "printers"
+              },
+              "name": {
+                "type": "string",
+                "description": "the printer's name for display (mDNS `ty`, or its instance name); `home discover --write` fills it"
+              },
+              "uuid": {
+                "type": "string",
+                "description": "the printer's UUID from its mDNS TXT record, the stable identity; `home discover --write` fills it"
+              },
+              "host": {
+                "description": "the address it last answered at; discovery refreshes it",
+                "type": "string"
+              },
+              "port": {
+                "description": "its IPP port (631 plain, 443 TLS); discovery fills it",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "offlineDays": {
+                "description": "days an unreachable printer shows as offline with its last-seen time before its entry flags it as long gone; default 14",
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              }
+            },
+            "required": [
+              "connector",
+              "name",
+              "uuid",
+              "id"
+            ],
+            "additionalProperties": {}
+          }
+        ]
+      }
+    },
+    "plan": {
+      "description": "the drawing, by path relative to this file",
+      "type": "object",
+      "properties": {
+        "svg": {
+          "type": "string",
+          "minLength": 1
+        },
+        "json": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": {}
+    }
+  },
+  "additionalProperties": {}
+}

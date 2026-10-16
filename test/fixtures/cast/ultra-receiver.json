@@ -1,0 +1,41 @@
+{
+  "requestId": 1,
+  "status": {
+    "applications": [
+      {
+        "appId": "E8C28D3C",
+        "appType": "WEB",
+        "displayName": "Backdrop",
+        "iconUrl": "",
+        "isIdleScreen": true,
+        "launchedFromCloud": false,
+        "namespaces": [
+          {
+            "name": "urn:x-cast:com.google.cast.debugoverlay"
+          },
+          {
+            "name": "urn:x-cast:com.google.cast.cac"
+          },
+          {
+            "name": "urn:x-cast:com.google.cast.sse"
+          },
+          {
+            "name": "urn:x-cast:com.google.cast.remotecontrol"
+          }
+        ],
+        "sessionId": "00000000-0000-4000-8000-000000000100",
+        "statusText": "",
+        "transportId": "00000000-0000-4000-8000-000000000101",
+        "universalAppId": "E8C28D3C"
+      }
+    ],
+    "userEq": {},
+    "volume": {
+      "controlType": "attenuation",
+      "level": 0.8000000715255737,
+      "muted": false,
+      "stepInterval": 0.05000000074505806
+    }
+  },
+  "type": "RECEIVER_STATUS"
+}

@@ -1,0 +1,123 @@
+{
+  "name": "@khalido/home",
+  "version": "0.1.0",
+  "description": "Opinionated, small home control for TypeScript: Hue, Daikin, Enphase and Google Cast on the local network, Amber prices and the weather from the cloud.",
+  "license": "MIT",
+  "author": "Khalid Omar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khalido/home.ts.git"
+  },
+  "homepage": "https://github.com/khalido/home.ts#readme",
+  "bugs": "https://github.com/khalido/home.ts/issues",
+  "keywords": [
+    "philips-hue",
+    "hue",
+    "enphase",
+    "envoy",
+    "daikin",
+    "home-automation",
+    "bun",
+    "amber-electric",
+    "weather",
+    "chromecast",
+    "google-cast",
+    "bom"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./hue": {
+      "types": "./dist/connectors/hue/index.d.ts",
+      "import": "./dist/connectors/hue/index.js"
+    },
+    "./daikin": {
+      "types": "./dist/connectors/daikin/index.d.ts",
+      "import": "./dist/connectors/daikin/index.js"
+    },
+    "./enphase": {
+      "types": "./dist/connectors/enphase/index.d.ts",
+      "import": "./dist/connectors/enphase/index.js"
+    },
+    "./amber": {
+      "types": "./dist/connectors/amber/index.d.ts",
+      "import": "./dist/connectors/amber/index.js"
+    },
+    "./weather": {
+      "types": "./dist/connectors/weather/index.d.ts",
+      "import": "./dist/connectors/weather/index.js"
+    },
+    "./weather/ftp": {
+      "types": "./dist/connectors/weather/ftp.d.ts",
+      "import": "./dist/connectors/weather/ftp.js"
+    },
+    "./cast": {
+      "types": "./dist/connectors/cast/index.d.ts",
+      "import": "./dist/connectors/cast/index.js"
+    },
+    "./printers": {
+      "types": "./dist/connectors/printers/index.d.ts",
+      "import": "./dist/connectors/printers/index.js"
+    },
+    "./cast/tls": {
+      "types": "./dist/connectors/cast/tls.d.ts",
+      "import": "./dist/connectors/cast/tls.js"
+    },
+    "./cast/serve": {
+      "types": "./dist/connectors/cast/serve.d.ts",
+      "import": "./dist/connectors/cast/serve.js"
+    },
+    "./finders": {
+      "types": "./dist/finders.d.ts",
+      "import": "./dist/finders.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    }
+  },
+  "bin": {
+    "home": "./src/cli/main.ts"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    ".env.example",
+    "dist",
+    "docs",
+    "!docs/handover.md",
+    "examples",
+    "skills",
+    "src",
+    "home.schema.json"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.node.json",
+    "bench": "bun bench/bench.ts",
+    "prepublishOnly": "bun run check && bun test && bun run build",
+    "schema": "bun scripts/schema.ts",
+    "gen": "bun scripts/gen.ts"
+  },
+  "dependencies": {
+    "basic-ftp": "^6.2.3",
+    "cac": "^7.1.0",
+    "fast-xml-parser": "^5.11.2",
+    "jsonc-parser": "^3.3.1",
+    "suncalc": "^2.1.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "mitata": "^1.0.34",
+    "typescript": "^7.0.2"
+  }
+}

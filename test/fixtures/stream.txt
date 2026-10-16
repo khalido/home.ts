@@ -1,0 +1,8 @@
+: hi
+
+id: 1770343753:0
+data: [{"creationtime":"2026-02-06T02:09:13Z","data":[{"id":"light-1","id_v1":"/lights/1","on":{"on":false},"owner":{"rid":"dev-1","rtype":"device"},"type":"light"}],"id":"ev-1","type":"update"}]
+
+id: 1770343754:0
+data: [{"creationtime":"2026-02-06T02:09:14Z","data":[{"id":"gl-living","dimming":{"brightness":30},"owner":{"rid":"room-living","rtype":"room"},"type":"grouped_light"}],"id":"ev-2","type":"update"},{"creationtime":"2026-02-06T02:09:14Z","data":[{"id":"scene-relax","type":"scene"}],"id":"ev-3","type":"delete"}]
+

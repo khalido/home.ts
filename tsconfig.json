@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": ["bun"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "test", "bench", "scripts"]
+}

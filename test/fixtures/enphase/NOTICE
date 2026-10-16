@@ -1,0 +1,5 @@
+The *.json files here are gateway replies recorded by pyenphase
+(https://github.com/pyenphase/pyenphase, tests/fixtures/8.3.5167_3rd-pv (production, meters, meter readings) and
+8.2.4264_metered_noct), used under its MIT licence:
+
+MIT License, Copyright (c) 2023 pyenphase

@@ -1,0 +1,27 @@
+{
+  "requestId": 1,
+  "status": {
+    "userEq": {
+      "high_shelf": {
+        "frequency": 4500,
+        "gain_db": 0,
+        "quality": 0.707
+      },
+      "low_shelf": {
+        "frequency": 150,
+        "gain_db": 0,
+        "quality": 0.707
+      },
+      "max_peaking_eqs": 0,
+      "peaking_eqs": []
+    },
+    "version": 2,
+    "volume": {
+      "controlType": "master",
+      "level": 0.435001939535141,
+      "muted": false,
+      "stepInterval": 0.05000000074505806
+    }
+  },
+  "type": "RECEIVER_STATUS"
+}

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -90 640 510" role="img" aria-label="Plan of an example single-storey house, rooms labelled, solar array on the roof" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<!--
+  Example home for @khalido/home, drawn by hand to show the contract. Not a real house.
+
+  Contract for anything that draws on this file (skills/draw-home/SKILL.md):
+  - Each room is <g class="room" id="room-…" data-floor data-name>. Ids are stable and
+    match "rooms" in home.json; devices refer to rooms by these ids.
+  - Each room holds an empty <g class="marker" id="marker-…" transform="translate(x,y)">
+    at its top-right inner corner. Draw a device's state inside it at the origin; never
+    move the anchor.
+  - A device drawn outside any room (the solar array on the roof) has its own marker,
+    named by that device's "marker" in home.jsonc.
+  - Strokes and text use currentColor, so a page that inlines the file themes it.
+-->
+<style>
+  svg:root { color: #1d1d1f; }
+  svg:root .bg { fill: #ffffff; }
+  .bg { fill: none; }
+  .room rect { fill: #8e8e9314; stroke: currentColor; stroke-width: 2; }
+  .array rect { fill: #8e8e9314; stroke: currentColor; stroke-width: 1.5; }
+  .label { font-size: 13px; fill: currentColor; }
+  .muted { opacity: 0.6; }
+  @media (prefers-color-scheme: dark) {
+    svg:root { color: #ececf0; }
+    svg:root .bg { fill: #1c1c1e; }
+    .room rect { fill: #ffffff10; }
+  }
+</style>
+<rect class="bg" y="-90" width="640" height="510"/>
+
+<!-- Outer wall -->
+<rect x="20" y="20" width="600" height="380" fill="none" stroke="currentColor" stroke-width="4"/>
+
+<!-- Solar array on the roof, outside any room: the Enphase device's marker -->
+<g class="array" id="array-solar" data-name="Solar">
+  <text class="label muted" x="36" y="-44">Roof</text>
+  <rect x="220" y="-74" width="60" height="44"/>
+  <rect x="290" y="-74" width="60" height="44"/>
+  <rect x="360" y="-74" width="60" height="44"/>
+  <rect x="430" y="-74" width="60" height="44"/>
+  <g class="marker" id="marker-solar" transform="translate(504,-70)"/>
+</g>
+
+<g class="room" id="room-living" data-floor="ground" data-name="Living">
+  <rect x="20" y="20" width="320" height="220"/>
+  <text class="label" x="36" y="44">Living</text>
+  <g class="marker" id="marker-living" transform="translate(324,36)"/>
+</g>
+
+<g class="room" id="room-kitchen" data-floor="ground" data-name="Kitchen">
+  <rect x="340" y="20" width="280" height="160"/>
+  <text class="label" x="356" y="44">Kitchen</text>
+  <g class="marker" id="marker-kitchen" transform="translate(604,36)"/>
+</g>
+
+<g class="room" id="room-hall" data-floor="ground" data-name="Hall">
+  <rect x="340" y="180" width="280" height="60"/>
+  <text class="label muted" x="356" y="214">Hall</text>
+  <g class="marker" id="marker-hall" transform="translate(604,196)"/>
+</g>
+
+<g class="room" id="room-bed-1" data-floor="ground" data-name="Bedroom">
+  <rect x="20" y="240" width="360" height="160"/>
+  <text class="label" x="36" y="264">Bedroom</text>
+  <g class="marker" id="marker-bed-1" transform="translate(364,256)"/>
+</g>
+
+<g class="room" id="room-bath" data-floor="ground" data-name="Bathroom">
+  <rect x="380" y="240" width="240" height="160"/>
+  <text class="label" x="396" y="264">Bathroom</text>
+  <g class="marker" id="marker-bath" transform="translate(604,256)"/>
+</g>
+
+<!-- Front door, on the hall's right wall -->
+<path d="M620 196 v28" stroke="currentColor" stroke-width="6" class="muted"/>
+</svg>

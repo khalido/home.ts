@@ -1,0 +1,50 @@
+{
+  "requestId": 1,
+  "status": {
+    "applications": [
+      {
+        "appId": "E8C28D3C",
+        "appType": "WEB",
+        "displayName": "Backdrop",
+        "iconUrl": "",
+        "isIdleScreen": true,
+        "launchedFromCloud": false,
+        "namespaces": [
+          {
+            "name": "urn:x-cast:com.google.cast.sse"
+          },
+          {
+            "name": "urn:x-cast:com.google.cast.cac"
+          }
+        ],
+        "senderConnected": false,
+        "sessionId": "00000000-0000-4000-8000-000000000102",
+        "statusText": "",
+        "transportId": "00000000-0000-4000-8000-000000000103",
+        "universalAppId": "E8C28D3C"
+      }
+    ],
+    "userEq": {
+      "high_shelf": {
+        "frequency": 4500,
+        "gain_db": 0,
+        "quality": 0.707
+      },
+      "low_shelf": {
+        "frequency": 150,
+        "gain_db": 0,
+        "quality": 0.707
+      },
+      "max_peaking_eqs": 0,
+      "peaking_eqs": []
+    },
+    "version": 2,
+    "volume": {
+      "controlType": "master",
+      "level": 0.4699999988079071,
+      "muted": false,
+      "stepInterval": 0.019999999552965164
+    }
+  },
+  "type": "RECEIVER_STATUS"
+}

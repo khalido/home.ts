@@ -1,0 +1,36 @@
+{
+  "requestId": 2,
+  "status": {
+    "devices": [
+      {
+        "capabilities": 229381,
+        "deviceId": "00000000-0000-4000-8000-000000000005",
+        "name": "Nest Hub",
+        "volume": {
+          "level": 0.4699999988079071,
+          "muted": false
+        }
+      },
+      {
+        "capabilities": 229381,
+        "deviceId": "00000000-0000-4000-8000-000000000007",
+        "name": "Nest Hub Max",
+        "volume": {
+          "level": 0.46000000834465027,
+          "muted": false
+        }
+      },
+      {
+        "capabilities": 196612,
+        "deviceId": "00000000-0000-4000-8000-000000000002",
+        "name": "Nest Mini",
+        "volume": {
+          "level": 0.37500572204589844,
+          "muted": false
+        }
+      }
+    ],
+    "isMultichannel": false
+  },
+  "type": "MULTIZONE_STATUS"
+}

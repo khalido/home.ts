@@ -1,0 +1,65 @@
+[
+  {
+    "file": "ultra",
+    "id": "00000000000040008000000000000001",
+    "name": "Chromecast Ultra",
+    "model": "Chromecast Ultra",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000001"
+  },
+  {
+    "file": "mini",
+    "id": "00000000000040008000000000000002",
+    "name": "Nest Mini",
+    "model": "Google Nest Mini",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000002"
+  },
+  {
+    "file": "streamer",
+    "id": "00000000000040008000000000000003",
+    "name": "TV Streamer",
+    "model": "Google TV Streamer",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000003"
+  },
+  {
+    "file": "speaker",
+    "id": "00000000000040008000000000000004",
+    "name": "Home Speaker",
+    "model": "Google Home Speaker",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000004"
+  },
+  {
+    "file": "hub",
+    "id": "00000000000040008000000000000005",
+    "name": "Nest Hub",
+    "model": "Google Nest Hub",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000005"
+  },
+  {
+    "file": "group",
+    "id": "00000000000040008000000000000006",
+    "name": "Cast Group",
+    "model": "Google Cast Group",
+    "group": true,
+    "port": 32005,
+    "peer": "00000000-0000-4000-8000-000000000005"
+  },
+  {
+    "file": "hubmax",
+    "id": "00000000000040008000000000000007",
+    "name": "Nest Hub Max",
+    "model": "Google Nest Hub Max",
+    "group": false,
+    "port": 8009,
+    "peer": "00000000-0000-4000-8000-000000000007"
+  }
+]

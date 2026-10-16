@@ -1,0 +1,15 @@
+{
+  "requestId": 1,
+  "status": {
+    "isActiveInput": false,
+    "isStandBy": true,
+    "userEq": {},
+    "volume": {
+      "controlType": "fixed",
+      "level": 1,
+      "muted": false,
+      "stepInterval": 0.06666667014360428
+    }
+  },
+  "type": "RECEIVER_STATUS"
+}

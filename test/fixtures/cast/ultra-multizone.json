@@ -1,0 +1,19 @@
+{
+  "requestId": 2,
+  "status": {
+    "devices": [
+      {
+        "capabilities": 196613,
+        "deviceId": "00000000-0000-4000-8000-000000000001",
+        "name": "Chromecast Ultra",
+        "volume": {
+          "level": 0.8000000715255737,
+          "muted": false
+        }
+      }
+    ],
+    "isMultichannel": false,
+    "isVideoGroup": false
+  },
+  "type": "MULTIZONE_STATUS"
+}

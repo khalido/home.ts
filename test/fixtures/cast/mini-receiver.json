@@ -1,0 +1,13 @@
+{
+  "requestId": 1,
+  "status": {
+    "version": 2,
+    "volume": {
+      "controlType": "master",
+      "level": 0.37500572204589844,
+      "muted": false,
+      "stepInterval": 0.019999999552965164
+    }
+  },
+  "type": "RECEIVER_STATUS"
+}

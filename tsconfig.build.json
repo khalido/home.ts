@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": ["src/cli/**", "src/connectors/weather/ftp.ts", "src/connectors/cast/tls.ts", "src/connectors/cast/serve.ts", "src/finders.ts"]
+}

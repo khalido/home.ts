@@ -1,0 +1,128 @@
+# The one file to copy into a repo. One job, one agent:
+#
+#   an issue is opened or edited  → a note from something that has read the
+#                                   code and its history — where this lives,
+#                                   what is already there, or the answer when
+#                                   the issue is a question. Refreshed in
+#                                   place when the issue changes
+#   /fx <anything>                → on any issue or PR. A question gets an
+#                                   answer. "fix this" or "add that" gets the
+#                                   change, tested, as a draft pull request,
+#                                   when the agent judges it can do it well in
+#                                   one run; otherwise a note saying what it
+#                                   would change and what a stronger agent or
+#                                   a person should pick up. Each comment gets
+#                                   its own reply, so a thread reads as pairs;
+#                                   editing a comment rewrites its reply
+#
+# Copy it to .github/workflows/fx.yml, add the AI_GATEWAY_API_KEY secret, and
+# switch on Settings → Actions → General → "Allow GitHub Actions to create and
+# approve pull requests", which GitHub leaves off by default. This repo runs
+# the same file on itself with `uses: ./`; CI keeps the two copies identical.
+# `workflow_dispatch` runs it by hand on an issue, from any branch, which is
+# how a change to the action is tried before it lands.
+#
+# No automatic PR review here on purpose. A PR you wrote with a stronger agent
+# does not need this one's opinion, and a PR fx wrote should not be graded by
+# fx. `/fx is this ready?` on a PR still works: the diff is in the prompt.
+
+name: fx
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    # `edited` too: fix a typo in your question and fx rewrites the reply to
+    # that question, rather than leaving a stale answer under it. The `if:`
+    # below means only a comment containing the trigger runs anything, and a
+    # bot's own comment never does.
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue or PR number to run on
+        required: true
+      prompt:
+        description: What to ask; the thread is appended below it
+        required: true
+
+jobs:
+  fx:
+    # Only people with write access, never a bot. The action checks both and
+    # fails the run if either is wrong; the `if:` only saves booting a runner.
+    # On an issue event the note runs; on a comment, the phrase has to be there.
+    #
+    # On a private repo the action's write check is the whole gate: whoever
+    # can open an issue there already has access, and `author_association`
+    # misses an org member whose membership is private (seen on a private org
+    # repo: the admin's own issue skipped). On a public repo it stays, so a
+    # stranger's issue skips instead of turning the Actions list red.
+    #
+    # A bare `contains`: `/fx` after a blank line has no space before it, and
+    # expressions have no regex. A comment that merely mentions
+    # `.github/fx/issue.md` boots a runner, and the action skips it.
+    if: >-
+      (
+        github.event_name == 'issues' &&
+        github.event.issue.user.type != 'Bot' &&
+        (github.event.repository.private ||
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+      ) || (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '/fx') &&
+        github.event.comment.user.type != 'Bot' &&
+        (github.event.repository.private ||
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      ) || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # One group per event and issue. A burst of edits to an issue: the last
+    # note wins. Comments queue instead, so a plain comment (which this job
+    # skips) can never take out a /fx answer in progress. At workflow level
+    # `github.job` is empty, so keep this on the job.
+    concurrency:
+      group: fx-${{ github.event_name }}-${{ github.event.issue.number || inputs.issue }}
+      cancel-in-progress: ${{ github.event_name == 'issues' }}
+    # `contents: write` is what lets a pull request's branch and the memory
+    # file be pushed. fx itself never holds this token, and branch protection
+    # is what stops a push to your default branch. For answers only:
+    # `contents: read`, drop `pull-requests`, add `memory: false`; the agent
+    # then cannot open anything however it is asked.
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # Full history, so `git log -S` and `git blame` answer "this used
+          # to work". A second or two on a normal repo; set a depth on a huge one.
+          fetch-depth: 0
+      # The agent runs the checks AGENTS.md names (`bun test`,
+      # `bunx tsc --noEmit`) before it answers or opens a PR, so Bun and the
+      # dependencies have to be on the runner first.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - uses: khalido/fx-agent-action@main
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        with:
+          max_steps: '60'
+          # Never want a pull request from it? `mode: answer` keeps the shell,
+          # so it still runs your tests before it answers, and opens nothing.
+          # Belt and braces is that plus `contents: read` above.
+          # mode: answer
+          # On a manual run these are set; on an issue or comment event they
+          # are empty and the action falls back to the event.
+          issue_number: ${{ inputs.issue }}
+          prompt: ${{ inputs.prompt }}
+          # Nothing else to set. The note prompt is built in (prompts/issue.md
+          # in the action) and a repo replaces it by adding .github/fx/issue.md.
+          # Facts about the repo go in AGENTS.md. Memory is on: one MEMORY.md
+          # on an `agent-memory` branch that the agent reads and edits each
+          # run, saved only from runs by people with write access; delete the
+          # branch to forget, `memory: false` to turn it off.
+          # A stronger model for everything, if notes come out shallow:
+          # model: anthropic/claude-sonnet-5

@@ -1,0 +1,11 @@
+# Publishing
+
+Not published yet. What I found (2026-10-13, npm CLI 11.20.0, Bun 1.4.2):
+
+- **Tokens.** npm removed classic tokens in late 2025; only granular tokens remain ([about access tokens](https://docs.npmjs.com/about-access-tokens)). Write tokens last at most 90 days and enforce 2FA unless "bypass 2FA" is ticked ([changelog](https://github.blog/changelog/2025-11-05-npm-security-update-classic-token-creation-disabled-and-granular-token-changes/)). The permission menu has "Read and write (publish and stage)" and "Read and write (stage only)" ([creating tokens](https://docs.npmjs.com/creating-and-viewing-access-tokens)). Direct publishing with granular tokens is due to end in January 2027.
+- **Staging.** A stage-only token can run `npm stage publish` but not `npm publish` (it fails with `E_STAGE_REQUIRED`). A maintainer then runs `npm stage approve <id> --otp <code>`. Staging can create a new package ([npm stage](https://docs.npmjs.com/cli/v12/commands/npm-stage)).
+- **`npm login`** now gives a two-hour session token with 2FA on publish ([changelog](https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/)).
+- **`bun publish`** reads `.npmrc`, `bunfig.toml` or `NPM_CONFIG_TOKEN` ([docs](https://bun.com/docs/pm/cli/publish)); with neither it says "run `bunx npm login`". It has no staging and, per third-party reports, no OIDC. Even `--dry-run` needs auth on 1.4.2.
+- **Trusted publishing** (GitHub Actions OIDC) needs no stored token: configure it in the package's settings on npmjs.com, give the workflow `id-token: write`, publish with npm CLI 11.5.1 or later. Provenance is automatic for a public repo. A trusted publisher can stage or publish ([trusted publishers](https://docs.npmjs.com/trusted-publishers)). Then set "Require two-factor authentication and disallow tokens". The workflow needs `oven-sh/setup-bun` before `npm publish`, since `prepublishOnly` runs the Bun checks.
+
+**Recommendation.** Publish 0.1.0 by hand with no token: `npm login`, then `npm publish` (2FA prompt). Then add trusted publishing from this repo's GitHub Actions for later releases. Skip the long-lived token; if one is ever needed, make it stage-only, limited to `@khalido/home`, bypass 2FA off, 90 days, kept in `~/.npmrc` as `${NPM_TOKEN}` from the Keychain, never in a repo.

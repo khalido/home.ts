@@ -1,0 +1,16 @@
+{
+  "errors": [],
+  "data": [
+    { "id": "home-0", "type": "bridge_home", "children": [{ "rid": "room-living", "rtype": "room" }], "services": [{ "rid": "gl-home", "rtype": "grouped_light" }] },
+    { "id": "gl-home", "type": "grouped_light", "owner": { "rid": "home-0", "rtype": "bridge_home" }, "on": { "on": true }, "dimming": { "brightness": 50 } },
+    { "id": "room-living", "type": "room", "metadata": { "name": "Living", "archetype": "living_room" }, "children": [{ "rid": "dev-1", "rtype": "device" }, { "rid": "dev-2", "rtype": "device" }], "services": [{ "rid": "gl-living", "rtype": "grouped_light" }] },
+    { "id": "gl-living", "type": "grouped_light", "owner": { "rid": "room-living", "rtype": "room" }, "on": { "on": true }, "dimming": { "brightness": 60 } },
+    { "id": "zone-reading", "type": "zone", "metadata": { "name": "Reading" }, "children": [{ "rid": "light-2", "rtype": "light" }], "services": [] },
+    { "id": "light-1", "type": "light", "owner": { "rid": "dev-1", "rtype": "device" }, "metadata": { "name": "Floor lamp", "archetype": "floor_shade" }, "on": { "on": true }, "dimming": { "brightness": 60 }, "mode": "normal" },
+    { "id": "light-2", "type": "light", "owner": { "rid": "dev-2", "rtype": "device" }, "metadata": { "name": "Shelf" }, "on": { "on": false }, "dimming": { "brightness": 20 } },
+    { "id": "zb-1", "type": "zigbee_connectivity", "owner": { "rid": "dev-1", "rtype": "device" }, "status": "connected" },
+    { "id": "zb-2", "type": "zigbee_connectivity", "owner": { "rid": "dev-2", "rtype": "device" }, "status": "connectivity_issue" },
+    { "id": "scene-relax", "type": "scene", "metadata": { "name": "Relax" }, "group": { "rid": "room-living", "rtype": "room" }, "status": { "active": "static" }, "actions": [] },
+    { "id": "dev-1", "type": "device", "metadata": { "name": "Floor lamp" }, "product_data": { "model_id": "LCT015" } }
+  ]
+}

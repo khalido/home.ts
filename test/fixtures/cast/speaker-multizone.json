@@ -1,0 +1,17 @@
+{
+  "requestId": 2,
+  "status": {
+    "devices": [
+      {
+        "capabilities": 196612,
+        "deviceId": "00000000-0000-4000-8000-000000000004",
+        "name": "Home Speaker",
+        "volume": {
+          "level": 0.30000001192092896,
+          "muted": false
+        }
+      }
+    ]
+  },
+  "type": "MULTIZONE_STATUS"
+}

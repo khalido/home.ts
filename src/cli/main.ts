@@ -1,0 +1,80 @@
+#!/usr/bin/env bun
+// `home`: the terminal layer. Commands come from cac; one `home <connector>` per manifest, its verbs from src/cli/<connector>.ts.
+import { cac } from "cac";
+import { MANIFESTS } from "../manifests.ts";
+import { cacheCommand } from "./cache.ts";
+import { CAST_OPTIONS, CAST_USAGE, castVerbs } from "./cast.ts";
+import { configCommand } from "./config.ts";
+import { addresses, die, type Options, type Verbs } from "./context.ts";
+import { discover } from "./discover.ts";
+import { enphaseVerbs } from "./enphase.ts";
+import { hueVerbs } from "./hue.ts";
+import { locate } from "./locate.ts";
+import { probe } from "./probe.ts";
+import { status } from "./status.ts";
+
+const HUE_HELP: Record<string, string> = {
+  lights: "lights off: one write to the whole-home group",
+  room: "room <name> on|off|<1-100>",
+  scene: "scene <name>",
+  pair: "pair: press the bridge's button first; prints the env lines to set",
+};
+
+/** Each connector's verbs beyond its status, the usage a wrong one prints, and any options of its own. */
+const VERBS: Record<string, { verbs: Verbs; usage: string; options?: [string, string, { type: unknown[] }?][] }> = {
+  hue: { verbs: hueVerbs, usage: `usage: home hue ${Object.values(HUE_HELP).map((h) => h.split(":")[0]).join(" | ")}` },
+  enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
+  cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
+};
+
+const cli = cac("home");
+cli.option("--json", "print JSON");
+cli.option("--config <path>", "a home config (JSONC); else HOME_CONFIG, else the env names in .env.example");
+
+const statusCommand = cli
+  .command("status", "each integration: connected or not, which env names it still needs (the default)")
+  .alias("doctor")
+  .alias("!") // cac's marker for the default command: `home` alone runs status
+  .action((o: Options) => status(o));
+cli
+  .command("discover", "which smart-home devices answer here (mDNS + Daikin UDP); with a config, how they match it")
+  .option("--passes <n>", "discovery passes, 5 s apart (default 2)")
+  .option("--write [path]", "match what answers by identity: add new devices, update moved hosts and renamed Cast names in the config")
+  .action((o: Options) => discover(o));
+cli.command("probe", "read-only, no keys: Hue's public config, Daikin, the IQ Gateway's /info, each Cast device, each printer, each weather source").action((o: Options) => probe(o));
+cli.command("config [verb] [path]", "config check [path]: what a home config would set up, secrets as set or unset, every problem").action(configCommand);
+cli.command("cache [verb]", "the addresses kept between runs; `cache clear` deletes them").action(cacheCommand);
+cli
+  .command("locate [...address]", "latitude and longitude of a street address from OpenStreetMap's Nominatim")
+  .option("--write [path]", "set them in the config's location (and timezone, when absent)")
+  .action(locate);
+
+for (const m of MANIFESTS) {
+  const v = VERBS[m.name];
+  const c = cli.command(`${m.name} [verb] [...args]`, `${m.title}: its status${v ? `; ${Object.keys(v.verbs).join(", ")}` : ""}`);
+  for (const [raw, what, config] of v?.options ?? []) c.option(raw, what, config);
+  c.action((verb: string | undefined, args: string[], o: Options) =>
+    verb === undefined ? status(o, m.name) : (v && Object.hasOwn(v.verbs, verb) ? v.verbs[verb]! : () => die(v?.usage ?? `usage: home ${m.name}`))(args, o),
+  );
+}
+// Hue's verbs also stand alone, as typed before the CLI had `home hue`: `home lights off`, `home room …`, `home scene …`, `home pair`.
+for (const [verb, run] of Object.entries(hueVerbs)) cli.command(`${verb} [...args]`, `Hue: ${HUE_HELP[verb]}`).action((args: string[], o: Options) => run(args, o));
+
+cli.help();
+
+let failed: string | undefined;
+try {
+  cli.parse(process.argv, { run: false });
+  if (cli.matchedCommand === statusCommand && cli.args.length) failed = `unknown command "${cli.args[0]}"; \`home --help\` lists them`;
+  else await cli.runMatchedCommand();
+} catch (e) {
+  failed = e instanceof Error ? e.message : String(e);
+} finally {
+  // Addresses discovery confirmed are kept whether the command succeeded or not; a cache that cannot be written is a warning, not a failure.
+  try {
+    addresses.flush();
+  } catch (e) {
+    console.error(`home: address cache not written: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+if (failed !== undefined) die(failed);

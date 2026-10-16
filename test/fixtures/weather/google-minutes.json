@@ -1,0 +1,215 @@
+{
+  "overallPredictionTimeframe": {
+    "startTime": "2025-02-10T20:00:00Z",
+    "endTime": "2025-02-11T02:00:00Z"
+  },
+  "timeZone": {
+    "id": "Australia/Sydney"
+  },
+  "segments": [
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T19:45:00Z",
+        "endTime": "2025-02-10T20:00:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T20:00:00Z",
+        "endTime": "2025-02-10T20:15:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T20:15:00Z",
+        "endTime": "2025-02-10T20:30:00Z"
+      },
+      "type": "RAIN",
+      "probability": 40,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0.2
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "LIGHT"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T20:30:00Z",
+        "endTime": "2025-02-10T20:45:00Z"
+      },
+      "type": "RAIN",
+      "probability": 70,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0.6
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "MODERATE"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T20:45:00Z",
+        "endTime": "2025-02-10T21:00:00Z"
+      },
+      "type": "NONE",
+      "probability": 10,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T21:00:00Z",
+        "endTime": "2025-02-10T21:15:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T21:15:00Z",
+        "endTime": "2025-02-10T21:30:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T21:30:00Z",
+        "endTime": "2025-02-10T21:45:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T21:45:00Z",
+        "endTime": "2025-02-10T22:00:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T22:00:00Z",
+        "endTime": "2025-02-10T22:15:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T22:15:00Z",
+        "endTime": "2025-02-10T22:30:00Z"
+      },
+      "type": "RAIN",
+      "probability": 50,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0.4
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "LIGHT"
+    },
+    {
+      "timeFrame": {
+        "startTime": "2025-02-10T22:30:00Z",
+        "endTime": "2025-02-10T22:45:00Z"
+      },
+      "type": "NONE",
+      "probability": 0,
+      "qpf": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "snowfallAmount": {
+        "unit": "MILLIMETERS",
+        "quantity": 0
+      },
+      "intensity": "NO_INTENSITY"
+    }
+  ]
+}

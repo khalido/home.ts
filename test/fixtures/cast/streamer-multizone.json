@@ -1,0 +1,18 @@
+{
+  "requestId": 2,
+  "status": {
+    "devices": [
+      {
+        "capabilities": 458757,
+        "deviceId": "00000000-0000-4000-8000-000000000003",
+        "name": "TV Streamer",
+        "volume": {
+          "level": 1,
+          "muted": false
+        }
+      }
+    ],
+    "isMultichannel": false
+  },
+  "type": "MULTIZONE_STATUS"
+}

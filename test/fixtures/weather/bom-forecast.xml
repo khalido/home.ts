@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- INVENTED VALUES in the shape of BOM's IDN11060 (NSW précis forecast, anonymous FTP, issued 16:22 AEDT 2026-10-13).
+     BOM's default terms do not allow redistributing its files, so the locations, codes and forecasts here are made up.
+     Today's period, as after every afternoon issue, has no minimum, maximum or rain range. -->
+<product version="1.7" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.bom.gov.au/schema/v1.7/product.xsd">
+    <amoc>
+        <source>
+            <sender>Australian Government Bureau of Meteorology</sender>
+            <region>New South Wales</region>
+            <office>NSWRO</office>
+            <copyright>http://www.bom.gov.au/other/copyright.shtml</copyright>
+            <disclaimer>http://www.bom.gov.au/other/disclaimer.shtml</disclaimer>
+        </source>
+        <identifier>IDN11060</identifier>
+        <issue-time-utc>2026-10-13T05:22:18Z</issue-time-utc>
+        <issue-time-local tz="EDT">2026-10-13T16:22:18+11:00</issue-time-local>
+        <sent-time>2026-10-13T05:22:18Z</sent-time>
+        <expiry-time>2026-10-14T05:22:18Z</expiry-time>
+        <next-routine-issue-time-utc>2026-10-13T17:15:00Z</next-routine-issue-time-utc>
+        <next-routine-issue-time-local tz="EDT">2026-10-14T04:15:00+11:00</next-routine-issue-time-local>
+        <status>O</status>
+        <service>WSP</service>
+        <sub-service>FPR</sub-service>
+        <product-type>F</product-type>
+        <phase>UPD</phase>
+    </amoc>
+    <forecast>
+        <area aac="NSW_FA001" description="New South Wales" type="region"/>
+        <area aac="NSW_PW005" description="Metropolitan" type="public-district" parent-aac="NSW_FA001"/>
+        <area aac="NSW_PT999" description="Sydney" type="location" parent-aac="NSW_PW005">
+            <forecast-period index="0" start-time-local="2026-10-13T16:00:00+11:00" end-time-local="2026-10-14T00:00:00+11:00" start-time-utc="2026-10-13T05:00:00Z" end-time-utc="2026-10-13T13:00:00Z">
+                <element type="forecast_icon_code">12</element>
+                <text type="precis">Rain at times.</text>
+                <text type="probability_of_precipitation">90%</text>
+            </forecast-period>
+            <forecast-period index="1" start-time-local="2026-10-14T00:00:00+11:00" end-time-local="2026-10-15T00:00:00+11:00" start-time-utc="2026-10-13T13:00:00Z" end-time-utc="2026-10-14T13:00:00Z">
+                <element type="forecast_icon_code">3</element>
+                <element type="precipitation_range">0 to 2 mm</element>
+                <element type="air_temperature_minimum" units="Celsius">13</element>
+                <element type="air_temperature_maximum" units="Celsius">21</element>
+                <text type="precis">Partly cloudy.</text>
+                <text type="probability_of_precipitation">20%</text>
+            </forecast-period>
+            <forecast-period index="2" start-time-local="2026-10-15T00:00:00+11:00" end-time-local="2026-10-16T00:00:00+11:00" start-time-utc="2026-10-14T13:00:00Z" end-time-utc="2026-10-15T13:00:00Z">
+                <element type="forecast_icon_code">1</element>
+                <element type="air_temperature_minimum" units="Celsius">12</element>
+                <element type="air_temperature_maximum" units="Celsius">25</element>
+                <text type="precis">Sunny.</text>
+                <text type="probability_of_precipitation">5%</text>
+            </forecast-period>
+        </area>
+        <area aac="NSW_PT998" description="Inland Town" type="location" parent-aac="NSW_PW005">
+            <forecast-period index="0" start-time-local="2026-10-13T16:00:00+11:00" end-time-local="2026-10-14T00:00:00+11:00" start-time-utc="2026-10-13T05:00:00Z" end-time-utc="2026-10-13T13:00:00Z">
+                <element type="forecast_icon_code">4</element>
+                <text type="precis">Cloudy.</text>
+                <text type="probability_of_precipitation">30%</text>
+            </forecast-period>
+        </area>
+    </forecast>
+</product>

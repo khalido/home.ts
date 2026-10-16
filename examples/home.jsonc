@@ -1,0 +1,31 @@
+// An invented home: the example house in home.svg, addresses from 192.0.2.0/24 (reserved for documentation).
+// Copy it beside your private files, not into a repo. Secrets are env names; paths are relative to this file.
+{
+  "$schema": "../home.schema.json",
+  "name": "Example house",
+
+  // `home locate "<street address>" --write` fills latitude and longitude (and timezone, when absent); the address is not kept.
+  "location": { "latitude": -33.8688, "longitude": 151.2093, "bomForecast": "Sydney", "timezone": "Australia/Sydney" },
+  "weather": { "sources": ["bom", "open-meteo"], "pollMinutes": 15 },
+
+  "plan": { "svg": "home.svg" },
+
+  // Each room's id matches <g class="room" id="…"> in home.svg. `hueRoom` is the Hue room whose lights its marker shows.
+  "rooms": [
+    { "id": "room-living", "name": "Living", "floor": "ground", "hueRoom": "11111111-1111-4111-8111-111111111111" },
+    { "id": "room-kitchen", "name": "Kitchen", "floor": "ground", "hueRoom": "22222222-2222-4222-8222-222222222222" },
+    { "id": "room-bed-1", "name": "Bedroom", "floor": "ground", "hueRoom": "33333333-3333-4333-8333-333333333333" },
+    { "id": "room-bath", "name": "Bathroom", "floor": "ground" },
+    { "id": "room-hall", "name": "Hall", "floor": "ground" },
+  ],
+
+  // Only what it takes to reach each device, and where it is: its identity (bridgeId, mac, serial) and last known host.
+  // Model, firmware and the like come live.
+  "devices": [
+    { "id": "bridge", "connector": "hue", "room": "room-hall", "host": "192.0.2.2", "bridgeId": "0017880000000000", "key": "HUE_APPLICATION_KEY", "ca": "hue-root-ca.pem" },
+    { "id": "ac", "connector": "daikin", "room": "room-living", "name": "Living AC", "host": "192.0.2.10", "mac": "00005E005301" },
+    // The array is drawn on the roof at marker-solar; capacityW is its rated size from the installer's paperwork.
+    { "id": "solar", "connector": "enphase", "host": "192.0.2.21", "serial": "000000000000", "token": "enphase-token.json", "marker": "marker-solar", "capacityW": 6600 },
+    { "id": "prices", "connector": "amber", "key": "AMBER_KEY" },
+  ],
+}
