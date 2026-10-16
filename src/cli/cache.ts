@@ -1,10 +1,10 @@
 // `home cache [clear]`: the addresses kept between runs, or delete them so the next run discovers afresh.
 import { rmSync } from "node:fs";
-import { addresses, CACHE_FILE, die, type Options, printJson } from "./context.ts";
+import { addresses, CACHE_FILE, type Options, printJson, usage } from "./context.ts";
 
 export async function cacheCommand(verb: string | undefined, o: Options): Promise<void> {
   if (verb === "clear") return rmSync(CACHE_FILE, { force: true }), console.log(`deleted ${CACHE_FILE}`);
-  if (verb !== undefined) die("usage: home cache [clear]");
+  if (verb !== undefined) usage("usage: home cache [clear]");
   const entries = addresses.cache.read();
   if (o.json) return printJson(entries);
   console.log(CACHE_FILE);

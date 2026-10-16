@@ -83,7 +83,7 @@ export async function discover(o: Options): Promise<void> {
   for (const r of match.renamed) console.log(`renamed ${r.connector} ${r.id}: "${r.from}" → "${r.to}"`);
   for (const a of match.added) console.log(`new     ${a.found.connector} ${a.found.name ? `"${a.found.name}" ` : ""}${a.found.id} at ${a.found.host}`);
   for (const s of match.skipped) console.log(`skipped ${s.found.connector} ${s.found.id} at ${s.found.host} · ${s.why}`);
-  if (!found.length) console.log("nothing answered (mDNS and the Daikin broadcast)");
-  else if (write === undefined) console.log(changes ? `run with --write ${path} to update it` : "the config is current");
-  else console.log(wrote ?? "nothing to write");
+  if (!found.length) console.error("home: nothing answered (mDNS and the Daikin broadcast)");
+  else if (write === undefined) console.error(changes ? `home: run with --write ${path} to update it` : "home: the config is current");
+  else console.error(`home: ${wrote ?? "nothing to write"}`);
 }

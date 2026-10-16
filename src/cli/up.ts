@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { writePrivate } from "../finders.ts";
 import { type AccountFilter, type Category, dollars, type Household, inHousehold, readTransactions, recurring, spendByCategory, spendByMerchant, type Transaction, type TransactionQuery, uncategorised, up, upClient } from "../connectors/up/index.ts";
-import { die, env, fail, type Options, printJson, text, type Verbs } from "./context.ts";
+import { env, fail, type Options, printJson, text, usage, type Verbs } from "./context.ts";
 
 export const UP_USAGE =
   "usage: home up transactions [--since <date>] [--until <date>] [--category <id>] [--tag <label>] [--status HELD|SETTLED] [--limit <n>] [--json|--csv] | categories | uncategorised | spend [--by category|merchant|recurring] | categorise <transaction id> <category id|none> | tag <transaction id> <label> [--remove] | webhooks [get|logs|ping|create|delete] [id|url]";
@@ -36,7 +36,7 @@ function accountFromEnv(): AccountFilter | undefined {
   return filter;
 }
 
-const token = () => env.UP_TOKEN ?? fail("set UP_TOKEN");
+const token = () => env.UP_TOKEN ?? fail("set UP_TOKEN", "auth");
 const client = () => upClient({ token: token(), fetch });
 
 /** Up as an integration from UP_TOKEN and UP_ACCOUNT, for `home status`. */
@@ -94,7 +94,7 @@ const beforeAfter = (before: Transaction, after: Transaction) => {
 export const upVerbs: Verbs = {
   async transactions(_args, o: UpOptions) {
     const status = text(o.status)?.toUpperCase();
-    if (status !== undefined && status !== "HELD" && status !== "SETTLED") die(UP_USAGE);
+    if (status !== undefined && status !== "HELD" && status !== "SETTLED") usage(UP_USAGE);
     const limit = Number(text(o.limit) ?? 100);
     if (!Number.isInteger(limit) || limit < 1) fail(`--limit: a whole number above 0, not ${text(o.limit)}`);
     const txs = await read({ since: iso(text(o.since), "since"), until: iso(text(o.until), "until"), category: text(o.category), tag: text(o.tag), status: status as "HELD" | "SETTLED" | undefined, limit });
@@ -113,12 +113,12 @@ export const upVerbs: Verbs = {
   async uncategorised(_args, o: UpOptions) {
     const txs = uncategorised(await read({ since: iso(text(o.since), "since") ?? daysAgo(30), status: "SETTLED" }));
     if (o.json) return printJson(txs.map(row));
-    if (!txs.length) return console.log("none");
+    if (!txs.length) return console.error("home: nothing to categorise");
     for (const t of txs) console.log(line(t));
   },
   async spend(_args, o: UpOptions) {
     const by = text(o.by) ?? "category";
-    if (by !== "category" && by !== "merchant" && by !== "recurring") die(UP_USAGE);
+    if (by !== "category" && by !== "merchant" && by !== "recurring") usage(UP_USAGE);
     // Recurring needs three distinct months, so its default window is six.
     const window = { since: iso(text(o.since), "since") ?? daysAgo(by === "recurring" ? 180 : 30), until: iso(text(o.until), "until") };
     const household = householdFromEnv();
@@ -132,11 +132,11 @@ export const upVerbs: Verbs = {
     if (by === "recurring") {
       const list = recurring(txs);
       if (o.json) return printJson(list);
-      console.log("a heuristic: the same merchant in three or more months at a similar amount");
+      console.error("home: a heuristic: the same merchant in three or more months at a similar amount");
       for (const r of list) console.log(`${dollars(r.medianCents, false).padStart(10)}  ${r.months} months  ${r.merchant}`);
       return;
     }
-    if (by !== "category") die(UP_USAGE);
+    if (by !== "category") usage(UP_USAGE);
     const s = spendByCategory(txs, await client().categories());
     if (o.json) return printJson(s);
     console.log(`${dollars(s.cents)} spent in ${s.count} purchases since ${window.since.slice(0, 10)}; ${dollars(s.excluded.cents)} in ${s.excluded.count} transfers and round-ups left out`);
@@ -149,14 +149,14 @@ export const upVerbs: Verbs = {
 
   /** A write: one transaction's category, or `none` to clear it. Only a child category can be set. */
   async categorise([txId, category]) {
-    if (!txId || !category) die(UP_USAGE);
+    if (!txId || !category) usage(UP_USAGE);
     const c = client();
     const before = await c.transaction(txId!);
     beforeAfter(before, await c.setCategory(txId!, category === "none" ? null : category!));
   },
   /** A write: add one tag to a transaction, or take it off with --remove. */
   async tag([txId, label], o: UpOptions) {
-    if (!txId || !label) die(UP_USAGE);
+    if (!txId || !label) usage(UP_USAGE);
     const c = client();
     const before = await c.transaction(txId!);
     beforeAfter(before, o.remove ? await c.removeTags(txId!, [label!]) : await c.addTags(txId!, [label!]));
@@ -168,11 +168,11 @@ export const upVerbs: Verbs = {
     if (verb === undefined) {
       const hooks = await c.webhooks();
       if (o.json) return printJson(hooks);
-      if (!hooks.length) return console.log("no webhooks");
+      if (!hooks.length) return console.error("home: no webhooks");
       for (const h of hooks) console.log(`${h.id}  ${h.url ?? "?"}  ${h.description ?? ""}`);
       return;
     }
-    if (!arg) die(UP_USAGE);
+    if (!arg) usage(UP_USAGE);
     if (verb === "get") {
       const { secretKey: _, ...hook } = await c.webhook(arg!); // Up returns the secret only on creation; never print one
       return printJson(hook);
@@ -192,6 +192,6 @@ export const upVerbs: Verbs = {
       console.log(`created ${h.id}; its secret is in ${path} (0600)`);
       return;
     }
-    die(UP_USAGE);
+    usage(UP_USAGE);
   },
 };

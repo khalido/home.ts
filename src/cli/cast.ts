@@ -11,7 +11,7 @@ import { tlsConnect } from "../connectors/cast/tls.ts";
 import { addressBook } from "../discover.ts";
 import { FINDERS } from "../finders.ts";
 import type { Part } from "../home.ts";
-import { addresses, die, expandHome, fail, printJson, text, type Verbs } from "./context.ts";
+import { addresses, expandHome, fail, printJson, text, usage, type Verbs } from "./context.ts";
 
 /** Every Cast device and group, read once: what `home status` and `home probe` run without a config. Cached addresses first; discovery when there are none or one fails. */
 export function castNow() {
@@ -43,7 +43,7 @@ export const CAST_USAGE =
 /** A 0–100 argument as the 0–1 a Cast device takes. */
 function percentLevel(value: string | undefined): number {
   const n = Number(value);
-  if (value === undefined || value.trim() === "" || !(n >= 0 && n <= 100)) die(CAST_USAGE);
+  if (value === undefined || value.trim() === "" || !(n >= 0 && n <= 100)) usage(CAST_USAGE);
   return n / 100;
 }
 
@@ -60,24 +60,24 @@ export const CAST_OPTIONS: [string, string, { type: unknown[] }?][] = [
 
 export const castVerbs: Verbs = {
   async volume([name, value]) {
-    if (!name) die(CAST_USAGE);
+    if (!name) usage(CAST_USAGE);
     const level = percentLevel(value);
     await withCast((c) => c.setVolume(name!, level));
   },
   async mute([name, value]) {
-    if (!name || (value !== "on" && value !== "off")) die(CAST_USAGE);
+    if (!name || (value !== "on" && value !== "off")) usage(CAST_USAGE);
     await withCast((c) => c.setMuted(name!, value === "on"));
   },
   async stop([name]) {
-    if (!name) die(CAST_USAGE);
+    if (!name) usage(CAST_USAGE);
     await withCast((c) => c.stop(name!));
   },
   async announce(_, o) {
     const [to, say, file] = [text(o.to), text(o.say), text(o.file)];
     // cac gives "true" for a flag with no value: `--say` alone must not speak the word "true", so each flag needs a value after it.
     const bare = ["--to", "--say", "--file"].some((f) => process.argv.some((a, i) => a === f && (process.argv[i + 1] === undefined || process.argv[i + 1]!.startsWith("--"))));
-    if (bare) die(CAST_USAGE);
-    if (!to || !say === !file) die(CAST_USAGE);
+    if (bare) usage(CAST_USAGE);
+    if (!to || !say === !file) usage(CAST_USAGE);
     const volume = o.volume === undefined ? undefined : percentLevel(text(o.volume));
     let type: string;
     let bytes: Uint8Array;

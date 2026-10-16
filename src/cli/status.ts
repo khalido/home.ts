@@ -15,7 +15,7 @@ import { kw, type Manifest } from "../manifest.ts";
 import { MANIFESTS, manifestOf } from "../manifests.ts";
 import { castNow } from "./cast.ts";
 import { printersNow } from "./printers.ts";
-import { addresses, configPathOf, env, fail, fromConfig, type Options, printJson, readConfig, settle, TOKEN_FILE } from "./context.ts";
+import { addresses, CliError, configPathOf, env, fail, fromConfig, type Options, printJson, readConfig, settle, TOKEN_FILE } from "./context.ts";
 import { enphaseFromEnv } from "./enphase.ts";
 import { hueFromEnv } from "./hue.ts";
 import { upFromEnv } from "./up.ts";
@@ -70,7 +70,8 @@ async function statusFromEnv(manifests: Manifest[]): Promise<Record<string, Row>
       try {
         return [await from.build()];
       } catch (error) {
-        rows[m.name] = { status: "unavailable", needs, detail: (error as Error).message };
+        const fix = error instanceof CliError && error.fix ? ` (run \`${error.fix}\`)` : "";
+        rows[m.name] = { status: "unavailable", needs, detail: `${(error as Error).message}${fix}` };
         return [];
       }
     }),
@@ -109,6 +110,7 @@ export async function status(o: Options, only?: string): Promise<void> {
   const rows = path ? await statusFromConfig(path, only) : await statusFromEnv(manifests);
   if (only !== undefined) {
     const row = rows[only]!;
+    if (row.status !== "connected") process.exitCode = 1; // `home <connector>` is a check a script can test; `home` alone lists every one and exits 0
     return o.json ? printJson(rowRecord(only, row)) : console.log(rowLines(only, row).join("\n"));
   }
   const connected = (name: string) => (rows[name]?.status === "connected" ? (rows[name]!.state as never) : undefined);

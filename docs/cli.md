@@ -20,6 +20,13 @@ home cast mute <name> on|off
 home cast stop <name>         # end the running app; the device returns to its idle screen
 ```
 
+## Output
+
+- **stdout is data, stderr everything else.** Notes such as "nothing to categorise" or "no webhooks" go to stderr, so `home … | jq` never sees them.
+- **`--json` shapes.** `home --json` is one object keyed by connector, with `now` (`energyNow`) first. `home <connector> --json` is that connector's object: `status`, `needs`, `access`, `detail`, `anomaly`, then its state (the weather adds `line`, its text). Lists (`home up transactions`, `uncategorised`, `spend --by merchant`) are arrays, `[]` when empty.
+- **Errors under `--json`** are one object on stderr: `{"error": "…", "code": "usage" | "auth" | "network" | "error", "fix": "home enphase login"}`; `fix` is there only when one command resolves it. In text: `home: <error> (run \`<fix>\`)`.
+- **Exit codes.** 0 success, empty results included. 1 a failure, and `home <connector>` when that connector is not `connected`, so a script can test one. 2 a wrong command, verb or argument. `home` alone lists every connector and exits 0 whatever their state.
+
 With `--config <home.jsonc>` or `HOME_CONFIG`, `status` runs the integrations the config describes until each has answered (at most 15 s) and `probe` takes its addresses from it; keys still come from the shell, by the names in the file. Without one, it reads `HUE_*` and the other names in `.env.example` from the shell, and parses arguments with [cac](https://github.com/cacjs/cac), which also generates `home --help`. Every connector has a verb of its own: `home amber`, `home cast`, `home hue` print only that connector's lines (`--json` for its record), and the verbs that need more sit under it (`home hue pair`, `home enphase login`, `home cast announce …`). The commands come from each connector's manifest (`src/manifest.ts`), as does `.env.example` (`bun run gen`). With no `HUE_BRIDGE_HOST` it finds the bridge by mDNS (`dns-sd`, macOS) every time and caches nothing. `home` with no arguments is `status`:
 
 ```

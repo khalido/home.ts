@@ -2,11 +2,11 @@
 import { existsSync } from "node:fs";
 import { checkHome } from "../config.ts";
 import { manifestOf } from "../manifests.ts";
-import { configPathOf, die, env, fromConfig, type Options, printJson, readConfig } from "./context.ts";
+import { configPathOf, env, fromConfig, type Options, printJson, readConfig, usage } from "./context.ts";
 
 export async function configCommand(verb: string | undefined, file: string | undefined, o: Options): Promise<void> {
   const path = file ?? configPathOf(o);
-  if (verb !== "check" || !path) die("usage: home config check [path]   (or set HOME_CONFIG, or pass --config)");
+  if (verb !== "check" || !path) usage("usage: home config check [path]   (or set HOME_CONFIG, or pass --config)");
   const { config, setup, problems } = checkHome(readConfig(path!), env);
   const files = [
     ...Object.entries(config?.plan ?? {}).flatMap(([k, v]) => (typeof v === "string" ? [[`plan.${k}`, v]] : [])),

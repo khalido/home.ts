@@ -10,11 +10,26 @@ import { createHome, type HomeSnapshot, type Integration, type Part } from "../h
 
 export const env = process.env;
 
-/** Print and exit 1. Only the top level and argument checks call it; helpers `fail`, so `status` can report every integration. */
-export const die = (message: string): never => (console.error(`home: ${message}`), process.exit(1));
-export const fail = (message: string): never => {
-  throw new Error(message);
+/** What went wrong, coarsely, as `--json` errors carry it: `usage` exits 2, the rest 1. */
+export type ErrorCode = "usage" | "auth" | "network" | "error";
+
+/** An error `home` reports in one line, or as `{ error, code, fix }` under `--json`. `fix` is the one command that resolves it. */
+export class CliError extends Error {
+  constructor(
+    message: string,
+    readonly code: ErrorCode = "error",
+    readonly fix?: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Stop the command. `status` catches it per integration, so one failing connector never hides the others. */
+export const fail = (message: string, code?: ErrorCode, fix?: string): never => {
+  throw new CliError(message, code, fix);
 };
+/** A wrong command, verb or argument: the usage line, exit 2. */
+export const usage = (message: string): never => fail(message, "usage");
 
 /** The options cac parses: the global ones, and each command's own. */
 export type Options = { json?: boolean; config?: string; write?: string | true; passes?: number | string; to?: unknown; say?: unknown; file?: unknown; volume?: number | string };

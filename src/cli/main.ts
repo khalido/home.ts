@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 // `home`: the terminal layer. Commands come from cac; one `home <connector>` per manifest, its verbs from src/cli/<connector>.ts.
 import { cac } from "cac";
+import { ConnectorError } from "../connector.ts";
 import { MANIFESTS } from "../manifests.ts";
 import { cacheCommand } from "./cache.ts";
 import { CAST_OPTIONS, CAST_USAGE, castVerbs } from "./cast.ts";
 import { configCommand } from "./config.ts";
-import { addresses, die, type Options, type Verbs } from "./context.ts";
+import { addresses, CliError, type ErrorCode, type Options, usage, type Verbs } from "./context.ts";
 import { discover } from "./discover.ts";
 import { enphaseVerbs } from "./enphase.ts";
 import { hueVerbs } from "./hue.ts";
@@ -56,7 +57,7 @@ for (const m of MANIFESTS) {
   const c = cli.command(`${m.name} [verb] [...args]`, `${m.title}: its status${v ? `; ${Object.keys(v.verbs).join(", ")}` : ""}`);
   for (const [raw, what, config] of v?.options ?? []) c.option(raw, what, config);
   c.action((verb: string | undefined, args: string[], o: Options) =>
-    verb === undefined ? status(o, m.name) : (v && Object.hasOwn(v.verbs, verb) ? v.verbs[verb]! : () => die(v?.usage ?? `usage: home ${m.name}`))(args, o),
+    verb === undefined ? status(o, m.name) : (v && Object.hasOwn(v.verbs, verb) ? v.verbs[verb]! : () => usage(v?.usage ?? `usage: home ${m.name}`))(args, o),
   );
 }
 // Hue's verbs also stand alone, as typed before the CLI had `home hue`: `home lights off`, `home room …`, `home scene …`, `home pair`.
@@ -64,13 +65,25 @@ for (const [verb, run] of Object.entries(hueVerbs)) cli.command(`${verb} [...arg
 
 cli.help();
 
-let failed: string | undefined;
+/** An error as `home` reports it: what went wrong, a coarse code, and the command that fixes it when there is one. */
+function describe(e: unknown): { error: string; code: ErrorCode; fix?: string } {
+  const error = e instanceof Error ? e.message : String(e);
+  if (e instanceof CliError) return { error, code: e.code, fix: e.fix };
+  if (e instanceof Error && e.name === "CACError") return { error, code: "usage" }; // cac: a missing argument or an unknown option
+  if (e instanceof ConnectorError && (e.status === 401 || e.status === 403)) return { error, code: "auth" };
+  // A timeout, or a socket error Bun and Node tag with a code (ECONNREFUSED, ENOTFOUND). A bare TypeError is more likely a bug.
+  const socket = typeof (e as { code?: unknown })?.code === "string" && /^E[A-Z]+$/.test((e as { code: string }).code);
+  if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError" || socket)) return { error, code: "network" };
+  return { error, code: "error" };
+}
+
+let failed: unknown;
 try {
   cli.parse(process.argv, { run: false });
-  if (cli.matchedCommand === statusCommand && cli.args.length) failed = `unknown command "${cli.args[0]}"; \`home --help\` lists them`;
+  if (cli.matchedCommand === statusCommand && cli.args.length) usage(`unknown command "${cli.args[0]}"; \`home --help\` lists them`);
   else await cli.runMatchedCommand();
 } catch (e) {
-  failed = e instanceof Error ? e.message : String(e);
+  failed = e ?? "failed";
 } finally {
   // Addresses discovery confirmed are kept whether the command succeeded or not; a cache that cannot be written is a warning, not a failure.
   try {
@@ -79,4 +92,9 @@ try {
     console.error(`home: address cache not written: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
-if (failed !== undefined) die(failed);
+// stdout is data, stderr everything else: under --json an error is one JSON object on stderr. Exit 2 for usage, 1 for the rest.
+if (failed !== undefined) {
+  const r = describe(failed);
+  console.error(process.argv.includes("--json") ? JSON.stringify(r) : `home: ${r.error}${r.fix ? ` (run \`${r.fix}\`)` : ""}`);
+  process.exit(r.code === "usage" ? 2 : 1);
+}

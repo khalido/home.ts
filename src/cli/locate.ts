@@ -4,10 +4,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { checkPlan, parseJsonc } from "../config.ts";
 import { applyLocation, geocode } from "../locate.ts";
-import { configPathOf, die, fail, type Options, printJson, writeTo } from "./context.ts";
+import { configPathOf, fail, type Options, printJson, usage, writeTo } from "./context.ts";
 
 export async function locate(words: string[], o: Options): Promise<void> {
-  const address = words.join(" ").trim() || die('usage: home locate "<street address>" [--write [path]]   (the address first: a word after --write is its path)');
+  const address = words.join(" ").trim() || usage('usage: home locate "<street address>" [--write [path]]   (the address first: a word after --write is its path)');
   const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
   const at = (await geocode(address, { fetch, userAgent: `khalido-home/${version}` })) ?? fail("Nominatim found no match; try the street, suburb and state");
   const write = writeTo(o);

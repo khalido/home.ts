@@ -24,7 +24,7 @@ export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
 
 /** Enphase as an integration from IQ_GATEWAY_HOST and the token file, for `home status`. */
 export function enphaseFromEnv() {
-  const t = enphaseToken() ?? fail("no token; run `home enphase login`");
+  const t = enphaseToken() ?? fail("no Enphase token", "auth", "home enphase login");
   return enphase({ host: env.IQ_GATEWAY_HOST!, token: t.token, fetch: bunGatewayFetch() });
 }
 

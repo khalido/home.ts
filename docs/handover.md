@@ -4,11 +4,12 @@
 
 ## Where things stand
 
-- Eight connectors: Hue, Daikin, Enphase, Cast, printers, Amber, Up, weather. All but Hue and printers have read live. `bun run check` clean, 331 tests. The global `home` is a `bun link` to this repo.
+- Eight connectors: Hue, Daikin, Enphase, Cast, printers, Amber, Up, weather. All but Hue and printers have read live. `bun run check` clean, 337 tests. The global `home` is a `bun link` to this repo.
 - **GitHub:** `khalido/home.ts`, **private**, `main` only, one squashed first commit under the noreply address (old history on the local branch `pre-squash`, never pushed). KO reviews it and flips it public himself. The fx workflow stays unpinned while KO develops it.
 - **Every export is named** (no `export *`); `test/exports.test.ts` fails when an entry point's list changes. All entry points load on Node 26.11.1 from `dist/`.
 - **Weather by the hour** landed today: an `hourly` slice (Open-Meteo, 48 hours from the home's midnight) and `dayBlocks`, morning 6–12, afternoon 12–18, evening 18–22, with one `condition` word. Times and blocks follow the home's time zone (`location.timezone`, or `HOME_TIMEZONE` for `home` from env). Read live for Sydney CBD, also with `TZ=UTC`.
 - **Up** reads live with a household filter (`UP_HOUSEHOLD="home tag:home"`, `UP_ACCOUNT="JOINT TRANSACTIONAL"`); no write has run. A session whose environment holds an older `UP_TOKEN` wins over the repo's `.env`, so run live reads with `env -u UP_TOKEN`.
+- **The CLI has an output contract** (`docs/cli.md`, Output), after kotools: stdout data, stderr notes, `--json` errors as `{error, code, fix}` on stderr, exit 0/1/2, `home <connector>` exits 1 when not connected. `test/cli.test.ts` holds it.
 - No write has reached a real device except `setPower(true)` on the Daikin at KO's request.
 
 ## Waiting on KO
@@ -29,7 +30,7 @@
 6. **Weather, more**: Google's hourly as a second `hourly` source; the hourly rain chance as the fallback when the minute forecast fails. Then Transport NSW, then calendar (`docs/google.md`).
 7. **First live printer read**: Brother on, `home discover`, `home printers`.
 8. **Typed actions** (jaldi): start with a typed accessor from `loadHome` (it returns `Integration<any>[]`).
-9. **Worth KO's thought** (architecture review): discovery spawns macOS `dns-sd`, so Cast cannot run on a Pi (`multicast-dns` would); env and config build integrations two ways (`FROM_ENV`, `loadHome`, `envFromConfig`); the relocator may be more than DHCP-reserved devices need; abort-cancels-read is tested only for Amber; `src/cli/` has few tests; Daikin's 404 is `unavailable` though the rule says that means a rejected key.
+9. **Worth KO's thought** (architecture review): discovery spawns macOS `dns-sd`, so Cast cannot run on a Pi (`multicast-dns` would); env and config build integrations two ways (`FROM_ENV`, `loadHome`, `envFromConfig`); the relocator may be more than DHCP-reserved devices need; abort-cancels-read is tested only for Amber; `src/cli/` has few tests beyond `test/cli.test.ts`; Daikin's 404 is `unavailable` though the rule says that means a rejected key.
 10. **Ideas** in `docs/ideas.md`, with the survey of what other homes run (Shelly, Fronius, forecast.solar, MQTT lead).
 
 ## To see the current state
