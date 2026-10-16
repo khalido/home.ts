@@ -1,14 +1,17 @@
-import { type Clock, realClock } from "../../clock.ts";
+import { type Clock, localTime, realClock } from "../../clock.ts";
 import type { Integration, Status } from "../../home.ts";
 import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
+import { blockText, type DayBlocks, dayBlocks } from "./blocks.ts";
 import { openMeteo } from "./open-meteo.ts";
 import { type RainSoon, rainSoon } from "./rain.ts";
 import { DEFAULT_POLL_MINUTES, type ForecastDay, RAIN_HORIZON_MINUTES, type Slices, sourcePollMinutes, type SourceReading, mergeWeather, type WeatherSource } from "./source.ts";
 import { type SunNow, sunNow } from "./sun.ts";
 
 export {
+  type Condition,
   type ForecastDay,
+  type ForecastHour,
   mergeWeather,
   nextPoll,
   type Place,
@@ -19,6 +22,7 @@ export {
   type Slices,
   type SourceReading,
   type WeatherForecast,
+  type WeatherHourly,
   type WeatherNow,
   type WeatherRain,
   type WeatherSky,
@@ -26,6 +30,7 @@ export {
 } from "./source.ts";
 export { type SunNext, type SunNow, sunNow } from "./sun.ts";
 export { type RainSoon, rainSoon } from "./rain.ts";
+export { type BlockName, blockText, type DayBlock, type DayBlocks, dayBlocks } from "./blocks.ts";
 export { bom, type BomOptions } from "./bom.ts";
 export { openMeteo, type OpenMeteoOptions } from "./open-meteo.ts";
 export { google, type GoogleOptions } from "./google.ts";
@@ -39,14 +44,16 @@ const MIN_POLL_MS = 60_000;
  * Where the home is, and the sources in preference order: each slice comes from the first source with a fresh one.
  * The default is `[openMeteo()]`, which works anywhere with no key. In Australia put `bom({ fetch: ftpFetch(), forecastLocation })`
  * first: it needs the FTP transport, so it is opt-in. `pollMinutes` (default 15) is how often observations and sky are read;
- * forecasts follow their issue times.
+ * forecasts follow their issue times. `timeZone` (IANA, the runtime's when left out) is where the home's day and its times are.
  */
-export type WeatherConfig = { latitude: number; longitude: number; sources?: WeatherSource[]; pollMinutes?: number; clock?: Clock };
+export type WeatherConfig = { latitude: number; longitude: number; sources?: WeatherSource[]; pollMinutes?: number; timeZone?: string; clock?: Clock };
 
 /** The weather in the snapshot: one slice each from the preferred fresh source, the sun, and how each source is doing. */
 export type WeatherState = Slices & {
   sun: SunNow;
   rainSoon?: RainSoon; // recomputed at every report and every 5 minutes; a consumer with its own clock calls `rainSoon(state.rain, now)`
+  blocks?: DayBlocks; // the same: `dayBlocks(state.hourly, now, state.timeZone)`
+  timeZone?: string; // the config's, which the blocks and the text use
   sources: Record<string, { read: boolean; problem?: string; stopped?: string; anomaly?: string }>;
 };
 
@@ -78,11 +85,11 @@ export function weather(config: WeatherConfig): Integration<WeatherState> {
             return [s.name, { read: r !== undefined, problem: r?.problem, stopped: r?.stop, anomaly: r?.anomaly }];
           }),
         );
-        const any = slices.now || slices.forecast || slices.sky || slices.rain;
+        const any = slices.now || slices.forecast || slices.hourly || slices.sky || slices.rain;
         const status: Status = any ? "connected" : sources.every((s) => readings.get(s.name)?.stop) ? "unavailable" : "disconnected";
         const notes = (k: "problem" | "stopped" | "anomaly") => Object.values(report).map((r) => r[k]).filter(Boolean).join("; ") || undefined;
         const detail = [notes("stopped"), notes("problem")].filter(Boolean).join("; ") || undefined;
-        update({ status, detail, anomaly: notes("anomaly"), state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), sources: report } });
+        update({ status, detail, anomaly: notes("anomaly"), state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), blocks: dayBlocks(slices.hourly, at, config.timeZone), timeZone: config.timeZone, sources: report } });
       };
       const poll = async (source: WeatherSource) => {
         const floorMs = (source.minPollMinutes ?? 0) * 60_000;
@@ -113,8 +120,8 @@ export function weather(config: WeatherConfig): Integration<WeatherState> {
   };
 }
 
-/** "20:20" in the runtime's time zone, or "?". */
-const hhmm = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false }) : "?");
+/** "20:20" in the home's time zone (the runtime's when unset), or "?". */
+const hhmmIn = (iso: string | undefined, timeZone?: string) => (iso ? localTime(Date.parse(iso), timeZone) : "?");
 const day = (d?: ForecastDay) =>
   d ? [d.minC === undefined && d.maxC === undefined ? "" : `${d.minC ?? "?"}–${d.maxC ?? "?"} °C`, d.text?.replace(/\.$/, "").toLowerCase() ?? "", d.rainChance === undefined ? "" : `${d.rainChance}% chance of rain`].filter(Boolean).join(" ") : "?";
 
@@ -129,8 +136,9 @@ export function rainText(rain: Slices["rain"], r: RainSoon | undefined): string 
 }
 
 /** The weather in one line, every part named by its source and time, never mixed. */
-export function weatherText(w: Slices & { rainSoon?: RainSoon }, sun: SunNow): string {
+export function weatherText(w: Slices & { rainSoon?: RainSoon; timeZone?: string }, sun: SunNow): string {
   const n = w.now;
+  const hhmm = (iso?: string) => hhmmIn(iso, w.timeZone);
   const readings = n
     ? [
         field(n.tempC, (v) => `${v} °C`),
@@ -149,6 +157,12 @@ export function weatherText(w: Slices & { rainSoon?: RainSoon }, sun: SunNow): s
   return [now, forecast, sky, rainText(w.rain, w.rainSoon), sunText].filter(Boolean).join(" · ");
 }
 
+/** "today: afternoon …; evening …" and the same for tomorrow, when there is an hourly forecast. */
+const blockLines = (state: Pick<WeatherState, "blocks" | "timeZone">) =>
+  state.blocks
+    ? (["today", "tomorrow"] as const).filter((d) => state.blocks![d].length).map((d) => `${d}: ${state.blocks![d].map((b) => blockText(b, state.timeZone)).join("; ")} (${state.blocks!.source})`)
+    : [];
+
 export const manifest: Manifest<WeatherState> = {
   name: "weather",
   title: "Weather",
@@ -158,9 +172,10 @@ export const manifest: Manifest<WeatherState> = {
   env: [
     { name: "HOME_LATITUDE", example: "-33.8688", what: "the home's position for weather and the sun (this one is Sydney CBD)" },
     { name: "HOME_LONGITUDE", example: "151.2093", what: "" },
+    { name: "HOME_TIMEZONE", example: "Australia/Sydney", optional: true, what: "the home's IANA time zone for weather times and day blocks; this machine's when unset" },
     { name: "HOME_BOM_FORECAST", example: "Sydney", optional: true, what: "BOM précis location by name or aac; unset, the forecast comes from Open-Meteo" },
     { name: "GOOGLE_WEATHER_KEY", example: "", optional: true, what: "Maps Platform key with the Weather API enabled" },
   ],
-  lines: ({ state }) => (state ? [weatherText(state, state.sun)] : []),
+  lines: ({ state }) => (state ? [weatherText(state, state.sun), ...blockLines(state)] : []),
   record: ({ state }) => (state ? { ...state, line: weatherText(state, state.sun) } : {}),
 };

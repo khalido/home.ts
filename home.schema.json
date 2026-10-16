@@ -26,7 +26,7 @@
           "type": "string"
         },
         "timezone": {
-          "description": "the home's IANA time zone, where its day starts (Enphase's today); the runtime's when left out",
+          "description": "the home's IANA time zone, where its day starts (Enphase's and Up's today, the weather's day blocks) and the zone weather times show in; the runtime's when left out",
           "type": "string"
         }
       },

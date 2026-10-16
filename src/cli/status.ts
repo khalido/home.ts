@@ -6,6 +6,7 @@ import { tlsConnect } from "../connectors/cast/tls.ts";
 import { daikin } from "../connectors/daikin/index.ts";
 import { bom, google, openMeteo, weather, type WeatherSource } from "../connectors/weather/index.ts";
 import { ftpFetch } from "../connectors/weather/ftp.ts";
+import { isTimeZone } from "../clock.ts";
 import { loadHome } from "../config.ts";
 import { energyNow, gridText } from "../energy.ts";
 import { FINDERS } from "../finders.ts";
@@ -29,6 +30,12 @@ export function place(): { latitude: number; longitude: number } {
   return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : fail("HOME_LATITUDE and HOME_LONGITUDE must be numbers");
 }
 
+/** HOME_TIMEZONE, the env form of the config's `location.timezone`; this machine's zone when unset. */
+export function homeTimeZone(): string | undefined {
+  const zone = env.HOME_TIMEZONE;
+  return zone === undefined || isTimeZone(zone) ? zone : fail(`HOME_TIMEZONE: an IANA time zone, e.g. Australia/Sydney, not ${zone}`);
+}
+
 /** The weather sources KO's env sets up, in preference order: BOM (opt-in, with the FTP transport), Open-Meteo, then Google if keyed, as the last resort. */
 export const weatherSources = (): WeatherSource[] => [
   bom({ fetch: ftpFetch(), forecastLocation: env.HOME_BOM_FORECAST }),
@@ -46,7 +53,7 @@ const FROM_ENV: Record<string, { needs?: () => string[]; build: () => Integratio
   enphase: { needs: () => (existsSync(TOKEN_FILE) ? [] : ["`home enphase login`"]), build: enphaseFromEnv },
   amber: { build: () => amber({ key: env.AMBER_KEY!, siteId: env.AMBER_SITE_ID, fetch }) },
   up: { build: upFromEnv },
-  weather: { build: () => weather({ ...place(), sources: weatherSources() }) },
+  weather: { build: () => weather({ ...place(), sources: weatherSources(), timeZone: homeTimeZone() }) },
   cast: { build: castNow },
   printers: { build: printersNow },
 };

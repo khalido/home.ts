@@ -58,7 +58,7 @@ export const HomeConfig = z.looseObject({
       latitude: z.number().min(-90).max(90),
       longitude: z.number().min(-180).max(180),
       bomForecast: z.string().optional().describe("BOM précis location by name or aac, e.g. Sydney"),
-      timezone: z.string().refine(isTimeZone, "an IANA time zone, e.g. Australia/Sydney").optional().describe("the home's IANA time zone, where its day starts (Enphase's today); the runtime's when left out"),
+      timezone: z.string().refine(isTimeZone, "an IANA time zone, e.g. Australia/Sydney").optional().describe("the home's IANA time zone, where its day starts (Enphase's and Up's today, the weather's day blocks) and the zone weather times show in; the runtime's when left out"),
     })
     .optional(),
   weather: z
@@ -259,7 +259,7 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
       google: () => google({ key: env(config.weather!.googleKey!), fetch: net }),
     };
     const sources = config.weather?.sources?.map((s) => make[s]());
-    integrations.push(weather({ latitude, longitude, sources, pollMinutes: config.weather?.pollMinutes }));
+    integrations.push(weather({ latitude, longitude, sources, pollMinutes: config.weather?.pollMinutes, timeZone: config.location.timezone }));
   }
   return integrations;
 }

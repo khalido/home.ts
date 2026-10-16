@@ -15,6 +15,12 @@ export const realClock: Clock = {
 /** The calendar day at `ms` in an IANA time zone (the runtime's when left out), as YYYY-MM-DD: where "today" starts. */
 export const localDay = (ms: number, timeZone?: string) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(ms);
 
+/** The hour of the day (0–23) at `ms` in an IANA time zone, the runtime's when left out. */
+export const localHour = (ms: number, timeZone?: string) => Number(new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(ms));
+
+/** "20:15" at `ms` in an IANA time zone, the runtime's when left out. */
+export const localTime = (ms: number, timeZone?: string) => new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms);
+
 /** Whether a name is an IANA time zone this runtime knows. */
 export function isTimeZone(name: string): boolean {
   try {

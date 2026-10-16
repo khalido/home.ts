@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { type Clock, createHome } from "../src/index.ts";
-import { bom, google, openMeteo, rainSoon, rainText, type SourceReading, sunNow, weather, type WeatherSource, mergeWeather } from "../src/connectors/weather/index.ts";
+import type { Part } from "../src/home.ts";
+import { blockText, bom, dayBlocks, google, manifest, openMeteo, rainSoon, rainText, weatherText, type SourceReading, sunNow, weather, type WeatherSource, type WeatherState, mergeWeather } from "../src/connectors/weather/index.ts";
 import { nextPoll } from "../src/connectors/weather/source.ts";
 import { sunDisagrees } from "../src/connectors/weather/sun.ts";
 import { toForecast, toNow } from "../src/connectors/weather/bom.ts";
 import { toRain, toSlices as googleSlices } from "../src/connectors/weather/google.ts";
-import { toSlices as openMeteoSlices } from "../src/connectors/weather/open-meteo.ts";
+import { toSlices as openMeteoSlices, wmoCondition } from "../src/connectors/weather/open-meteo.ts";
 
 const text = (name: string) => Bun.file(new URL(`./fixtures/weather/${name}`, import.meta.url)).text();
 // BOM: invented values in the real shape (see each file's header). Open-Meteo: a real response for Sydney CBD,
@@ -182,41 +183,64 @@ describe("bom source", () => {
 });
 
 describe("Open-Meteo", () => {
-  const fetchedAt = Date.parse("2026-10-13T09:20:00Z");
+  const fetchedAt = Date.parse("2026-10-16T05:50:00Z"); // 16:50 in Sydney; the fixture is a live read of Sydney CBD at 16:45
   test("a real Sydney response: every slice modelled, local times to UTC, today by local date", () => {
     const r = openMeteoSlices(openMeteoJson, fetchedAt);
     expect(r.anomaly).toBeUndefined();
-    expect(r.now).toMatchObject({ source: "open-meteo", modelled: true, at: "2026-10-13T09:15:00.000Z", tempC: 16.3, apparentC: 16.1, humidity: 91, windKmh: 11.8, windDeg: 173, gustKmh: 25.9 });
+    expect(r.now).toMatchObject({ source: "open-meteo", modelled: true, at: "2026-10-16T05:45:00.000Z", tempC: 18.1, apparentC: 15.7, humidity: 56, windKmh: 15.2, windDeg: 100, gustKmh: 39.2 });
     expect(r.now!.rainMm).toBeUndefined(); // `precipitation` is the last 15 minutes, not since 9am
-    expect(r.sky).toMatchObject({ cloudPct: 100, uvIndex: 0, radiationWm2: 0 });
-    expect(r.sky!.hours).toHaveLength(6);
-    expect(r.sky!.hours[0]!.at).toBe("2026-10-13T09:00:00.000Z");
-    expect(r.forecast!.today).toEqual({ date: "2026-10-13", minC: 15.7, maxC: 23.8, rainChance: 100, rainMm: 23.9, text: "Moderate rain showers", code: "81" });
-    expect(r.forecast!.tomorrow).toMatchObject({ date: "2026-10-14", maxC: 16.3, text: "Moderate drizzle" });
+    expect(r.sky).toMatchObject({ cloudPct: 19, uvIndex: 1.8, radiationWm2: 401 });
+    expect(r.sky!.hours).toHaveLength(6); // from the hour it was read
+    expect(r.sky!.hours[0]).toEqual({ at: "2026-10-16T05:00:00.000Z", cloudPct: 10, uvIndex: 3.15, radiationWm2: 571 });
+    expect(r.forecast!.today).toEqual({ date: "2026-10-16", minC: 13.1, maxC: 19.3, rainChance: 87, rainMm: 1.8, text: "Moderate drizzle", code: "53" });
+    expect(r.forecast!.tomorrow).toMatchObject({ date: "2026-10-17", maxC: 19.3, text: "Light drizzle" });
   });
 
-  test("an unknown weather code is flagged", () => {
+  test("the hourly forecast: 48 hours from the home's midnight, each code also in a word", () => {
+    const { hourly } = openMeteoSlices(openMeteoJson, fetchedAt);
+    expect(hourly).toMatchObject({ source: "open-meteo", modelled: true, at: "2026-10-16T05:50:00.000Z" });
+    expect(hourly!.hours).toHaveLength(48);
+    expect(hourly!.hours[0]).toEqual({ at: "2026-10-15T13:00:00.000Z", tempC: 15.1, apparentC: 13.5, rainChance: 87, rainMm: 0.3, windKmh: 11.8, gustKmh: 24.5, cloudPct: 66, uvIndex: 0, code: "51", condition: "drizzle" });
+  });
+
+  test("WMO codes in words, by family", () => {
+    expect([0, 1, 2, 3, 45, 53, 63, 73, 81, 85, 95, 99, 42].map(wmoCondition)).toEqual(["clear", "clear", "partly cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "showers", "snow", "storm", "storm", undefined]);
+  });
+
+  test("one offset for every time, across a daylight-saving change, as Open-Meteo applies it", () => {
+    // Live, 2026-10-16: Sydney's hours for 2026-10-03 to 04 all came at +11, including 02:00 on the 4th, which Sydney skipped.
+    const dst = structuredClone(openMeteoJson);
+    dst.hourly.time.splice(0, 4, "2026-10-04T00:00", "2026-10-04T01:00", "2026-10-04T02:00", "2026-10-04T03:00");
+    expect(openMeteoSlices(dst, fetchedAt).hourly!.hours.slice(0, 4).map((h) => h.at)).toEqual(["2026-10-03T13:00:00.000Z", "2026-10-03T14:00:00.000Z", "2026-10-03T15:00:00.000Z", "2026-10-03T16:00:00.000Z"]);
+  });
+
+  test("an unknown weather code is flagged, once per code in the hourly forecast", () => {
     const odd = structuredClone(openMeteoJson);
     odd.daily.weather_code[1] = 42;
-    expect(openMeteoSlices(odd, fetchedAt).anomaly).toBe("unknown WMO code 42 on 2026-10-14");
+    odd.hourly.weather_code[3] = 42;
+    odd.hourly.weather_code[4] = 42;
+    const r = openMeteoSlices(odd, fetchedAt);
+    expect(r.anomaly).toBe("unknown WMO code 42 in the hourly forecast; unknown WMO code 42 on 2026-10-17");
+    expect(r.hourly!.hours[3]).toMatchObject({ code: "42", condition: undefined });
   });
 
   test("an hour with no usable time is skipped and flagged; the rest of the read stands", () => {
     const odd = structuredClone(openMeteoJson);
     odd.hourly.time[2] = "soon";
     const r = openMeteoSlices(odd, fetchedAt);
-    expect(r.sky!.hours).toHaveLength(5);
-    expect(r.now?.tempC).toBe(16.3);
+    expect(r.hourly!.hours).toHaveLength(47);
+    expect(r.now?.tempC).toBe(18.1);
     expect(r.anomaly).toBe("hourly time not understood: soon");
   });
 
-  test("a current time that does not parse drops now and sky, not the forecast", () => {
+  test("a current time that does not parse drops now and sky, not the forecasts", () => {
     const odd = structuredClone(openMeteoJson);
     odd.current.time = "";
     const r = openMeteoSlices(odd, fetchedAt);
     expect(r.now).toBeUndefined();
     expect(r.sky).toBeUndefined();
-    expect(r.forecast?.today?.maxC).toBe(23.8);
+    expect(r.forecast?.today?.maxC).toBe(19.3);
+    expect(r.hourly?.hours).toHaveLength(48);
     expect(r.anomaly).toBe("current.time not understood: ");
   });
 
@@ -234,12 +258,13 @@ describe("Open-Meteo cadence", () => {
     const asked: string[] = [];
     const f = (async (url: string) => (asked.push(url), new Response(JSON.stringify(openMeteoJson)))) as unknown as typeof fetch;
     const s = openMeteo({ fetch: f });
-    const t0 = Date.parse("2026-10-13T09:05:00Z");
+    const t0 = Date.parse("2026-10-16T05:05:00Z");
     await s.read(req(t0));
     const later = await s.read(req(t0 + 15 * 60_000));
     expect(asked.map((u) => u.includes("daily="))).toEqual([true, false]);
     expect(later.forecast?.fetchedAt).toBe(new Date(t0).toISOString());
     expect(later.sky?.hours).toHaveLength(6); // kept from the hourly read
+    expect(later.hourly?.at).toBe(new Date(t0).toISOString());
     await s.read(req(t0 + 60 * 60_000));
     expect(asked.map((u) => u.includes("daily="))).toEqual([true, false, true]);
   });
@@ -498,6 +523,20 @@ describe("weather integration", () => {
     expect(part.state).toMatchObject({ now: { source: "bom", tempC: 16.4 }, forecast: { source: "open-meteo" }, sky: { cloudPct: 100 }, sun: { at: new Date(at).toISOString() } });
   });
 
+  test("the hourly forecast becomes day blocks in the config's time zone, recomputed at each report", async () => {
+    const stop = new AbortController();
+    const t = Date.parse("2026-10-16T05:50:00Z");
+    let sleeps = 0;
+    const clock: Clock = { now: () => t, sleep: async () => void (++sleeps >= 3 && stop.abort()) };
+    const hourly = openMeteoSlices(openMeteoJson, t).hourly!;
+    const home = createHome([weather({ ...sydney, sources: [fake("open-meteo", { hourly }, { hourly: 6 * 3_600_000 })], timeZone: "Australia/Sydney", clock })]);
+    await home.start(stop.signal);
+    const part = home.snapshot().weather as Part<WeatherState>;
+    expect(part.state!.timeZone).toBe("Australia/Sydney");
+    expect(part.state!.blocks).toEqual(dayBlocks(hourly, t, "Australia/Sydney"));
+    expect(manifest.lines(part)[1]).toStartWith("today: afternoon from 16:00 18–18.2 °C, clear");
+  });
+
   test("refresh reads every source now, with force, before the interval is up", async () => {
     const stop = new AbortController();
     const stuck: Clock = { now: () => at, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
@@ -563,5 +602,59 @@ describe("weather integration", () => {
     const home = createHome([weather({ ...sydney, sources: [dead, live], clock })]);
     await home.start(stop.signal);
     expect(home.snapshot().weather).toMatchObject({ status: "connected", detail: "bom: plain fetch cannot read ftp://", state: { now: { source: "open-meteo" } } });
+  });
+});
+
+describe("dayBlocks", () => {
+  const hourly = openMeteoSlices(openMeteoJson, Date.parse("2026-10-16T05:50:00Z")).hourly!;
+  const zone = "Australia/Sydney";
+
+  test("the rest of today and all of tomorrow, cut in the home's time zone", () => {
+    const b = dayBlocks(hourly, Date.parse("2026-10-16T05:50:00Z"), zone)!; // 16:50
+    expect(b.source).toBe("open-meteo");
+    expect(b.today.map((x) => [x.name, x.hours])).toEqual([["afternoon", 2], ["evening", 4]]); // the 16:00 hour has not ended
+    expect(b.tomorrow.map((x) => [x.name, x.date, x.hours])).toEqual([["morning", "2026-10-17", 6], ["afternoon", "2026-10-17", 6], ["evening", "2026-10-17", 4]]);
+    expect(b.tomorrow[0]).toEqual({ name: "morning", date: "2026-10-17", from: "2026-10-16T19:00:00.000Z", to: "2026-10-17T01:00:00.000Z", hours: 6, minC: 14.2, maxC: 18.5, rainChance: 45, rainMm: 0.2, windKmh: 13.4, gustKmh: 33.5, condition: "drizzle" });
+  });
+
+  test("the same hours on a machine in UTC are cut by UTC's day, which is why the home's zone is passed", () => {
+    const b = dayBlocks(hourly, Date.parse("2026-10-16T05:50:00Z"), "UTC")!;
+    expect(b.today.map((x) => x.name)).toEqual(["morning", "afternoon", "evening"]); // 05:50 UTC is still morning there
+  });
+
+  test("a part's worst hour sets its condition; a missing amount leaves the sum out, not zero", () => {
+    const h = structuredClone(hourly);
+    const i = h.hours.findIndex((x) => x.at === "2026-10-17T03:00:00.000Z"); // 14:00 tomorrow
+    h.hours[i] = { ...h.hours[i]!, condition: "storm", rainMm: undefined };
+    const afternoon = dayBlocks(h, Date.parse("2026-10-16T05:50:00Z"), zone)!.tomorrow[1]!;
+    expect(afternoon.condition).toBe("storm");
+    expect(afternoon.rainMm).toBeUndefined();
+    expect(afternoon.rainChance).toBe(43);
+  });
+
+  test("tomorrow is the next calendar day, on a 25-hour day too", () => {
+    // Sydney left daylight saving at 3am on 2026-04-05; 00:30 that day plus 24 hours is still the 5th.
+    const t = Date.parse("2026-04-04T13:30:00Z");
+    const h = { ...hourly, hours: [{ at: "2026-04-05T21:00:00.000Z", tempC: 20 }] }; // 07:00 on the 6th, at +10
+    expect(dayBlocks(h, t, zone)!.tomorrow.map((b) => [b.name, b.date])).toEqual([["morning", "2026-04-06"]]);
+  });
+
+  test("no hourly forecast, no blocks", () => {
+    expect(dayBlocks(undefined, at, zone)).toBeUndefined();
+  });
+
+  test("in words, with the start when a part is under way", () => {
+    const b = dayBlocks(hourly, Date.parse("2026-10-16T05:50:00Z"), zone)!;
+    expect(blockText(b.today[0]!, zone)).toBe("afternoon from 16:00 18–18.2 °C, clear, rain 12%, wind 16.5 km/h gusting 41.8");
+    expect(blockText(b.tomorrow[0]!, zone)).toBe("morning 14.2–18.5 °C, drizzle, rain 45% 0.2 mm, wind 13.4 km/h gusting 33.5");
+  });
+});
+
+describe("weather text in the home's time zone", () => {
+  test("times read in the config's zone, whatever the machine's", () => {
+    const now = { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), tempC: 16.3 };
+    const sun = sunNow(sydney.latitude, sydney.longitude, at);
+    expect(weatherText({ now, timeZone: "Australia/Sydney" }, sun)).toStartWith("open-meteo 20:15 modelled: 16.3 °C");
+    expect(weatherText({ now, timeZone: "UTC" }, sun)).toStartWith("open-meteo 09:15 modelled: 16.3 °C");
   });
 });

@@ -64,8 +64,29 @@ export type WeatherRain = SliceMeta & { segments: RainSegment[] };
 /** How far ahead the rain forecast is kept and read: two hours, KO's call. */
 export const RAIN_HORIZON_MINUTES = 120;
 
-export type SliceName = "now" | "forecast" | "sky" | "rain";
-export type Slices = { now?: WeatherNow; forecast?: WeatherForecast; sky?: WeatherSky; rain?: WeatherRain };
+/** Weather in words, mildest first, so an hour from any source reads the same and a stretch of hours takes its worst. */
+export const CONDITIONS = ["clear", "partly cloudy", "cloudy", "fog", "drizzle", "showers", "rain", "snow", "storm"] as const;
+export type Condition = (typeof CONDITIONS)[number];
+
+/** One forecast hour, starting at `at`. `rainChance` in percent, `rainMm` over the hour, `code` the source's own, `condition` it in a word. */
+export type ForecastHour = {
+  at: string;
+  tempC?: number;
+  apparentC?: number;
+  rainChance?: number;
+  rainMm?: number;
+  windKmh?: number;
+  gustKmh?: number;
+  cloudPct?: number;
+  uvIndex?: number;
+  code?: string;
+  condition?: Condition;
+};
+/** The hourly forecast for today and tomorrow, from the home's midnight. `at` is when it was read. Ask `dayBlocks` for mornings and evenings. */
+export type WeatherHourly = SliceMeta & { hours: ForecastHour[] };
+
+export type SliceName = "now" | "forecast" | "hourly" | "sky" | "rain";
+export type Slices = { now?: WeatherNow; forecast?: WeatherForecast; hourly?: WeatherHourly; sky?: WeatherSky; rain?: WeatherRain };
 
 /** One read of a source: the slices it has (last good ones included), when to call again, and anything to report. */
 export type SourceReading = Slices & {
@@ -105,7 +126,7 @@ export function mergeWeather(readings: { source: WeatherSource; reading?: Source
     }
     return undefined;
   };
-  return { now: pick("now"), forecast: pick("forecast"), sky: pick("sky"), rain: pick("rain") };
+  return { now: pick("now"), forecast: pick("forecast"), hourly: pick("hourly"), sky: pick("sky"), rain: pick("rain") };
 }
 
 /** GET a URL as text (BOM's XML), with the timeout and user agent every source sends. A non-ok status throws `ConnectorError` with it. */
