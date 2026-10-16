@@ -67,6 +67,7 @@ Before writing one, search Home Assistant's [integration list](https://www.home-
 | `docs/philosophy.md`, `docs/using.md`, `docs/config.md`, `docs/cli.md` | why, wiring it in, the config, the command |
 | `docs/cast.md`, `docs/google.md`, `docs/up.md`, `docs/weather-probe.md`, `docs/enphase-notes.md` | the design or investigation behind a connector |
 | `docs/ideas.md` | connectors and features considered, with the research, not yet decided |
+| `docs/devices.md` | devices worth buying for a home: local, Google Home, AU price, whether this library can read them |
 | `docs/handover.md` | where things stand and what is next; disposable, rewritten |
 
 ## Drawing a home

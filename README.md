@@ -101,6 +101,7 @@ The library never reads your environment or a file: callers pass addresses, keys
 | [performance.md](docs/performance.md) · [publishing.md](docs/publishing.md) | measured numbers; how 0.1.0 gets to npm |
 | [cast.md](docs/cast.md) · [google.md](docs/google.md) · [up.md](docs/up.md) · [weather-probe.md](docs/weather-probe.md) · [enphase-notes.md](docs/enphase-notes.md) | the design or investigation behind a connector |
 | [ideas.md](docs/ideas.md) | connectors considered and not yet built, and why |
+| [devices.md](docs/devices.md) | devices worth buying for a home, judged by whether they work locally and this library can read them |
 | [handover.md](docs/handover.md) | where the last session left off |
 
 ## Licence
