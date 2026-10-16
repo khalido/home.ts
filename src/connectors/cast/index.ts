@@ -62,7 +62,7 @@ type Session = CastSession & { ask: (namespace: string, destination: string, typ
  * whatever address discovery last gave. While anything is down or missing, discovery repeats at 1, 5 and 15 minutes, then
  * hourly, as the relocator does; never once per socket. The writes (`CastActions`) go over these same sockets.
  */
-export function cast(config: CastConfig): Integration<CastSnapshot> & CastActions {
+export function cast(config: CastConfig): Integration<CastSnapshot, "cast"> & CastActions {
   const clock = config.clock ?? realClock;
   const pingMs = config.pingMs ?? 5000;
   let snapshot: CastSnapshot = { devices: {}, asOf: asOf(clock) };

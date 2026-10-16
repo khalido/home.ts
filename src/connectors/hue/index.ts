@@ -31,7 +31,7 @@ export type HueConfig = { ip: string; bridgeId: string; key: string; ca: string;
  * Hue as a home integration: a full read on every (re)connect, then patched from the event stream; `refresh` re-reads it all.
  * A bridge that stops answering is looked for by `bridgeId` after three failed reconnects, and followed to its new address.
  */
-export function hue(config: HueConfig): Integration<HueSnapshot> & { readonly client: ReturnType<typeof hueClient> } {
+export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { readonly client: ReturnType<typeof hueClient> } {
   let options = { ...config, fetch: config.fetch ?? bunPinnedFetch(config.bridgeId, config.ca) };
   let client = hueClient(options);
   const clock = config.clock ?? realClock;

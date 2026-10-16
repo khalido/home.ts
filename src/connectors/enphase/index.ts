@@ -36,7 +36,7 @@ export type EnphaseSnapshot = EnphaseState & {
 };
 
 /** The IQ Gateway as a home integration: one read now, then every 60 s. */
-export function enphase(config: EnphaseConfig): Integration<EnphaseSnapshot> {
+export function enphase(config: EnphaseConfig): Integration<EnphaseSnapshot, "enphase"> {
   const clock = config.clock ?? realClock;
   const where = relocator({ host: gatewayHost(config.host), id: config.serial, find: config.find, clock, cached: config.hostCached });
   let client = enphaseClient(config);

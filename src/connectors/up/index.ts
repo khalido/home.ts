@@ -111,7 +111,7 @@ export function toSnapshot(txs: Transaction[], categories: Category[], at: { now
 }
 
 /** Up as a home integration: two months of transactions now, then every 15 minutes. Reads only; it never writes. */
-export function up(config: UpConfig): Integration<UpSnapshot> {
+export function up(config: UpConfig): Integration<UpSnapshot, "up"> {
   const client = upClient(config);
   const clock = config.clock ?? realClock;
   const poll = poller(clock);

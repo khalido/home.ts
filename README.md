@@ -9,6 +9,7 @@ import { hue } from "@khalido/home/hue";
 const home = createHome([hue({ ip, bridgeId, key, ca })], (snapshot) => render(snapshot));
 home.start(signal);           // connects, reads everything, follows the event stream, reconnects
 home.snapshot().hue?.status;  // "connected": from memory, never from the bridge
+home.part("hue")?.state;      // typed: HueSnapshot, from the integration's name
 ```
 
 Every integration keeps its own state current, by event stream or on its own timer. Callers read one snapshot, from memory, in microseconds. [Home Assistant](https://www.home-assistant.io/) is the inspiration and the reference; this is a few files you import, covering only the devices I own. Why it is shaped like this: [docs/philosophy.md](docs/philosophy.md).

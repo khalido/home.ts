@@ -25,7 +25,7 @@ export type AmberConfig = { key: string; siteId?: string; fetch: typeof fetch; c
 export type AmberSnapshot = AmberState & { asOf: string };
 
 /** Amber prices as a home integration: one read now, then every 60 s. */
-export function amber(config: AmberConfig): Integration<AmberSnapshot> {
+export function amber(config: AmberConfig): Integration<AmberSnapshot, "amber"> {
   const client = amberClient(config);
   const clock = config.clock ?? realClock;
   const poll = poller(clock);

@@ -66,7 +66,7 @@ type Target = {
  * `unavailable` for that. Discovery is one shared scan, as Cast's is, not a relocator per printer: it finds printers
  * the config does not list, and after a failed read it looks for the printer's new address (at 1, 5 and 15 minutes, then hourly).
  */
-export function printers(config: PrintersConfig = {}): Integration<PrintersState> {
+export function printers(config: PrintersConfig = {}): Integration<PrintersState, "printers"> {
   const clock = config.clock ?? realClock;
   const fetcher = config.fetch ?? fetch;
   const pollMs = config.pollMs ?? POLL_MS;

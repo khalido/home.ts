@@ -25,7 +25,7 @@ export type DaikinConfig = { host: string; mac?: string; find?: Finder; fetch: t
 export type DaikinSnapshot = DaikinState & { asOf: string };
 
 /** One Daikin AC as a home integration: one read now, then every 120 s. */
-export function daikin(config: DaikinConfig): Integration<DaikinSnapshot> {
+export function daikin(config: DaikinConfig): Integration<DaikinSnapshot, "daikin"> {
   const clock = config.clock ?? realClock;
   const where = relocator({ host: config.host, id: config.mac, find: config.find, clock, cached: config.hostCached });
   let client = daikinClient(config);

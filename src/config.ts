@@ -6,7 +6,6 @@ import { daikin, configSchema as daikinDevice } from "./connectors/daikin/index.
 import { cast, type CastConnect, configSchema as castDevice, resolvedFrom } from "./connectors/cast/index.ts";
 import { bunGatewayFetch, enphase, configSchema as enphaseDevice } from "./connectors/enphase/index.ts";
 import { type AddressCache, addressBook, type Connector, discover, type Finder, type Found, MANY, sameId } from "./discover.ts";
-import type { Integration } from "./home.ts";
 import { envName, filePath } from "./home.ts";
 import { hue, configSchema as hueDevice } from "./connectors/hue/index.ts";
 import { printers, configSchema as printersDevice } from "./connectors/printers/index.ts";
@@ -184,8 +183,19 @@ export type LoadOptions = {
   configAt?: number;
 };
 
+/** Any integration `loadHome` builds, typed by its name and state (and Hue's client, Cast's actions), so `createHome(loadHome(…))` is typed. */
+export type HomeIntegration =
+  | ReturnType<typeof hue>
+  | ReturnType<typeof daikin>
+  | ReturnType<typeof enphase>
+  | ReturnType<typeof amber>
+  | ReturnType<typeof up>
+  | ReturnType<typeof cast>
+  | ReturnType<typeof printers>
+  | ReturnType<typeof weather>;
+
 /** Build the integrations a config describes, in its device order, weather last. Throws `HomeConfigError` naming every problem. */
-export function loadHome(input: unknown, options: LoadOptions): Integration<any>[] {
+export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[] {
   const { config, problems } = checkHome(input, options.env);
   if (config && !options.readFile)
     (config.devices ?? []).forEach((d, i) => {
@@ -209,10 +219,10 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
   };
   // Every Cast entry is one integration, at the first Cast entry's place; so is every printer.
   const printersAt = (config.devices ?? []).findIndex((d) => d.connector === "printers");
-  const integrations = (config.devices ?? []).flatMap((d, i) =>
+  const integrations: HomeIntegration[] = (config.devices ?? []).flatMap((d, i) =>
     d.connector === "cast" ? (i === castAt ? [castAll()] : []) : d.connector === "printers" ? (i === printersAt ? [printersAll()] : []) : [one(d, `devices[${i}] (${d.id})`)],
   );
-  function one(d: Exclude<Device, { connector: "cast" | "printers" }>, at: string): Integration<any> {
+  function one(d: Exclude<Device, { connector: "cast" | "printers" }>, at: string): HomeIntegration {
     switch (d.connector) {
       case "hue": {
         const { host: ip, ...cached } = start("hue", d.bridgeId, d.host);
@@ -232,7 +242,7 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
         return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone });
     }
   }
-  function castAll(): Integration<any> {
+  function castAll(): ReturnType<typeof cast> {
     const expect = config!.devices!.flatMap((x) => {
       if (x.connector !== "cast") return [];
       const c = book.fresh("cast", x.castId);
@@ -243,7 +253,7 @@ export function loadHome(input: unknown, options: LoadOptions): Integration<any>
     const resolve = async () => resolvedFrom(await discover(options.finders!.cast!, { clock: realClock, done: all }));
     return cast({ resolve, connect: options.castConnect!, expect, seen: (id, a) => book.seen("cast", id, a) });
   }
-  function printersAll(): Integration<any> {
+  function printersAll(): ReturnType<typeof printers> {
     const entries = config!.devices!.flatMap((x) => {
       if (x.connector !== "printers") return [];
       const c = book.fresh("printers", x.uuid);

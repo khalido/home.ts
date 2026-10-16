@@ -58,7 +58,7 @@ export type WeatherState = Slices & {
 };
 
 /** Outside weather as a home integration. Each source polls on its own cadence; the sun is computed, never fetched. */
-export function weather(config: WeatherConfig): Integration<WeatherState> {
+export function weather(config: WeatherConfig): Integration<WeatherState, "weather"> {
   const sources = config.sources ?? [openMeteo()];
   const clock = config.clock ?? realClock;
   const pollMinutes = config.pollMinutes ?? DEFAULT_POLL_MINUTES;

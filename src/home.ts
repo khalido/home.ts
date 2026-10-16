@@ -16,21 +16,28 @@ export type Part<S = unknown> = { status: Status; detail?: string; anomaly?: str
  * `run` keeps its state current until `signal` aborts, reporting each change through `update`.
  * `refresh` asks for a fresh read now, ahead of the integration's schedule; it returns at once and the read reports through `update`.
  */
-export type Integration<S = unknown> = {
-  name: string;
+export type Integration<S = unknown, N extends string = string> = {
+  name: N;
   run(signal: AbortSignal, update: (part: Part<S>) => void): Promise<void>;
   refresh(): void;
 };
 
-/** The whole home: one `Part` per integration, by name. This is the cache every read comes from. */
-export type HomeSnapshot = Record<string, Part>;
+/** The state an integration reports. */
+export type StateOf<I> = I extends Integration<infer S, string> ? S : never;
+
+/**
+ * The whole home: one `Part` per integration, by name, each typed by its integration (`snapshot.weather?.state` is a
+ * `WeatherState`). A name can be missing: a config need not have every connector. This is the cache every read comes from.
+ */
+export type HomeSnapshot<I extends Integration<any, string> = Integration<unknown, string>> = { [X in I as X["name"]]?: Part<StateOf<X>> };
 
 /** Load a home: run each integration, keep one snapshot, call `onChange` with it after every change. */
-export function createHome(integrations: Integration<any>[], onChange?: (home: HomeSnapshot) => void) {
-  let snapshot: HomeSnapshot = Object.fromEntries(integrations.map((i) => [i.name, { status: "connecting" }]));
+export function createHome<I extends Integration<any, string>>(integrations: readonly I[], onChange?: (home: HomeSnapshot<I>) => void) {
+  type Name = I["name"];
+  let snapshot = Object.fromEntries(integrations.map((i) => [i.name, { status: "connecting" }])) as HomeSnapshot<I>;
   const waiting = new Map<string, (() => void)[]>(); // refresh() callers, resolved by the integration's next report
   const finished = new Set<string>(); // integrations whose run has ended: a refresh of one resolves at once, nothing will report
-  const set = (name: string, part: Part) => {
+  const set = (name: Name, part: Part) => {
     snapshot = { ...snapshot, [name]: part };
     onChange?.(snapshot);
     const w = waiting.get(name);
@@ -42,11 +49,13 @@ export function createHome(integrations: Integration<any>[], onChange?: (home: H
   return {
     /** The latest snapshot. Never touches a device. */
     snapshot: () => snapshot,
+    /** One integration's part, typed by its name: `home.part("weather")?.state?.blocks`. */
+    part: <N extends Name>(name: N): HomeSnapshot<I>[N] => snapshot[name],
     /**
      * Read now: one integration by name, or every one. Results arrive through the snapshot and `onChange` as usual; the
      * promise resolves once each target has reported (its next update, good or bad), or at once for one whose run has ended.
      */
-    refresh(name?: string): Promise<void> {
+    refresh(name?: Name): Promise<void> {
       const targets = name === undefined ? integrations : integrations.filter((i) => i.name === name);
       if (!targets.length) throw new Error(`no integration "${name}"; have ${integrations.map((i) => i.name).join(", ")}`);
       const reported = targets.map(
