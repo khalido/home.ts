@@ -298,6 +298,45 @@ export const parseBrowse = (text: string): string[] => [...new Set([...text.matc
 
 const utf8 = new TextEncoder();
 
+/** Undo DNS-SD text escapes, as `dns-sd` and `avahi-browse` print them: `\ ` or `\.` for the character, `\226\128\153` for each byte of a UTF-8 character. */
+function unescapeDnsSd(token: string): string {
+  const bytes: number[] = [];
+  for (let i = 0; i < token.length; i++) {
+    const decimal = token[i] === "\\" ? token.slice(i + 1, i + 4) : "";
+    if (/^\d{3}$/.test(decimal)) bytes.push(Number(decimal)), (i += 3);
+    else bytes.push(...utf8.encode(token[token[i] === "\\" ? ++i : i]!));
+  }
+  return new TextDecoder().decode(Uint8Array.from(bytes));
+}
+
+/** TXT strings as a record: `key=value`, and a bare `key` or `key=` as an empty value. */
+const txtRecord = (pairs: string[]) =>
+  Object.fromEntries(pairs.filter((p) => p && !p.startsWith("=")).map((p) => (p.includes("=") ? [p.slice(0, p.indexOf("=")), p.slice(p.indexOf("=") + 1)] : [p, ""])));
+
+/**
+ * `avahi-browse --parsable --resolve` (Linux): each resolved instance once, IPv4 only (the config keeps IPv4 addresses).
+ * A resolved line is `=;interface;IPv4;name;type;domain;hostname;address;port;"txt" "txt"`; names and TXT strings use
+ * the same escapes as `dns-sd` (`\059` for a `;` in a name, `\"` inside TXT). An instance seen on two interfaces is kept
+ * once, the first; loopback is skipped. Checked against avahi-utils on Debian trixie, 2026-10-16.
+ */
+export function parseAvahi(text: string): { instance: string; hostname: string; host: string; port: number; txt: Record<string, string> }[] {
+  const seen = new Map<string, { instance: string; hostname: string; host: string; port: number; txt: Record<string, string> }>();
+  for (const line of text.split("\n")) {
+    const f = line.split(";");
+    // By the address itself: column 3 is the protocol the service was seen on, not necessarily the address's. Loopback is a service on this machine.
+    if (f[0] !== "=" || f.length < 10 || !/^\d+\.\d+\.\d+\.\d+$/.test(f[7]!) || f[1] === "lo" || f[7]!.startsWith("127.")) continue;
+    const instance = unescapeDnsSd(f[3]!);
+    const port = Number(f[8]);
+    if (seen.has(instance) || !f[7] || !Number.isInteger(port)) continue;
+    const txt = txtRecord([...f.slice(9).join(";").matchAll(/"((?:\\.|[^"\\])*)"/g)].map((m) => unescapeDnsSd(m[1]!)));
+    seen.set(instance, { instance, hostname: f[6]!, host: f[7]!, port, txt });
+  }
+  return [...seen.values()];
+}
+
+/** Instance names from `avahi-browse --parsable` (a `+` line per instance and interface), each once. */
+export const parseAvahiBrowse = (text: string): string[] => [...new Set(text.split("\n").flatMap((l) => (l.startsWith("+;") ? [unescapeDnsSd(l.split(";")[3] ?? "")] : [])))].filter(Boolean);
+
 /**
  * One `dns-sd -L` answer: the host and port it can be reached at, and its TXT record. TXT values come escaped (`\ ` for
  * a space, `\226\128\153` for each byte of a UTF-8 character); these are undone, so `fn` reads as the Google Home app shows it.
@@ -306,17 +345,6 @@ export function parseResolve(text: string): { hostname: string; port: number; tx
   const at = text.match(/can be reached at (\S+?)\.?:(\d+)/);
   if (!at) return undefined;
   const line = text.slice(at.index).split("\n")[1] ?? "";
-  const txt: Record<string, string> = {};
-  for (const token of line.trim().match(/(?:\\.|[^\s\\])+/g) ?? []) {
-    const bytes: number[] = [];
-    for (let i = 0; i < token.length; i++) {
-      const decimal = token[i] === "\\" ? token.slice(i + 1, i + 4) : "";
-      if (/^\d{3}$/.test(decimal)) bytes.push(Number(decimal)), (i += 3);
-      else bytes.push(...utf8.encode(token[token[i] === "\\" ? ++i : i]!));
-    }
-    const pair = new TextDecoder().decode(Uint8Array.from(bytes));
-    const eq = pair.indexOf("=");
-    if (eq > 0) txt[pair.slice(0, eq)] = pair.slice(eq + 1);
-  }
-  return { hostname: at[1]!, port: Number(at[2]), txt };
+  const tokens = (line.trim().match(/(?:\\.|[^\s\\])+/g) ?? []).map(unescapeDnsSd);
+  return { hostname: at[1]!, port: Number(at[2]), txt: txtRecord(tokens) };
 }

@@ -52,12 +52,12 @@ src/
   connector.ts  what connectors share: one error, one timeout, a fetch the run can cancel
   manifest.ts   what each connector declares about itself; the CLI and .env.example derive from it
   poll.ts  clock.ts  energy.ts  locate.ts  index.ts
-  finders.ts    Node-side discovery (dns-sd, UDP), the address cache file
+  finders.ts    Node-side discovery (macOS dns-sd, Linux avahi-browse, UDP), the address cache file
   cli/          the home command on cac, the only code that reads your shell
   connectors/   one folder per device or service, each with its own README
     hue/  daikin/  enphase/  cast/  printers/  amber/  weather/
 docs/           design notes, decisions, investigations, the handover
-skills/         draw-home: an agent draws your home as an SVG
+skills/         draw-home: an agent draws your home as an SVG; use-home: an agent reads and runs it safely
 ```
 
 ## Connectors

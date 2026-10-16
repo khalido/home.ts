@@ -18,7 +18,7 @@ src/
   clock.ts       Clock, realClock, asOf(clock); tests pass a fake
   energy.ts      energyNow: the one owner of solar, use, grid flow and cost per hour
   locate.ts      geocoding for `home locate`
-  finders.ts     Node-side discovery (dns-sd, UDP) and fileCache; the only library file that spawns a process
+  finders.ts     Node-side discovery (macOS dns-sd, Linux avahi-browse, UDP) and fileCache; the only library file that spawns a process
   cli/           the home command on cac, the only code that reads the environment or the filesystem:
                  main.ts (commands from MANIFESTS), context.ts (env, config, cache, finders), status.ts,
                  discover.ts, probe.ts, config.ts, cache.ts, locate.ts, and hue.ts, enphase.ts, cast.ts for verbs that need Node
@@ -30,6 +30,7 @@ test/            fixtures, a fake clock, one file per connector; bench/bench.ts
 scripts/         schema.ts (home.schema.json from zod) and gen.ts (.env.example from the manifests); tests fail on drift
 docs/            design, decisions, investigations, the handover
 skills/draw-home a coding agent draws a home as SVG and writes the config's rooms
+skills/use-home  an agent uses `home`: reading safely, connecting, addresses, discovery, the rules for writes
 ```
 
 **Words.** A *connector* is a folder under `src/connectors/`, its factory, and the `connector:` field in the config. An *integration* is the running object the factory returns (`Integration`): a `name`, `run(signal, update)` and `refresh()`. A *Part* is one integration's slice of the snapshot: `status`, `detail`, `anomaly`, `state`. `unavailable` means stopped for good (a rejected key); unreachable is `disconnected`. A *manifest* is what a connector declares about itself (`Manifest` in `manifest.ts`): the CLI, `.env.example` and `loadHome` read it rather than knowing each connector.

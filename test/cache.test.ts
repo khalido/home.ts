@@ -104,5 +104,6 @@ describe("fileCache", () => {
 describe("dnsSd", () => {
   test("a missing binary rejects, naming it, rather than finding nothing", async () => {
     await expect(dnsSd(["-B", "_hue._tcp"], { command: "dns-sd-not-installed" })).rejects.toThrow("dns-sd-not-installed not found; mDNS discovery needs it");
+    await expect(dnsSd(["--parsable"], { command: "avahi-browse-not-installed", install: "apt install avahi-utils" })).rejects.toThrow("avahi-browse-not-installed not found; mDNS discovery needs it (apt install avahi-utils)");
   });
 });

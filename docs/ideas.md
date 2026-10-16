@@ -48,14 +48,6 @@ Takeaways: energy is where this library is strongest and where demand is; one MQ
 
 The bot does not import this library yet. What it computes about the home that the library owns, so the bot should call the library instead: Google weather parsing (`tools/weather.ts`, duplicating `google.ts`'s `toSlices`), a 06:00–18:00 day/night proxy (`+layout.svelte`; `sunNow(...).daylight` is the owner), the condition-to-icon map (check against `weatherText`). What the bot has that the library lacks and should grow: **rain soon** ("rain in the next N minutes") and **per-day forecast blocks** as pure helpers over the forecast, one owner for the rain window; **Transport NSW departures** (item 2 above; the bot's `tools/bus.ts` is the shape: key via fetch, typed departures with `dueMins`, `cancelled`, `realtime`); a daily **sunrise and sunset times** helper beside `sunNow` for a daily print. Stays in the bot: the surf report, calendar, school, chores, lists, Telegram formatting, the agent prompts, the box hardware.
 
-## Discovery on Linux (2026-10-16)
-
-Discovery spawns macOS `dns-sd`, so on a Pi (Raspberry Pi OS Lite, trixie) only the Daikin's UDP broadcast works. Not urgent: with DHCP reservations the config's hosts hold, and discovery matters only when a device moves. Options, none chosen:
-
-- **`bonjour-service`** ([onlxltd](https://github.com/onlxltd/bonjour-service), 1.4.4, July 2026, types bundled): pure JS browse and resolve on `multicast-dns`, the same code on the Mac and the Pi; likely ends the 1.5 s `dns-sd` wait too. Binds UDP 5353 beside avahi-daemon (expected to share; test on the Pi). `multicast-dns` alone is stale (last release 2022).
-- **avahi-daemon**, already running on Pi OS: spawn `avahi-browse -rpt <type>` (needs `apt install avahi-utils`), the same pattern as `dns-sd` on the Mac; or talk to it over D-Bus (`dbus-next`, `@astronautlabs/avahi`), which binds no port but adds dependencies. Either way the system resolver does the work, and it is Linux-only, so one finder per OS.
-- Build the chosen one beside `dns-sd`, check it finds the same devices on the Mac (or matches `dns-sd -B` on the Pi), then switch.
-
 ## Recording what happens (2026-10-16, later)
 
 Worth having for questions like "how long are lights left on" or "AC hours against outside temperature". The bot, which runs all day, owns it: one SQLite table it can query and filter, `events(at, source, entity, kind, value)`, with `value` as JSON and `at` in UTC ms, backed up with `VACUUM INTO`. Durations come from SQL window functions (`LEAD`) over on and off rows, not extra tables. The library's part, when it comes: a pure function from two snapshots to typed events (no files, no SQL). Not recorded: what has its own record (Up transactions, Amber bills, Enphase history). Pitfalls: Hue is chatty (record semantic changes, not every event), mark when the bot was down so a gap never reads as "off", batch writes on an SD card.

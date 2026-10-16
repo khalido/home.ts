@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type Clock, createHome } from "../src/index.ts";
 import { checkPlan, type HomeConfig } from "../src/config.ts";
 import { daikin } from "../src/connectors/daikin/index.ts";
-import { applyFound, DAY_MS, discover, type Found, lostDetail, matchFound, parseBrowse, parseResolve, relocator } from "../src/discover.ts";
+import { applyFound, DAY_MS, discover, type Found, lostDetail, matchFound, parseAvahi, parseAvahiBrowse, parseBrowse, parseResolve, relocator } from "../src/discover.ts";
 
 // Invented addresses (192.0.2.0/24) and identities, in the shape each discovery reports them.
 const text = `// a home
@@ -260,6 +260,36 @@ describe("Cast", () => {
   test("dns-sd's browse: each instance once", () => {
     const text = "21:02:28.396  Add        3  14 local.               _googlecast._tcp.    Google-Nest-Mini-0000\n21:02:28.396  Add        2  15 local.               _googlecast._tcp.    Google-Nest-Mini-0000\n";
     expect(parseBrowse(text)).toEqual(["Google-Nest-Mini-0000"]);
+  });
+
+  test("avahi-browse's resolve (Linux): IPv4 only, each instance once, names and TXT unescaped as dns-sd's", () => {
+    // Invented values in avahi-browse --parsable --resolve's shape: a + line per sighting, a = line per resolve.
+    const text = [
+      "+;wlan0;IPv4;Google-Nest-Mini-0000;_googlecast._tcp;local",
+      "+;wlan0;IPv6;Google-Nest-Mini-0000;_googlecast._tcp;local",
+      '=;wlan0;IPv6;Google-Nest-Mini-0000;_googlecast._tcp;local;0000-0000.local;fe80::1;8009;"id=00000000000040008000000000000001"',
+      '=;wlan0;IPv4;Google-Nest-Mini-0000;_googlecast._tcp;local;0000-0000.local;192.0.2.31;8009;"rs=" "fn=KO\\226\\128\\153s kitchen" "md=Google Nest Mini" "id=00000000000040008000000000000001" "nf"',
+      '=;eth0;IPv4;Google-Nest-Mini-0000;_googlecast._tcp;local;0000-0000.local;192.0.2.31;8009;"id=00000000000040008000000000000001"',
+      '=;wlan0;IPv4;Hue\\032Bridge\\032-\\032000000;_hue._tcp;local;ecb5fa000000.local;192.0.2.2;443;"bridgeid=0017880000000000" "modelid=BSB002"',
+    ].join("\n");
+    expect(parseAvahi(text)).toEqual([
+      { instance: "Google-Nest-Mini-0000", hostname: "0000-0000.local", host: "192.0.2.31", port: 8009, txt: { rs: "", fn: "KO’s kitchen", md: "Google Nest Mini", id: "00000000000040008000000000000001", nf: "" } },
+      { instance: "Hue Bridge - 000000", hostname: "ecb5fa000000.local", host: "192.0.2.2", port: 443, txt: { bridgeid: "0017880000000000", modelid: "BSB002" } },
+    ]);
+    expect(parseAvahiBrowse(text)).toEqual(["Google-Nest-Mini-0000"]);
+  });
+
+  test("avahi-browse as Debian trixie prints it: ; and quotes escaped, loopback skipped", () => {
+    // Captured from avahi-utils in a debian:trixie container publishing a test service (2026-10-16); the address changed to a documentation one.
+    const text = [
+      "+;lo;IPv4;Hue\\032Bridge\\032\\226\\128\\147\\032KO\\039s\\059\\032test\\.one;_hue._tcp;local",
+      '=;lo;IPv4;Hue\\032Bridge\\032\\226\\128\\147\\032KO\\039s\\059\\032test\\.one;_hue._tcp;local;e317183b6abc.local;127.0.0.1;443;"fn=say \\"hi\\"\\\\x" "flag" "rs=" "bridgeid=0017880000000000"',
+      '=;eth0;IPv4;Hue\\032Bridge\\032\\226\\128\\147\\032KO\\039s\\059\\032test\\.one;_hue._tcp;local;e317183b6abc.local;192.0.2.2;443;"fn=say \\"hi\\"\\\\x" "flag" "rs=" "bridgeid=0017880000000000"',
+    ].join("\n");
+    expect(parseAvahi(text)).toEqual([
+      { instance: "Hue Bridge – KO's; test.one", hostname: "e317183b6abc.local", host: "192.0.2.2", port: 443, txt: { fn: 'say "hi"\\x', flag: "", rs: "", bridgeid: "0017880000000000" } },
+    ]);
+    expect(parseAvahiBrowse(text)).toEqual(["Hue Bridge – KO's; test.one"]);
   });
 
   test("dns-sd's resolve: host, port, and TXT with escaped spaces and UTF-8 bytes undone", () => {
