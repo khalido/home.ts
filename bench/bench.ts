@@ -4,7 +4,7 @@ import { groups } from "../src/connectors/hue/index.ts";
 import { parseSse } from "../src/connectors/hue/events.ts";
 import { reduce, snapshotFrom } from "../src/connectors/hue/state.ts";
 import { Resource, type HueEvent } from "../src/connectors/hue/schemas.ts";
-import { writeQueue } from "../src/connectors/hue/client.ts";
+import { writeLane } from "../src/lane.ts";
 
 const resources = Resource.array().parse(JSON.parse(await Bun.file(new URL("../test/fixtures/resources.json", import.meta.url)).text()).data);
 const start = snapshotFrom(resources, "t");
@@ -24,10 +24,10 @@ summary(() => {
   bench("parseSse: 1,000 messages, 4 KiB chunks", async () => { for await (const _ of parseSse(chunked(4096))); });
   bench("reduce: 1,000 events", () => { let s = start; for (const e of events) s = reduce(s, e); return s; });
   bench("groups(): rooms view of a snapshot", () => groups(start));
-  bench("writeQueue: 100 queued writes, fake clock", async () => {
+  bench("writeLane: 100 writes to 100 slots, fake clock", async () => {
     let t = 0;
-    const enqueue = writeQueue({ now: () => t, sleep: async (ms) => void (t += ms) });
-    await Promise.all(Array.from({ length: 100 }, (_, i) => enqueue(i % 2 ? "light" : "group", async () => t)));
+    const lane = writeLane({ gapMs: 100, clock: { now: () => t, sleep: async (ms: number) => void (t += ms) } });
+    await Promise.all(Array.from({ length: 100 }, (_, i) => lane.send(`light/${i}`, {}, async () => t)));
   });
 });
 

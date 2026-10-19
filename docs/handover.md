@@ -1,6 +1,6 @@
 # Handover
 
-2026-10-16. Read `AGENTS.md` first, then this.
+2026-10-19. Read `AGENTS.md` first, then this.
 
 ## Where things stand
 
@@ -12,6 +12,7 @@
 - **The snapshot is typed by name**: `home.part("weather")?.state` is a `WeatherState`; `loadHome` returns `HomeIntegration[]`.
 - **`docs/devices.md`** (public): devices worth buying, with the TIMMERFLOTTE verdict.
 - **The CLI has an output contract** (`docs/cli.md`, Output), after kotools: stdout data, stderr notes, `--json` errors as `{error, code, fix}` on stderr, exit 0/1/2, `home <connector>` exits 1 when not connected. `test/cli.test.ts` holds it.
+- **Writes go through a write lane** (`src/lane.ts`, KO's call 2026-10-19, `docs/decisions.md`): spaced, the waiting writes to one slot merged, a fast slot slowed and never refused. Hue, Daikin and Cast volume use it; Up's writes and Cast announcements do not. Uncommitted until `/ko-review` and KO's word. A slowed slot is not yet in any `anomaly`: that lands with item 9.
 - No write has reached a real device except `setPower(true)` on the Daikin at KO's request.
 
 ## Waiting on KO
@@ -34,7 +35,7 @@
 6. **Discovery on the Pi**: built (`avahi-browse` on Linux, checked in Debian trixie containers); run `home discover` on the Pi once it is set up (`apt install avahi-utils`). Then **Node for chota-bot**: lift `settle` from `src/cli/context.ts` into `src/home.ts` with `clock.sleep` and export it; a `node --test` smoke file over `dist/`. Chota's other asks: `engines`, publish from GitHub Actions with `--provenance`, an optional logger, actions that return the resulting state.
 7. **Weather, more**: Google's hourly as a second `hourly` source; the hourly rain chance as the fallback when the minute forecast fails. Then Transport NSW, then calendar (`docs/google.md`).
 8. **First live printer read**: Brother on, `home discover`, `home printers`.
-9. **Writes that return the resulting state** (jaldi, chota): the typed snapshot is done; a write (Hue room, Daikin mode) should resolve with the state it left.
+9. **Writes that return the resulting state** (jaldi, chota): the typed snapshot is done; a write (Hue room, Daikin mode) should resolve with the state it left. With it, a lane slot held to its rate shows in the part's `anomaly`.
 10. **Worth KO's thought** (architecture review): env and config build integrations two ways (`FROM_ENV`, `loadHome`, `envFromConfig`); the relocator may be more than DHCP-reserved devices need; abort-cancels-read is tested only for Amber; `src/cli/` has few tests beyond `test/cli.test.ts`; Daikin's 404 is `unavailable` though the rule says that means a rejected key.
 11. **Ideas** in `docs/ideas.md`, with the survey of what other homes run (Shelly, Fronius, forecast.solar, MQTT lead).
 

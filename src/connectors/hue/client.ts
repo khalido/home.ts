@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { Envelope, type Kind, PairResponse, Resource } from "./schemas.ts";
-import { type Clock, realClock } from "../../clock.ts";
+import type { Clock } from "../../clock.ts";
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
+import { writeLane } from "../../lane.ts";
 
 /** What a Hue client needs: the bridge's LAN address, its application key, and a pinned `fetch`. */
 export type HueOptions = { ip: string; key: string; fetch: typeof fetch; clock?: Clock };
@@ -18,28 +19,18 @@ type Lane = keyof typeof WRITE_GAP_MS;
 /** Which lane a write goes in: `light` writes are fast, everything else (grouped_light, scene) is a group write. */
 export const laneFor = (kind: string): Lane => (kind === "light" ? "light" : "group");
 
-/** One queue per bridge: writes run in order per lane, spaced by `WRITE_GAP_MS`. */
-export function writeQueue(clock: Clock = realClock) {
-  const tail: Record<Lane, Promise<unknown>> = { group: Promise.resolve(), light: Promise.resolve() };
-  const lastAt: Record<Lane, number> = { group: -Infinity, light: -Infinity };
-  return function enqueue<T>(lane: Lane, write: () => Promise<T>): Promise<T> {
-    const run = tail[lane]
-      .catch(() => {})
-      .then(async () => {
-        const wait = lastAt[lane] + WRITE_GAP_MS[lane] - clock.now();
-        if (wait > 0) await clock.sleep(wait);
-        lastAt[lane] = clock.now();
-        return write();
-      });
-    tail[lane] = run;
-    return run;
-  };
+/** Hue bodies merge field by field, the newer value winning: `{ on }` then `{ dimming }` lands as both. */
+export function mergeBody(older: object, newer: object): object {
+  const plain = (x: unknown): x is object => typeof x === "object" && x !== null && !Array.isArray(x);
+  const out: Record<string, unknown> = { ...older };
+  for (const [k, v] of Object.entries(newer)) out[k] = plain(out[k]) && plain(v) ? mergeBody(out[k], v) : v;
+  return out;
 }
 
 /** A typed CLIP v2 client. Reads go straight through; writes go through the bridge's write queue. */
 export function hueClient(options: HueOptions) {
   const base = `https://${options.ip}`;
-  const enqueue = writeQueue(options.clock);
+  const lanes = { group: writeLane({ gapMs: WRITE_GAP_MS.group, clock: options.clock }), light: writeLane({ gapMs: WRITE_GAP_MS.light, clock: options.clock }) };
 
   async function call(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<unknown[]> {
     const headers: Record<string, string> = { "hue-application-key": options.key };
@@ -51,9 +42,9 @@ export function hueClient(options: HueOptions) {
     return parsed.success ? parsed.data.data : [];
   }
 
-  /** Change one resource, e.g. `put("grouped_light", id, { on: { on: false } })`. Queued and spaced. */
+  /** Change one resource, e.g. `put("grouped_light", id, { on: { on: false } })`. Spaced per lane; writes to one resource waiting their turn merge. */
   const put = (kind: Kind, id: string, body: object): Promise<unknown[]> =>
-    enqueue(laneFor(kind), () => call("PUT", `/clip/v2/resource/${kind}/${id}`, body));
+    lanes[laneFor(kind)].send(`${kind}/${id}`, body, (b) => call("PUT", `/clip/v2/resource/${kind}/${id}`, b), mergeBody);
 
   return {
     put,

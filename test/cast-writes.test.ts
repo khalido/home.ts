@@ -317,6 +317,13 @@ describe("volume, mute, stop", () => {
     await expect(h.c.setVolume("Kitchen", -0.1)).rejects.toThrow("volume is 0 to 1");
     await h.done();
   });
+
+  test("a burst of levels sends the first and the last; a mute goes as its own request", async () => {
+    const h = await connected(home());
+    await Promise.all([h.c.setVolume("Kitchen", 0.1), h.c.setVolume("Kitchen", 0.2), h.c.setMuted("Kitchen", true), h.c.setVolume("Kitchen", 0.3)]);
+    expect(h.net.sent.filter((x) => x.p.type === "SET_VOLUME").map((x) => JSON.stringify(x.p.volume))).toEqual(['{"level":0.1}', '{"level":0.3}', '{"muted":true}']);
+    await h.done();
+  });
 });
 
 describe("serveClip", () => {

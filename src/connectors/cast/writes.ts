@@ -1,4 +1,5 @@
 import type { Clock } from "../../clock.ts";
+import { type WriteLane, writeLane } from "../../lane.ts";
 import { NS } from "./codec.ts";
 import { type Application, MediaStatus, MultizoneStatus, ReceiverStatus } from "./schemas.ts";
 import { type CastDevice, castKey } from "./state.ts";
@@ -14,6 +15,9 @@ export const ANSWER_MS = 10_000;
 export const PLAY_MS = 60_000;
 
 const RECEIVER = "receiver-0";
+/** Level writes, and mute writes, per device or group in any minute; more wait their turn, the newest winning. A guess: Cast publishes no limit. */
+export const VOLUME_PER_MINUTE = 30;
+
 /** Replies that refuse a request. */
 const REFUSALS = new Set(["LAUNCH_ERROR", "LOAD_FAILED", "LOAD_CANCELLED", "INVALID_REQUEST", "INVALID_PLAYER_STATE", "INVALID_MEDIA_SESSION_ID"]);
 
@@ -206,13 +210,22 @@ export function castActions(ctx: WriteContext): CastActions {
     return finished;
   };
 
+  // A lane per device, so a speaker that stopped answering holds up only itself. Level and mute are separate slots:
+  // a SET_VOLUME carries one or the other, never both.
+  const lanes = new Map<string, WriteLane>();
+  const setVolume = (target: string, volume: { level: number } | { muted: boolean }) => {
+    const id = find(target).id;
+    if (!lanes.has(id)) lanes.set(id, writeLane({ gapMs: 0, perMinute: VOLUME_PER_MINUTE, clock }));
+    return lanes.get(id)!.send("level" in volume ? "level" : "muted", volume, (v) => receiver(live(find(target)), { type: "SET_VOLUME", volume: v }));
+  };
+
   return {
     async setVolume(target, level) {
       checkLevel(level);
-      await receiver(live(find(target)), { type: "SET_VOLUME", volume: { level } });
+      await setVolume(target, { level });
     },
     async setMuted(target, muted) {
-      await receiver(live(find(target)), { type: "SET_VOLUME", volume: { muted } });
+      await setVolume(target, { muted });
     },
     async stop(target) {
       const s = live(find(target));

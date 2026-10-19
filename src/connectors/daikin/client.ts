@@ -1,5 +1,7 @@
 import { z } from "zod";
+import type { Clock } from "../../clock.ts";
 import { ConnectorError, getJson } from "../../connector.ts";
+import { writeLane } from "../../lane.ts";
 
 // Daikin's JSON dsiot API (the BRP084 family): POST /dsiot/multireq, plain HTTP, no key. Field paths and value
 // maps are protocol facts from pydaikin (GPL-3.0, read only; see README.md), checked against KO's unit 2026-10-13.
@@ -101,6 +103,20 @@ export type WriteRequest = { requests: { op: 3; to: string; pc: Node }[] };
 const write = (fields: [entity: string, pn: string, pv: string][]): WriteRequest => ({
   requests: [{ op: 3, to: INDOOR, pc: { pn: "dgc_status", pch: [{ pn: "e_1002", pch: fields.map(([e, pn, pv]) => ({ pn: e, pch: [{ pn, pv }] })) }] } }],
 });
+const fields = (r: WriteRequest): [string, string, string][] =>
+  r.requests.flatMap((q) => (q.pc.pch ?? []).flatMap((e1002) => (e1002.pch ?? []).flatMap((e) => (e.pch ?? []).map((f): [string, string, string] => [e.pn!, f.pn!, String(f.pv)]))));
+
+/** Two writes as one, field by field, the newer value winning: `setMode("cool")` then `setPower(false)` sends mode cool, power off. */
+export function mergeWrites(older: WriteRequest, newer: WriteRequest): WriteRequest {
+  const merged = new Map(fields(older).map((f) => [`${f[0]}/${f[1]}`, f]));
+  for (const f of fields(newer)) merged.set(`${f[0]}/${f[1]}`, f);
+  return write([...merged.values()]);
+}
+
+/** Writes to the unit at most this often, and at most `WRITE_PER_MINUTE` a minute; a guess, the BRP084's limits are unpublished. */
+export const WRITE_GAP_MS = 1000;
+export const WRITE_PER_MINUTE = 20;
+
 const key = <T>(map: Record<string, T>, v: T) => Object.keys(map).find((k) => map[k] === v)!;
 
 /** Turn the unit on or off. */
@@ -124,7 +140,8 @@ export function setFan(fan: Fan, mode: Mode): WriteRequest {
 }
 
 /** A client for one unit. Reads are op 2; `write` sends a body built by setPower, setMode, setTarget or setFan. */
-export function daikinClient(options: { host: string; fetch: typeof fetch }) {
+export function daikinClient(options: { host: string; fetch: typeof fetch; clock?: Clock }) {
+  const lane = writeLane({ gapMs: WRITE_GAP_MS, perMinute: WRITE_PER_MINUTE, clock: options.clock });
   const multireq = (body: unknown, signal?: AbortSignal): Promise<Multi> =>
     getJson(options.fetch, `http://${options.host}/dsiot/multireq`, {
       init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
@@ -140,11 +157,16 @@ export function daikinClient(options: { host: string; fetch: typeof fetch }) {
       if (indoor?.rsc !== 2000) throw new DaikinError(`no indoor status (rsc ${indoor?.rsc})`, { status: indoor?.rsc });
       return toState(m);
     },
-    /** Send a write. Only when KO asks: this changes the AC. Needs an answer for the indoor unit below 4000 (success codes unconfirmed; re-read to be sure). */
-    async write(request: WriteRequest): Promise<void> {
-      const answer = (await multireq(request)).responses.find((r) => r.fr === INDOOR);
-      if (!answer || answer.rsc === undefined || answer.rsc >= 4000)
-        throw new DaikinError(`no accepted answer from the indoor unit (rsc ${answer?.rsc})`, { status: answer?.rsc });
+    /**
+     * Send a write. Only when KO asks: this changes the AC. Needs an answer for the indoor unit below 4000 (success codes
+     * unconfirmed; re-read to be sure). Writes waiting their turn merge (`mergeWrites`) and resolve with the send that carried them.
+     */
+    write(request: WriteRequest): Promise<void> {
+      return lane.send("unit", request, async (r) => {
+        const answer = (await multireq(r)).responses.find((x) => x.fr === INDOOR);
+        if (!answer || answer.rsc === undefined || answer.rsc >= 4000)
+          throw new DaikinError(`no accepted answer from the indoor unit (rsc ${answer?.rsc})`, { status: answer?.rsc });
+      }, mergeWrites);
     },
   };
 }

@@ -33,7 +33,7 @@ Unconfirmed: whether the bridge resumes from `Last-Event-ID`; how many streams o
 
 ## Rates
 
-One write queue per client. `grouped_light` and `scene` writes go out 1 s apart, `light` writes 100 ms apart, each lane in order. That is Signify's guidance as secondary sources quote it (about 10 commands a second to lights, 1 a second to groups), unconfirmed from the gated page. Prefer one `grouped_light` or scene write over many light writes: the bridge sends it to every light at once.
+Two write lanes per client (`src/lane.ts`). `grouped_light` and `scene` writes go out 1 s apart, `light` writes 100 ms apart, each lane in order. A write to a resource whose last write is still waiting merges into it (`mergeBody`, the newer field winning), so a burst cannot build a backlog; the merged write keeps the first one's place in the lane. Unverified: which the bridge applies when a merge carries both `color_temperature` and `color`. That is Signify's guidance as secondary sources quote it (about 10 commands a second to lights, 1 a second to groups), unconfirmed from the gated page. Prefer one `grouped_light` or scene write over many light writes: the bridge sends it to every light at once.
 
 ## Sources
 
