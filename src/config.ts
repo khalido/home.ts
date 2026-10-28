@@ -221,6 +221,9 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
       }
     });
   const castAt = (config?.devices ?? []).findIndex((d) => d.connector === "cast");
+  const notBun = typeof (globalThis as { Bun?: unknown }).Bun === "undefined"; // Bun's fetch takes a `tls` option; elsewhere it is ignored and the read fails
+  for (const [i, d] of (config?.devices ?? []).entries())
+    if ((d.connector === "hue" || d.connector === "enphase") && !options.tls && notBun) problems.push(`devices[${i}] (${d.id}): ${d.connector} needs tls (NODE_TLS from @khalido/home/node) outside Bun`);
   if (castAt >= 0 && !options.castConnect) problems.push(`devices[${castAt}] (${config!.devices![castAt]!.id}): Cast needs castConnect (tlsConnect from @khalido/home/cast/tls)`);
   if (castAt >= 0 && !options.finders?.cast) problems.push(`devices[${castAt}] (${config!.devices![castAt]!.id}): Cast needs finders.cast (its mDNS discovery)`);
   if (!config || problems.length) throw new HomeConfigError(problems);

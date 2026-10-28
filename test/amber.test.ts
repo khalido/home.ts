@@ -28,6 +28,13 @@ describe("toPrices", () => {
     });
   });
 
+  test("an interval whose time does not parse is left out and said, not thrown", () => {
+    const odd = forecastReply.map((i: { type: string; startTime: string }, n: number) => (n === 3 ? { ...i, startTime: "soon" } : i));
+    const s = toPrices(odd);
+    expect(s.anomaly).toBe("1 price row(s) left out: their start or end time could not be read");
+    expect(s.forecast!.length).toBeGreaterThan(20);
+  });
+
   test("the forecast: the current interval then each one ahead, in order, both channels on one row", () => {
     const f = toPrices(forecastReply).forecast!;
     expect(f.length).toBe(forecastReply.filter((i: { channelType: string; type: string }) => i.channelType === "general" && i.type !== "ActualInterval").length);
@@ -64,6 +71,11 @@ describe("bestWindow", () => {
     expect(bestWindow(forecast, 1.1, { by: "renewables" })?.renewables).toBeNumber();
     expect(() => bestWindow(forecast, 0)).toThrow(RangeError);
     expect(() => bestWindow(forecast, -1)).toThrow(RangeError);
+  });
+
+  test("the greenest window needs renewables only; an import price missing anywhere leaves its average out", () => {
+    const green = [row(0, undefined, 90), row(1, 10, 80)];
+    expect(bestWindow(green, 2, { by: "renewables" })).toMatchObject({ renewables: 85, importCents: undefined });
   });
 
   test("never spans a gap or a missing price, and is undefined when nothing fits", () => {

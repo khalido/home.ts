@@ -88,18 +88,25 @@ describe("settle", () => {
     const a = fake("a");
     const b = fake("b");
     const { clock } = manualClock();
-    const p = settle([a, b], 15_000, clock);
+    const p = settle([a, b], { clock });
     await Promise.resolve();
     a.report();
     b.report();
     expect((await p).b).toMatchObject({ status: "connected", state: 0 });
   });
 
+  test("the caller's signal stops it early", async () => {
+    const stop = new AbortController();
+    const p = settle([fake("a")], { signal: stop.signal });
+    stop.abort();
+    expect((await p).a?.status).toBe("connecting");
+  });
+
   test("gives up after `ms`, leaving a silent one connecting", async () => {
     const a = fake("a");
     const b = fake("b");
     const { clock, advance } = manualClock();
-    const p = settle([a, b], 1000, clock);
+    const p = settle([a, b], { ms: 1000, clock });
     await Promise.resolve();
     a.report();
     await advance(1000);

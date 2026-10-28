@@ -9,5 +9,5 @@ export { checkHome, checkPlan, Device, HomeConfig, HomeConfigError, type HomeInt
 export type { AddressCache, CachedAddress, Connector, Finder, Found } from "./discover.ts";
 export { type SunNow, sunNow } from "./connectors/weather/sun.ts";
 export { type RainSoon, rainSoon } from "./connectors/weather/rain.ts";
-export { type DayBlock, type DayBlocks, dayBlocks } from "./connectors/weather/blocks.ts";
+export { type BlockDef, BLOCKS, blockText, type DayBlock, type DayBlocks, dayBlocks } from "./connectors/weather/blocks.ts";
 export type { EnvVar, IotClass, Manifest } from "./manifest.ts";

@@ -92,7 +92,7 @@ export function gridText(now: EnergyNow): string {
 }
 
 /** A run of the forecast and its time-weighted averages: import price, feed-in price and the grid's renewable share. */
-export type PriceWindow = { start: string; end: string; importCents: number; exportCents?: number; renewables?: number };
+export type PriceWindow = { start: string; end: string; importCents?: number; exportCents?: number; renewables?: number };
 
 const HOUR_MS = 3_600_000;
 
@@ -114,23 +114,23 @@ export function bestWindow(forecast: PriceInterval[] | undefined, hours: number,
   let bestScore = Infinity;
   for (const start of starts) {
     const window = windowAt(rows, start, length, by);
-    const score = window && (by === "price" ? window.importCents : -window.renewables!);
+    const score = window && (by === "price" ? window.importCents! : -window.renewables!);
     if (window && score! < bestScore) (best = window), (bestScore = score!);
   }
   return best;
 }
 
-/** The window of `length` ms from `start`, or undefined when an interval in it is missing, or lacks the number `by` needs. */
+/** The window of `length` ms from `start`, or undefined when an interval in it is missing, or lacks the number `by` needs. Any other average is left out unless every interval has it. */
 function windowAt(rows: (PriceInterval & { t0: number; t1: number })[], start: number, length: number, by: "price" | "renewables"): PriceWindow | undefined {
   const end = start + length;
-  const sum = { importCents: 0, exportCents: 0, renewables: 0, exportMs: 0, renewablesMs: 0 };
+  const sum = { importCents: 0, exportCents: 0, renewables: 0, importMs: 0, exportMs: 0, renewablesMs: 0 };
   let at = start;
   for (const r of rows) {
     if (r.t1 <= at) continue;
     if (at >= end) break;
-    if (r.t0 > at || r.importCents === undefined || (by === "renewables" && r.renewables === undefined)) return undefined; // a gap or a missing number
+    if (r.t0 > at || (by === "price" ? r.importCents : r.renewables) === undefined) return undefined; // a gap, or no number to judge by
     const ms = Math.min(r.t1, end) - at;
-    sum.importCents += r.importCents * ms;
+    if (r.importCents !== undefined) (sum.importCents += r.importCents * ms), (sum.importMs += ms);
     if (r.exportCents !== undefined) (sum.exportCents += r.exportCents * ms), (sum.exportMs += ms);
     if (r.renewables !== undefined) (sum.renewables += r.renewables * ms), (sum.renewablesMs += ms);
     at += ms;
@@ -139,7 +139,7 @@ function windowAt(rows: (PriceInterval & { t0: number; t1: number })[], start: n
   return {
     start: new Date(start).toISOString(),
     end: new Date(end).toISOString(),
-    importCents: sum.importCents / length,
+    importCents: sum.importMs === length ? sum.importCents / length : undefined,
     exportCents: sum.exportMs === length ? sum.exportCents / length : undefined,
     renewables: sum.renewablesMs === length ? sum.renewables / length : undefined,
   };

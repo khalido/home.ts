@@ -71,13 +71,14 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
           let s = snapshotFrom(all, asOf(clock));
           for (const event of buffered ?? []) s = reduce(s, event);
           buffered = undefined;
-          if (signal.aborted) return;
+          if (signal.aborted || status !== "connected") return; // the stream dropped meanwhile, or the key was rejected: the next connect reads it all
           snapshot = s;
           report?.({ status, detail: moved, state: snapshot });
         },
         (error) => {
           buffered = undefined;
-          if (!signal.aborted) report?.({ status, detail: `refresh failed: ${errorText(error)}`, state: snapshot });
+          // Still connected (the stream is fine) but this read failed: not a good read, so the last one's time stands.
+          if (!signal.aborted && status === "connected") report?.({ status, detail: `refresh failed: ${errorText(error)}`, state: snapshot, lastGoodAt: snapshot?.asOf });
         },
       );
     },
@@ -93,8 +94,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
               const r = await where.failed(signal);
               if (r.moved) {
                 moved = r.moved;
-                update({ status: "disconnected", detail: moved, state: snapshot });
-                break; // connect at the new address now
+                break; // connect at the new address now; that connection reports, with the move in `detail`
               }
               update({ status: "disconnected", detail: lostDetail(r, item.error), state: snapshot });
               continue;

@@ -5,8 +5,15 @@ import type { z } from "zod";
 /** No device or service call waits longer than this. */
 export const TIMEOUT_MS = 10_000;
 
-/** An error as a detail line: its message ("fetch failed", not "TypeError: fetch failed"). */
-export const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/**
+ * An error as a detail line: its message ("fetch failed", not "TypeError: fetch failed"), and its cause's when it has one.
+ * Node's fetch puts the reason there: "fetch failed: connect ECONNREFUSED 192.0.2.10:443".
+ */
+export function errorText(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause instanceof Error ? error.cause.message : undefined;
+  return cause && cause !== error.message ? `${error.message}: ${cause}` : error.message;
+}
 
 /** A failed device or service call. `status` is the HTTP status (or a device's own code); `code` a connector's own reason. */
 export class ConnectorError extends Error {

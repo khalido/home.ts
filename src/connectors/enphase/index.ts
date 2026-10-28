@@ -39,7 +39,12 @@ export type EnphaseSnapshot = EnphaseState & {
 export function enphase(config: EnphaseConfig): Integration<EnphaseSnapshot, "enphase"> {
   const clock = config.clock ?? realClock;
   const where = relocator({ host: gatewayHost(config.host), id: config.serial, find: config.find, clock, cached: config.hostCached });
-  let client = enphaseClient(config);
+  const client = enphaseClient({
+    ...config,
+    get host() {
+      return where.host();
+    },
+  });
   const poll = poller(clock);
   return {
     name: "enphase",
@@ -79,10 +84,8 @@ export function enphase(config: EnphaseConfig): Integration<EnphaseSnapshot, "en
             return update({ status: "unavailable", detail: "the gateway rejected the token; run `home enphase login`", state: last });
           const r = await where.failed(signal);
           if (r.moved) {
-            client = enphaseClient({ ...config, host: where.host() });
             moved = r.moved;
-            update({ status: "disconnected", detail: moved, state: last });
-            continue; // read at the new address now
+            continue; // read at the new address now; that read reports, with the move in `detail`
           }
           update({ status: "disconnected", detail: [lostDetail(r, error), warn].filter(Boolean).join("; "), state: last });
         }

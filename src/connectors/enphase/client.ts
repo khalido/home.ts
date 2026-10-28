@@ -93,9 +93,9 @@ export const gatewayHost = (host: string) => host.trim().replace(/^https?:\/\//i
 
 /** A read-only client for the IQ Gateway's local API (software 7 and later). */
 export function enphaseClient(options: EnphaseOptions) {
-  const base = `https://${gatewayHost(options.host)}`;
   const headers = { authorization: `Bearer ${options.token}`, accept: "application/json" };
-  const get = (path: string, signal?: AbortSignal) => getJson(options.fetch, base + path, { init: { headers }, signal, error: EnphaseError });
+  // `host` is read at each call, so a getter follows a move.
+  const get = (path: string, signal?: AbortSignal) => getJson(options.fetch, `https://${gatewayHost(options.host)}${path}`, { init: { headers }, signal, error: EnphaseError });
   return {
     get,
     /** Production, consumption and net now: the fast meter readings when a production meter is on, else `/production.json`. */

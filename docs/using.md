@@ -34,7 +34,7 @@ await home.refresh("amber");           // read now; resolves at its next report
 health(home.snapshot(), Date.now());   // per integration: ok, stale or down, with lastGoodAt, downSince and the thresholds
 ```
 
-`createHome` stamps each part with `lastGoodAt` (its last connected report) and `downSince` (when it stopped being connected). `health` judges from those: a polling connector is stale after 2½ polls with no good read and down after 3 polls not connected; Hue and Cast are down after 2 minutes not connected. Health takes each connector's interval from its manifest; a home that changes one (the weather's `pollMinutes`) passes it: `health(snapshot, now, { weather: 60 * 60 })`. For a one-shot read (a script, a printed brief), `settle(integrations)` runs them until each has answered and returns the snapshot.
+`createHome` stamps each part with `lastGoodAt` (its last good read) and `downSince` (when it stopped being connected). `health` judges from those: a polling connector is stale after 2½ polls with no good read and down after 3 polls not connected; Hue and Cast are down after 2 minutes not connected. Health takes each connector's interval from its manifest; a home that changes one (the weather's `pollMinutes`) passes it: `health(snapshot, now, { pollSeconds: { weather: 60 * 60 } })`. For a one-shot read (a script, a printed brief), `settle(integrations, { ms })` runs them until each has answered and returns the snapshot.
 
 ## Writes
 

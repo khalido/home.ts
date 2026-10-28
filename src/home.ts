@@ -12,8 +12,9 @@ export type Status = "connecting" | "connected" | "disconnected" | "unavailable"
 
 /**
  * One integration's slice of the home: its status, a human detail, anything odd the device reported, and its state.
- * `createHome` stamps the times (UTC ISO); an integration never sets them. `lastGoodAt`: its last report while connected.
- * `downSince`: when it stopped being connected (or started, if it never has); none while connected.
+ * `createHome` stamps the times (UTC ISO). `lastGoodAt`: its last report while connected, or the read time a connected report
+ * gives when it repeats an older read (weather's 5-minute sun tick). `downSince`: when it stopped being connected (or started,
+ * if it never has); none while connected. Any other time an integration sets is ignored.
  */
 export type Part<S = unknown> = { status: Status; detail?: string; anomaly?: string; state?: S; lastGoodAt?: string; downSince?: string };
 
@@ -42,8 +43,8 @@ export type Change<I extends Integration<any, string> = Integration<unknown, str
 
 /** The times `createHome` keeps on a part, from the one before it: when it was last good, and when it stopped being. */
 function stamped(part: Part, before: Part | undefined, now: string): Part {
-  if (part.status === "connected") return { ...part, lastGoodAt: now, downSince: undefined };
-  return { ...part, lastGoodAt: before?.lastGoodAt, downSince: before?.downSince ?? now }; // an integration's own stamps never count
+  if (part.status === "connected") return { ...part, lastGoodAt: part.lastGoodAt ?? now, downSince: undefined };
+  return { ...part, lastGoodAt: before?.lastGoodAt, downSince: before?.downSince ?? now };
 }
 
 /**
@@ -117,10 +118,12 @@ const answered = (p: Part | undefined) => !!p && p.status !== "connecting" && Ob
 
 /**
  * One read of everything, for a script, a test or a one-shot command: run the integrations until each has answered
- * (connected or not), at most `ms`, then stop them and return the snapshot.
+ * (connected or not), at most `ms` (15 s by default) or until `signal` aborts, then stop them and return the snapshot.
  */
-export async function settle<I extends Integration<any, string>>(integrations: readonly I[], ms = 15_000, clock: Clock = realClock): Promise<HomeSnapshot<I>> {
+export async function settle<I extends Integration<any, string>>(integrations: readonly I[], options: { ms?: number; clock?: Clock; signal?: AbortSignal } = {}): Promise<HomeSnapshot<I>> {
+  const { ms = 15_000, clock = realClock, signal } = options;
   const stop = new AbortController();
+  const run = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal; // the caller's signal stops it too, with nothing left on it after
   const home = createHome(
     integrations,
     (snapshot) => {
@@ -128,8 +131,8 @@ export async function settle<I extends Integration<any, string>>(integrations: r
     },
     { clock },
   );
-  const running = home.start(stop.signal);
-  await Promise.race([clock.sleep(ms, stop.signal), running]);
+  const running = home.start(run);
+  await Promise.race([clock.sleep(ms, run), running]);
   stop.abort();
   await running;
   return home.snapshot();

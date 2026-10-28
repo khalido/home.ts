@@ -232,7 +232,7 @@ describe("home", () => {
     const stop = new AbortController();
     const h = hue({ host: "192.0.2.2", bridgeId: "001788fffe000000", key: "k", ca: "", fetch: f, clock, find });
     await h.run(stop.signal, (p) => (parts.push(p), p.status === "connected" && stop.abort()));
-    expect(parts.slice(0, parts.findIndex((p) => p.status === "connected") + 1).map((p) => p.detail)).toEqual(["no route", "no route", "moved from 192.0.2.2 to 192.0.2.44", "moved from 192.0.2.2 to 192.0.2.44"]);
+    expect(parts.slice(0, parts.findIndex((p) => p.status === "connected") + 1).map((p) => p.detail)).toEqual(["no route", "no route", "moved from 192.0.2.2 to 192.0.2.44"]); // the move is reported by the connection at the new address
     expect(parts.at(-1)!.status).toBe("connected");
     expect(scans).toBe(1);
   });

@@ -13,7 +13,7 @@ const readFile = (p: string) => readFileSync(resolve(dirname(path), p), "utf8");
 const home = createHome(loadHome(parseJsonc(readFileSync(path, "utf8")), { env: process.env, readFile, ftpFetch: ftpFetch() }));
 ```
 
-`loadHome` is **Bun only for now**: Hue and Enphase use Bun's `tls` fetch option, and the `fetch` option reaches only Daikin, Amber and the weather. Per-connector fetches come when a Node consumer does; until then Node builds its integrations by hand with `createHome`.
+`loadHome` runs on Bun and Node. Hue and Enphase need a fetch that handles their certificates: Bun's `tls` fetch option by default, and under Node `tls: NODE_TLS` from `@khalido/home/node`. Under Node, a config with Hue or Enphase and no `tls` is a problem `loadHome` names, not a silent failure at the first read.
 
 - **A device entry is only how to reach it and where it is**: its identity (the Hue `bridgeId`, a Daikin's `mac`, the Enphase `serial`, a Cast `castId`), its last known `host`, a key's env name, a file's path, its `room`. What a device reports about itself (model, firmware) comes live; a note about it is a comment.
 - **Secrets are env variable names** (`"key": "AMBER_KEY"`), resolved against the `env` the caller passes; a pasted key fails the schema. Files (`ca`, `token`) are paths the caller reads, relative to the config; the library reads nothing.

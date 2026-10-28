@@ -27,10 +27,11 @@ const POLL_SECONDS: Record<string, number | undefined> = Object.fromEntries(MANI
 
 /**
  * Each integration's health at `now` (ms), from the times `createHome` stamps on its part. `pollSeconds` overrides a
- * connector's own interval (its manifest's), or names one the library does not know.
+ * connector's own interval (its manifest's, so pass the weather's when the config changes it), or names one the library does not know.
  */
-export function health(snapshot: Record<string, Part | undefined>, now: number, pollSeconds: Record<string, number> = {}): Record<string, Health> {
-  return Object.fromEntries(Object.entries(snapshot).flatMap(([name, part]) => (part ? [[name, healthOf(part, now, pollSeconds[name] ?? POLL_SECONDS[name])]] : [])));
+export function health(snapshot: Record<string, Part | undefined>, now: number, options: { pollSeconds?: Record<string, number> } = {}): Record<string, Health> {
+  const poll = (name: string) => options.pollSeconds?.[name] ?? POLL_SECONDS[name];
+  return Object.fromEntries(Object.entries(snapshot).flatMap(([name, part]) => (part ? [[name, healthOf(part, now, poll(name))]] : [])));
 }
 
 function healthOf(part: Part, now: number, pollSeconds: number | undefined): Health {

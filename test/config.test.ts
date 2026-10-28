@@ -143,7 +143,7 @@ describe("loadHome", () => {
     const prices = await Bun.file(new URL("./fixtures/amber/current.json", import.meta.url)).text();
     const f = (async (url: string) => new Response(url.endsWith("/sites") ? JSON.stringify([{ id: "S1", status: "active" }]) : prices)) as unknown as typeof fetch;
     const integrations = loadHome({ devices: [{ id: "prices", connector: "amber", key: "AMBER_KEY" }] }, { env, fetch: f, clock: manualClock().clock });
-    const s = (await settle(integrations, 1000)) as Record<string, { state?: { asOf?: string } }>;
+    const s = (await settle(integrations, { ms: 1000 })) as Record<string, { state?: { asOf?: string } }>;
     expect(s.amber?.state?.asOf).toBe(new Date(0).toISOString()); // the fake clock's time, not the wall's
   });
 

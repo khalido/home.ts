@@ -85,10 +85,11 @@ export function dayBlocks(hourly: WeatherHourly | undefined, at: number, timeZon
   return { source: hourly.source, today: cut(today), tomorrow: cut(tomorrow) };
 }
 
-/** Throw on blocks a day cannot hold: each within 0–24 and ending after it starts. */
+/** Throw on blocks a day cannot hold: whole hours within 0–24, each ending after it starts. */
 export function checkBlocks(blocks: readonly BlockDef[]): void {
   for (const b of blocks)
-    if (!(b.from >= 0 && b.to <= 24 && b.from < b.to)) throw new RangeError(`day block ${b.name}: hours ${b.from}–${b.to}, want 0 ≤ from < to ≤ 24`);
+    if (!(Number.isInteger(b.from) && Number.isInteger(b.to) && b.from >= 0 && b.to <= 24 && b.from < b.to))
+      throw new RangeError(`day block ${b.name}: hours ${b.from}–${b.to}, want whole hours, 0 ≤ from < to ≤ 24`);
 }
 
 /** The UV index from which a block's text names it: 3, where sun protection starts to be advised (WHO's "moderate"). A display rule. */

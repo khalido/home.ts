@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Clock, createHome } from "../src/index.ts";
+import { type Clock, createHome, settle } from "../src/index.ts";
 import { checkPlan, type HomeConfig } from "../src/config.ts";
 import { daikin, setPower } from "../src/connectors/daikin/index.ts";
 import { addressKey, applyFound, DAY_MS, discover, type Found, lostDetail, matchFound, parseAvahi, parseAvahiBrowse, parseBrowse, parseResolve, relocator, sameId } from "../src/discover.ts";
@@ -214,6 +214,17 @@ describe("a polling connector that moves", () => {
     await home.start(stop.signal);
     expect(details.slice(0, 4)).toEqual(["no route", "no route", "moved from 192.0.2.10 to 192.0.2.44", "moved from 192.0.2.10 to 192.0.2.44"]);
     expect(home.snapshot().daikin).toMatchObject({ status: "connected", detail: "moved from 192.0.2.10 to 192.0.2.44", state: { targetC: 25 } });
+  });
+
+  test("a one-shot read (settle) waits for the read at the new address, which is what the address book keeps", async () => {
+    const status = await Bun.file(new URL("./fixtures/daikin/status.json", import.meta.url)).text();
+    const f = (async (url: string) => (url.includes("192.0.2.44") ? new Response(status) : Promise.reject(new Error("no route")))) as unknown as typeof fetch;
+    const seen: string[] = [];
+    const find = async (): Promise<Found[]> => [{ connector: "daikin", id: "00005E005301", host: "192.0.2.44" }];
+    const quick: Clock = { now: () => 0, sleep: async () => {} };
+    const s = await settle([daikin({ host: "192.0.2.10", mac: "00005E005301", find, fetch: f, clock: quick, hostCached: true, seen: (h) => seen.push(h) })], { ms: 1000 });
+    expect(s.daikin).toMatchObject({ status: "connected", detail: "moved from 192.0.2.10 to 192.0.2.44" });
+    expect(seen).toEqual(["192.0.2.44"]);
   });
 
   test("a write after the move goes to the new address, through the integration's own client", async () => {

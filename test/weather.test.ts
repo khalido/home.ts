@@ -628,6 +628,22 @@ describe("weather integration", () => {
     expect(home.snapshot().weather).toMatchObject({ status: "disconnected", detail: "open-meteo: fetch failed", state: { now: { tempC: 16.3 } } });
   });
 
+  test("the 5-minute sun tick re-reports without moving lastGoodAt: only a read does", async () => {
+    const { manualClock } = await import("./clock.ts");
+    const { clock, advance } = manualClock();
+    const once: WeatherSource = { name: "open-meteo", owns: { now: 3_600_000 }, read: async ({ at: t }) => ({ now: { ...meta("open-meteo", true, new Date(t).toISOString()), tempC: 16 }, nextAt: t + 3_600_000 }) };
+    const home = createHome([weather({ ...sydney, sources: [once], clock })], undefined, { clock });
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    await advance(0);
+    const first = home.part("weather")!.lastGoodAt;
+    expect(first).toBe(new Date(0).toISOString());
+    await advance(10 * 60_000); // two sun ticks
+    expect(home.part("weather")).toMatchObject({ status: "connected", lastGoodAt: first });
+    stop.abort();
+    await running;
+  });
+
   test("a refresh once every source has stopped is answered at once", async () => {
     const stop = new AbortController();
     const stuck: Clock = { now: () => at, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
@@ -686,6 +702,7 @@ describe("dayBlocks", () => {
 
   test("a block a day cannot hold throws", () => {
     expect(() => dayBlocks(hourly, 0, zone, [{ name: "night", from: 22, to: 6 }])).toThrow(RangeError);
+    expect(() => dayBlocks(hourly, 0, zone, [{ name: "brunch", from: 9.5, to: 12 }])).toThrow(RangeError);
     expect(() => weather({ ...sydney, blocks: [{ name: "late", from: 20, to: 25 }] })).toThrow(RangeError);
   });
 

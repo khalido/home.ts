@@ -57,3 +57,12 @@ describe("asOf", () => {
     expect(asOf(clock)).toBe("1970-01-01T00:01:30.000Z");
   });
 });
+
+describe("errorText", () => {
+  test("the message, and the cause's when it differs: Node's fetch keeps the reason there", async () => {
+    const { errorText } = await import("../src/connector.ts");
+    expect(errorText(new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 192.0.2.10:443") }))).toBe("fetch failed: connect ECONNREFUSED 192.0.2.10:443");
+    expect(errorText(new Error("no route"))).toBe("no route");
+    expect(errorText("plain")).toBe("plain");
+  });
+});

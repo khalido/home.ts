@@ -70,6 +70,7 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
   const place = { latitude: config.latitude, longitude: config.longitude };
   const readings = new Map<string, SourceReading>();
   const fresh = new Map<string, boolean>(); // whether a source's latest read brought anything new, rather than its last good slices again
+  let readAt: number | undefined; // the last read that brought something new: the part's `lastGoodAt`, so a re-report is not a read
   const polls = new Map(sources.map((s) => [s.name, poller(clock)]));
   let answer: (() => void) | undefined; // reports now: for a refresh no source will answer
 
@@ -97,7 +98,8 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
         const status: Status = sources.some((s) => fresh.get(s.name)) ? "connected" : sources.every((s) => readings.get(s.name)?.stop) ? "unavailable" : "disconnected";
         const notes = (k: "problem" | "stopped" | "anomaly") => Object.values(report).map((r) => r[k]).filter(Boolean).join("; ") || undefined;
         const detail = [notes("stopped"), notes("problem")].filter(Boolean).join("; ") || undefined;
-        update({ status, detail, anomaly: notes("anomaly"), state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), blocks: dayBlocks(slices.hourly, at, config.timeZone, config.blocks), timeZone: config.timeZone, sources: report } });
+        const lastGoodAt = status === "connected" && readAt !== undefined ? new Date(readAt).toISOString() : undefined;
+        update({ status, detail, anomaly: notes("anomaly"), lastGoodAt, state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), blocks: dayBlocks(slices.hourly, at, config.timeZone, config.blocks), timeZone: config.timeZone, sources: report } });
       };
       const poll = async (source: WeatherSource) => {
         const floorMs = (source.minPollMinutes ?? 0) * 60_000;
@@ -107,7 +109,9 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
           const reading = await source.read({ place, at, pollMinutes: sourcePollMinutes(source, pollMinutes), force, signal });
           if (signal.aborted) return; // an aborted read is not a problem to report
           readings.set(source.name, reading);
-          fresh.set(source.name, SLICE_NAMES.some((k) => (reading[k]?.fetchedAt ? Date.parse(reading[k]!.fetchedAt) >= at : false)));
+          const isFresh = SLICE_NAMES.some((k) => (reading[k]?.fetchedAt ? Date.parse(reading[k]!.fetchedAt) >= at : false));
+          fresh.set(source.name, isFresh);
+          if (isFresh) readAt = Math.max(readAt ?? at, at);
           emit();
           if (reading.stop) return;
           for (;;) {

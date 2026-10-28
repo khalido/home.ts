@@ -36,6 +36,7 @@ export type AmberState = {
   estimate?: boolean; // true while the current interval's price can still move; information, not an anomaly
   nextImportCents?: number; // the next interval's forecast
   intervalEnds?: string;
+  anomaly?: string; // forecast intervals left out because their times could not be read
   forecast?: PriceInterval[]; // the current interval, then Amber's forecast, as far ahead as Amber has one (about 8 hours, 2026-10-28)
 };
 
@@ -64,15 +65,20 @@ export function toPrices(intervals: unknown): AmberState {
     estimate: buy?.estimate,
     nextImportCents: pick("ForecastInterval", "general")?.perKwh,
     intervalEnds: buy?.endTime,
-    forecast: forecastOf(list),
+    ...forecastOf(list),
   };
 }
 
 const MINUTE = 60_000;
 
-/** The current and forecast intervals, in time order, each channel's price on one row. Undefined when Amber sent none. */
-function forecastOf(list: Interval[]): PriceInterval[] | undefined {
-  const ahead = list.filter((i) => (i.type === "CurrentInterval" || i.type === "ForecastInterval") && i.startTime && i.endTime);
+/**
+ * The current and forecast intervals, in time order, each channel's price on one row; none when Amber sent none. An interval
+ * whose times do not parse is left out and counted in `anomaly`, so one odd row never fails the prices.
+ */
+function forecastOf(list: Interval[]): Pick<AmberState, "forecast" | "anomaly"> {
+  const timed = list.filter((i) => i.type === "CurrentInterval" || i.type === "ForecastInterval");
+  const ahead = timed.filter((i) => Number.isFinite(Date.parse(i.startTime ?? "")) && Number.isFinite(Date.parse(i.endTime ?? "")));
+  const odd = timed.length - ahead.length;
   const feedIn = new Map(ahead.filter((i) => i.channelType === "feedIn").map((i) => [i.endTime, i]));
   const rows = ahead
     .filter((i) => i.channelType === "general")
@@ -88,7 +94,7 @@ function forecastOf(list: Interval[]): PriceInterval[] | undefined {
       };
     })
     .sort((a, b) => a.start.localeCompare(b.start));
-  return rows.length ? rows : undefined;
+  return { forecast: rows.length ? rows : undefined, anomaly: odd ? `${odd} price row(s) left out: their start or end time could not be read` : undefined };
 }
 
 /** A read-only client for Amber's API. The key comes in; nothing is stored. */

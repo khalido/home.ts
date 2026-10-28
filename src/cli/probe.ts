@@ -106,11 +106,11 @@ export async function probe(o: Options): Promise<void> {
       : { status: "unavailable", detail: `${r.status} ${r.body.slice(0, 80)}` };
   } else out.enphase = { status: "needs IQ_GATEWAY_HOST" };
   // Cast: connect to every device and group, read receiver (and group) status, close. Nothing is launched or changed.
-  const c = (await settle([castNow()], 10_000)).cast!;
+  const c = (await settle([castNow()], { ms: 10_000 })).cast!;
   const devices = (c.state as CastSnapshot | undefined)?.devices ?? {};
   out.cast = { status: c.status, detail: c.detail, anomaly: c.anomaly, devices: castDevices({ devices, asOf: "" }).map(({ host: _, asOf: __, ...d }) => d) };
   // Printers: one Get-Printer-Attributes to each AirPrint printer that answers mDNS (or the address cache). Nothing is sent but the read.
-  const pr = (await settle([printersNow()], 15_000)).printers!;
+  const pr = (await settle([printersNow()], { ms: 15_000 })).printers!;
   out.printers = { status: pr.status, detail: pr.detail, anomaly: pr.anomaly, printers: printerList((pr.state as PrintersState | undefined) ?? { printers: {}, asOf: "" }).map(({ host: _, asOf: __, ...p }) => p) };
   const needs = ["HOME_LATITUDE", "HOME_LONGITUDE"].filter((n) => !env[n]);
   if (needs.length) out.weather = { status: `needs ${needs.join(", ")}` };

@@ -50,6 +50,6 @@ describe("health", () => {
   });
 
   test("pollSeconds names an integration the library does not know", () => {
-    expect(health({ bus: { status: "connected", lastGoodAt: at(0) } }, 2.5 * MIN, { bus: 60 }).bus!.level).toBe("stale");
+    expect(health({ bus: { status: "connected", lastGoodAt: at(0) } }, 2.5 * MIN, { pollSeconds: { bus: 60 } }).bus!.level).toBe("stale");
   });
 });

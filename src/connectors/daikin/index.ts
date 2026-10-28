@@ -61,8 +61,7 @@ export function daikin(config: DaikinConfig): Integration<DaikinSnapshot, "daiki
           const r = await where.failed(signal);
           if (r.moved) {
             moved = r.moved;
-            update({ status: "disconnected", detail: moved, state: last });
-            continue; // read at the new address now
+            continue; // read at the new address now; that read reports, with the move in `detail`
           }
           update({ status: "disconnected", detail: lostDetail(r, why), state: last });
         }

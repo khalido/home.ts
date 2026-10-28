@@ -40,7 +40,7 @@ export function amber(config: AmberConfig): Integration<AmberSnapshot, "amber"> 
         try {
           siteId ??= await client.siteId(signal);
           last = { ...(await client.prices(siteId, signal)), asOf: asOf(clock) };
-          update({ status: "connected", state: last });
+          update({ status: "connected", anomaly: last.anomaly, state: last });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
           if (error instanceof AmberError && error.status === 401)
