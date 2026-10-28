@@ -161,3 +161,10 @@ describe("daikin integration", () => {
     expect(home.snapshot().daikin).toMatchObject({ status: "unavailable" });
   });
 });
+
+describe("daikinFields", () => {
+  test("decodes values, and keeps one that is not valid encoding as sent", async () => {
+    const { daikinFields } = await import("../src/finders.ts");
+    expect(daikinFields("ret=OK,name=%4c%69%76%69%6e%67,odd=100%")).toEqual({ ret: "OK", name: "Living", odd: "100%" });
+  });
+});

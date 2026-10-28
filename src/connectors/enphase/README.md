@@ -27,7 +27,7 @@ Reads an IQ Gateway (Envoy) on the LAN: production, consumption and grid flow. `
 The gateway's certificate is **not self-signed** on software 8: it serves `CN=<serial>.<part>._mDevice.enphaseenergy.com`, issued by `Cloud.HSM.TA`, then `Factories.MFR.CA` (valid to 2070), which chains to `root-a.PKI.CA`. The gateway does not send that root and Enphase does not publish it (searched 2026-10-13).
 
 - **Bun 1.4.2** (measured): trusting `Factories.MFR.CA` fails with "unable to get issuer certificate" (no partial-chain trust), and with verification off Bun does not run `checkServerIdentity`, so the CN cannot be checked either. `bunGatewayFetch()` therefore skips verification for the gateway's requests only. The token goes to whatever answers at that address, so reserve the address in the router.
-- **Node** (untested): undici's `Agent({ connect: { ca: factoriesMfrCa, allowPartialTrustChain: true, checkServerIdentity } })`, checking the CN starts with the serial, would pin it properly (Node 22.9 and later).
+- **Node**: `nodeGatewayFetch()` from `@khalido/home/node` skips verification the same way (checked against a local self-signed server, 2026-10-28; the gateway did not answer that day). Untested: undici's `Agent({ connect: { ca: factoriesMfrCa, allowPartialTrustChain: true, checkServerIdentity } })`, checking the CN starts with the serial, would pin it properly (Node 22.9 and later).
 
 ## The plan: local IQ Gateway with an owner token
 

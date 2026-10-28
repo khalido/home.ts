@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { asOf, type Clock, realClock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { DAY_MS, discover, type Finder, HOUR, type Found, type Lost, lostDetail, rescanDelay } from "../../discover.ts";
 import type { Integration, Part, Status } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
@@ -136,7 +137,7 @@ export function printers(config: PrintersConfig = {}): Integration<PrintersState
       t.lost = {};
       config.seen?.(t.key, { host: t.host, port: t.port ?? (t.ipps ? 443 : 631), name: t.fixedName ? undefined : t.name });
     } catch (error) {
-      if (!signal.aborted) t.failure = error instanceof Error ? error.message : String(error);
+      if (!signal.aborted) t.failure = errorText(error);
     }
   }
 
@@ -154,7 +155,7 @@ export function printers(config: PrintersConfig = {}): Integration<PrintersState
       });
       scanError = undefined;
     } catch (error) {
-      scanError = error instanceof Error ? error.message : String(error);
+      scanError = errorText(error);
       for (const t of failed) t.lost = { discoveryFailed: scanError };
       return [];
     }

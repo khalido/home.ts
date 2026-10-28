@@ -1,6 +1,6 @@
 // The root entry: the home, its config, discovery types, the clock, energy, and the sun, rain and day-block helpers. The weather types are in `./weather`.
 // Each connector has its own entry point (`@khalido/home/hue` and so on). Every export is named; test/exports.test.ts lists them.
-export { createHome, envName, filePath, type HomeSnapshot, type Integration, type Part, type StateOf, type Status } from "./home.ts";
+export { createHome, envName, filePath, settle, type HomeSnapshot, type Integration, type Part, type StateOf, type Status } from "./home.ts";
 export { asOf, type Clock, realClock } from "./clock.ts";
 export { ConnectorError } from "./connector.ts";
 export { type EnergyNow, energyNow, gridText, solarLevel } from "./energy.ts";

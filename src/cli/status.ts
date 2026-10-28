@@ -6,16 +6,15 @@ import { tlsConnect } from "../connectors/cast/tls.ts";
 import { daikin } from "../connectors/daikin/index.ts";
 import { bom, google, openMeteo, weather, type WeatherSource } from "../connectors/weather/index.ts";
 import { ftpFetch } from "../connectors/weather/ftp.ts";
-import { isTimeZone } from "../clock.ts";
 import { loadHome } from "../config.ts";
 import { energyNow, gridText } from "../energy.ts";
 import { FINDERS } from "../finders.ts";
-import type { Integration, Part, Status } from "../home.ts";
+import { type Integration, type Part, type Status, settle } from "../home.ts";
 import { kw, type Manifest } from "../manifest.ts";
 import { MANIFESTS, manifestOf } from "../manifests.ts";
 import { castNow } from "./cast.ts";
 import { printersNow } from "./printers.ts";
-import { addresses, CliError, configPathOf, env, fail, fromConfig, type Options, printJson, readConfig, settle, TOKEN_FILE } from "./context.ts";
+import { addresses, CliError, configPathOf, env, fail, fromConfig, homeTimeZone, type Options, printJson, readConfig, TOKEN_FILE } from "./context.ts";
 import { enphaseFromEnv } from "./enphase.ts";
 import { hueFromEnv } from "./hue.ts";
 import { upFromEnv } from "./up.ts";
@@ -28,12 +27,6 @@ export function place(): { latitude: number; longitude: number } {
   const latitude = Number(env.HOME_LATITUDE);
   const longitude = Number(env.HOME_LONGITUDE);
   return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : fail("HOME_LATITUDE and HOME_LONGITUDE must be numbers");
-}
-
-/** HOME_TIMEZONE, the env form of the config's `location.timezone`; this machine's zone when unset. */
-export function homeTimeZone(): string | undefined {
-  const zone = env.HOME_TIMEZONE;
-  return zone === undefined || isTimeZone(zone) ? zone : fail(`HOME_TIMEZONE: an IANA time zone, e.g. Australia/Sydney, not ${zone}`);
 }
 
 /** The weather sources KO's env sets up, in preference order: BOM (opt-in, with the FTP transport), Open-Meteo, then Google if keyed, as the last resort. */
@@ -76,7 +69,7 @@ async function statusFromEnv(manifests: Manifest[]): Promise<Record<string, Row>
       }
     }),
   );
-  for (const [name, part] of Object.entries(await settle(built.flat()))) rows[name] = { ...part, needs: [] };
+  for (const [name, part] of Object.entries((await settle(built.flat())) as Record<string, Part>)) rows[name] = { ...part, needs: [] };
   return rows;
 }
 

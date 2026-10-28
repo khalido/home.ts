@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { asOf, type Clock, realClock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { type Found, HOUR, lostDetail, rescanDelay } from "../../discover.ts";
 import { poller } from "../../poll.ts";
 import type { Integration, Part, Status } from "../../home.ts";
@@ -100,7 +101,7 @@ export function cast(config: CastConfig): Integration<CastSnapshot, "cast"> & Ca
         lastFound = new Set(all.map((r) => castKey(r.id)));
         resolveError = undefined;
       } catch (error) {
-        resolveError = `discovery failed: ${error}`;
+        resolveError = `discovery failed: ${errorText(error)}`;
       }
       resolved = true;
       const missing = (config.expect ?? []).filter((e) => !snapshot.devices[castKey(e.castId)]);
@@ -251,7 +252,7 @@ export function cast(config: CastConfig): Integration<CastSnapshot, "cast"> & Ca
           await discover();
           continue;
         }
-        const why = error instanceof Error ? error.message : String(error);
+        const why = errorText(error);
         // A cached address the last discovery did not find says so, as a polling connector's does.
         snapshot = connection(snapshot, id, { status: "disconnected", detail: lostDetail(lastFound && !lastFound.has(id) ? { seenHere: false } : {}, why) }, asOf(clock));
         publish();

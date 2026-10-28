@@ -5,6 +5,9 @@ import type { z } from "zod";
 /** No device or service call waits longer than this. */
 export const TIMEOUT_MS = 10_000;
 
+/** An error as a detail line: its message ("fetch failed", not "TypeError: fetch failed"). */
+export const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 /** A failed device or service call. `status` is the HTTP status (or a device's own code); `code` a connector's own reason. */
 export class ConnectorError extends Error {
   readonly status?: number;

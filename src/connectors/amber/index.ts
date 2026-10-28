@@ -1,4 +1,5 @@
 import { asOf, type Clock, realClock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { z } from "zod";
 import { envName, type Integration } from "../../home.ts";
 import { energyNow } from "../../energy.ts";
@@ -44,7 +45,7 @@ export function amber(config: AmberConfig): Integration<AmberSnapshot, "amber"> 
           if (signal.aborted) return; // stopped mid-read: not a failure
           if (error instanceof AmberError && error.status === 401)
             return update({ status: "unavailable", detail: "Amber rejected the key", state: last });
-          update({ status: "disconnected", detail: String(error), state: last });
+          update({ status: "disconnected", detail: errorText(error), state: last });
         }
         await poll.wait(POLL_MS, signal);
       }

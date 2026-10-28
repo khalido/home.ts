@@ -2,16 +2,40 @@
 
 My house as a TypeScript import: Philips Hue, a Daikin AC, Enphase solar, Google Cast speakers and screens, and AirPrint printers on the local network, plus Amber Electric's live prices, Up Bank spending and the weather. One small library and a `home` command. No server, no cloud of its own.
 
-```ts
-import { createHome } from "@khalido/home";
-import { hue } from "@khalido/home/hue";
+- Read every device into one typed snapshot, kept current by event stream or on a timer.
+- Turn lights on, set the AC, change speaker volume. Writes are spaced and merged, so a burst never floods a device.
+- Find what answers on your network, and check it read-only from the terminal.
+- Combine solar, grid and price into one energy figure.
 
-const home = createHome([hue({ ip, bridgeId, key, ca })], (snapshot) => render(snapshot));
-home.start(signal);           // connects, reads everything, follows the event stream, reconnects
-home.part("hue")?.state;      // typed by name, read from memory, never from the bridge
+## Try it
+
+Needs [Bun](https://bun.sh) 1.4 or newer. Not on npm yet, so clone it:
+
+```sh
+bun install
+bun test        # runs on fixtures, no device needed
+bun link        # puts `home` on your PATH
+home discover   # what answers on this network, and which of it this package supports
+home probe      # read-only checks, no keys
+home            # each connector: connected, or what it still needs
 ```
 
-Each integration keeps its own state current, by event stream or on a timer, so reading the house is a lookup in memory. Each app that imports it runs its own copy and talks to the devices directly; mine are a Mac launcher (Bun) and a Telegram bot (Node). [Home Assistant](https://www.home-assistant.io/) is the inspiration and the reference for every protocol; this covers only the devices I own. Why it is shaped this way: [docs/philosophy.md](docs/philosophy.md).
+Copy [.env.example](.env.example) to `.env` and fill in the connectors you have, or describe the home in a [config file](docs/config.md) ([example](examples/home.jsonc)).
+
+## Use it from code
+
+Weather needs no key or device, so this runs anywhere:
+
+```ts
+import { createHome } from "@khalido/home";
+import { weather } from "@khalido/home/weather";
+
+const home = createHome([weather({ latitude: -33.87, longitude: 151.21 })], (snapshot) => console.log(snapshot));
+home.start(new AbortController().signal); // connects, reads, keeps reading, reconnects
+home.part("weather")?.state;              // typed by name, read from memory, never from the device
+```
+
+The library never reads your environment or a file: you pass addresses, keys and a `fetch`. Under Node, Hue and Enphase take the fetches in `@khalido/home/node`. From a clone, run `bun run build` first: the package's entry points resolve to `dist/`. More in [using it from an app](docs/using.md).
 
 ## Connectors
 
@@ -24,25 +48,17 @@ Each integration keeps its own state current, by event stream or on a timer, so 
 | [printers](src/connectors/printers/README.md) | AirPrint printers over IPP: state, toner, paper | none |
 | [amber](src/connectors/amber/README.md) | live import and feed-in prices | none |
 | [up](src/connectors/up/README.md) | household spending by category, what still needs one | a category or tag on a transaction |
-| [weather](src/connectors/weather/README.md) | now, forecast, rain soon, the sun, from BOM, Open-Meteo and Google | none |
+| [weather](src/connectors/weather/README.md) | now, forecast by the hour and by part of the day, rain soon, the sun, from BOM, Open-Meteo and Google | none |
 
-Each connector's README says what has been tried on a real device and what has not. Writes are spaced and coalesced, so a burst of changes never floods a device and the last one always lands.
+Each connector's README says what has run against a real device and what has not. This covers only the devices I own; [Home Assistant](https://www.home-assistant.io/) is the inspiration and the reference for every protocol.
 
-## Install and run
+## More
 
-Not on npm yet. Clone it, then:
+- [The `home` command](docs/cli.md) and [the home config](docs/config.md)
+- [Why it is shaped this way](docs/philosophy.md) and [decisions](docs/decisions.md)
+- To add a connector, follow [AGENTS.md](AGENTS.md)
 
-```sh
-bun install && bun test        # tests run on fixtures; no device needed
-bun link                       # puts `home` on your PATH
-home                           # each connector: connected, or what it still needs
-home discover                  # what answers on this network, and which of it this package supports
-home probe                     # read-only checks, no keys
-```
-
-The library never reads your environment or a file: callers pass addresses, keys and a `fetch`. The `home` command reads the names in [.env.example](.env.example), or a home config. Developed on Bun; Hue and Enphase need Bun's `fetch` today, the rest also runs on Node.
-
-More: [using it from an app](docs/using.md), [the home config](docs/config.md), [the `home` command](docs/cli.md), [decisions](docs/decisions.md), [ideas](docs/ideas.md), [devices worth buying](docs/devices.md). To add a connector, follow [AGENTS.md](AGENTS.md).
+I use it from jaldi, a Mac launcher (Bun), and chota-bot, a family bot (Node); the docs name both.
 
 ## Licence
 

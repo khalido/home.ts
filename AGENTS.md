@@ -19,6 +19,7 @@ src/
   clock.ts       Clock, realClock, asOf(clock); tests pass a fake
   energy.ts      energyNow: the one owner of solar, use, grid flow and cost per hour
   locate.ts      geocoding for `home locate`
+  node-fetch.ts  `@khalido/home/node`: Hue's pinned fetch and Enphase's unverified one under Node, on undici
   finders.ts     Node-side discovery (macOS dns-sd, Linux avahi-browse, UDP) and fileCache; the only library file that spawns a process
   cli/           the home command on cac, the only code that reads the environment or the filesystem:
                  main.ts (commands from MANIFESTS), context.ts (env, config, cache, finders), status.ts,
@@ -38,7 +39,7 @@ skills/use-home  an agent uses `home`: reading safely, connecting, addresses, di
 
 ## Rules
 
-- **Runtime-neutral library.** `src/` outside `cli/` uses only `fetch`, Web Streams and the listed dependencies: no Bun or Node APIs. `tsconfig.build.json` has no runtime types and fails if one creeps in. The exceptions are `connectors/weather/ftp.ts` (BOM is FTP only), `connectors/cast/tls.ts` and `connectors/cast/serve.ts` (raw TLS, a clip served on the LAN) and `finders.ts`: each excluded there, type-checked by `tsconfig.node.json`, never imported by library code; callers pass them in.
+- **Runtime-neutral library.** `src/` outside `cli/` uses only `fetch`, Web Streams and the listed dependencies: no Bun or Node APIs. `tsconfig.build.json` has no runtime types and fails if one creeps in. The exceptions are `connectors/weather/ftp.ts` (BOM is FTP only), `connectors/cast/tls.ts` and `connectors/cast/serve.ts` (raw TLS, a clip served on the LAN), `node-fetch.ts` (undici, for Hue and Enphase under Node) and `finders.ts`: each excluded there, type-checked by `tsconfig.node.json`, never imported by library code; callers pass them in.
 - **Every field a device reports is optional.** Never clamp, round or correct an odd reading: pass it through and set `anomaly`.
 - **Secrets.** The package never stores a key. The CLI reads KO's env names (`.env.example`); only `home enphase login` writes a file (`~/.config/home/enphase-token.json`, 0600). Never print a key, token or password. Never put an IP, MAC, serial or KO's device names in the repo.
 - **KO's devices are live.** Reads are fine. **Writes to a device (lights, AC, speakers) only when KO asks.** `home probe` is the read-only check.

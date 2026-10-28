@@ -100,7 +100,7 @@ export async function* hueEvents(options: HueOptions & { signal?: AbortSignal; i
       };
       try {
         arm();
-        const res = await options.fetch(`https://${options.ip}/eventstream/clip/v2`, {
+        const res = await options.fetch(`https://${options.host}/eventstream/clip/v2`, {
           headers: { "hue-application-key": options.key, accept: "text/event-stream" },
           signal: AbortSignal.any([stop.signal, connection.signal]),
         });

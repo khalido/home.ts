@@ -20,12 +20,12 @@ const key = () => env.HUE_APPLICATION_KEY ?? fail("set HUE_APPLICATION_KEY", "au
 /** Hue as an integration from the shell's env names, for `home status`. */
 export async function hueFromEnv() {
   const b = await bridge();
-  return hue({ ip: b.host, bridgeId: b.id, key: key(), ca: ca() });
+  return hue({ host: b.host, bridgeId: b.id, key: key(), ca: ca() });
 }
 
 async function client() {
   const b = await bridge();
-  return hueClient({ ip: b.host, key: key(), fetch: bunPinnedFetch(b.id, ca()) });
+  return hueClient({ host: b.host, key: key(), fetch: bunPinnedFetch(b.id, ca()) });
 }
 
 /** Find one room, zone or scene by name, case-insensitively; a miss lists what exists. */
@@ -60,7 +60,7 @@ export const hueVerbs: Verbs = {
 
   async pair() {
     const b = await bridge();
-    const { key } = await pair({ ip: b.host, fetch: bunPinnedFetch(b.id, ca()), deviceType: `home#${hostname().slice(0, 19)}` }).catch((e) =>
+    const { key } = await pair({ host: b.host, fetch: bunPinnedFetch(b.id, ca()), deviceType: `home#${hostname().slice(0, 19)}` }).catch((e) =>
       e.code === "link_button" ? fail("press the link button on the bridge, then pair again within 30 s", "auth", "home pair") : Promise.reject(e),
     );
     console.error("Paired. Put this in your shell environment (never in a repo):");

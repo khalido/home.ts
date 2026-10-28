@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createHome, type Integration } from "../src/home.ts";
+import { createHome, type Integration, settle } from "../src/home.ts";
+import { manualClock } from "./clock.ts";
 
 /** A fake integration: reports when poked, ends when its signal aborts. */
 function fake(name: string) {
@@ -64,5 +65,30 @@ describe("createHome.refresh", () => {
     await running;
     await home.refresh("a"); // would hang if it waited for a report
     expect(home.snapshot().a?.status).toBe("connecting"); // never reported, never flipped
+  });
+});
+
+describe("settle", () => {
+  test("returns once every integration has answered, and stops them", async () => {
+    const a = fake("a");
+    const b = fake("b");
+    const { clock } = manualClock();
+    const p = settle([a, b], 15_000, clock);
+    await Promise.resolve();
+    a.report();
+    b.report();
+    expect((await p).b).toEqual({ status: "connected", state: 0 });
+  });
+
+  test("gives up after `ms`, leaving a silent one connecting", async () => {
+    const a = fake("a");
+    const b = fake("b");
+    const { clock, advance } = manualClock();
+    const p = settle([a, b], 1000, clock);
+    await Promise.resolve();
+    a.report();
+    await advance(1000);
+    const s = await p;
+    expect([s.a?.status, s.b?.status]).toEqual(["connected", "connecting"]);
   });
 });

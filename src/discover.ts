@@ -1,6 +1,7 @@
 import { applyEdits, modify } from "jsonc-parser";
 import type { Clock } from "./clock.ts";
 import type { HomeConfig } from "./config.ts";
+import { errorText } from "./connector.ts";
 
 /** mDNS service types worth looking for at home, and what this package does with each. Extend the list as needed. */
 export const KNOWN_SERVICES: Record<string, { what: string; connector?: string }> = {
@@ -265,7 +266,7 @@ export function relocator(options: { host: string; id?: string; find?: Finder; c
         at = (await discover(find, { clock, signal, done: (all) => all.some((f) => sameId(f.id, id)) })).find((f) => sameId(f.id, id))?.host;
         discoveryFailed = undefined;
       } catch (error) {
-        discoveryFailed = String(error);
+        discoveryFailed = errorText(error);
       }
       if (at && at !== host) {
         const from = host;
@@ -289,7 +290,7 @@ export function lostDetail(lost: Lost, error: unknown): string {
     : lost.seenHere === true ? "discovery finds it at its address but reads fail"
     : lost.seenHere === false ? "not found by discovery"
     : "";
-  const why = error instanceof Error ? error.message : String(error); // "fetch failed", not "TypeError: fetch failed"
+  const why = errorText(error);
   return [lost.overADay ? "no answer for a day" : "", what, why].filter(Boolean).join("; ");
 }
 

@@ -1,4 +1,5 @@
 import { asOf, type Clock, realClock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { z } from "zod";
 import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import { envName, filePath, type Integration, type Part, type Status } from "../../home.ts";
@@ -25,7 +26,7 @@ export const configSchema = z.looseObject({
  * Hue settings for a home. Leave out `fetch` in Bun and it pins to `ca` and `bridgeId`; in Node pass a pinned one.
  * `find` (mDNS, matched by `bridgeId`) finds the bridge again after three failed reconnects; `idleMs` is the stream's watchdog.
  */
-export type HueConfig = { ip: string; bridgeId: string; key: string; ca: string; fetch?: typeof fetch; clock?: Clock; find?: Finder; idleMs?: number; seen?: (host: string) => void; hostCached?: boolean }; // seen: on each connect, for an address cache; hostCached: `ip` came from it
+export type HueConfig = { host: string; bridgeId: string; key: string; ca: string; fetch?: typeof fetch; clock?: Clock; find?: Finder; idleMs?: number; seen?: (host: string) => void; hostCached?: boolean }; // seen: on each connect, for an address cache; hostCached: `host` came from it
 
 /**
  * Hue as a home integration: a full read on every (re)connect, then patched from the event stream; `refresh` re-reads it all.
@@ -35,7 +36,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
   let options = { ...config, fetch: config.fetch ?? bunPinnedFetch(config.bridgeId, config.ca) };
   let client = hueClient(options);
   const clock = config.clock ?? realClock;
-  const where = relocator({ host: config.ip, id: config.bridgeId, find: config.find, clock, cached: config.hostCached });
+  const where = relocator({ host: config.host, id: config.bridgeId, find: config.find, clock, cached: config.hostCached });
   let snapshot: HueSnapshot | undefined;
   let report: ((part: Part<HueSnapshot>) => void) | undefined;
   let status: Status = "connecting";
@@ -68,7 +69,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
         },
         (error) => {
           buffered = undefined;
-          if (!signal.aborted) report?.({ status, detail: `refresh failed: ${error}`, state: snapshot });
+          if (!signal.aborted) report?.({ status, detail: `refresh failed: ${errorText(error)}`, state: snapshot });
         },
       );
     },
@@ -83,7 +84,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
             if (item.kind === "disconnected") {
               const r = await where.failed(signal);
               if (r.moved) {
-                options = { ...options, ip: where.host() };
+                options = { ...options, host: where.host() };
                 client = hueClient(options);
                 moved = r.moved;
                 update({ status: "disconnected", detail: moved, state: snapshot });
@@ -95,7 +96,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
             if (item.kind === "connected") {
               snapshot = snapshotFrom(await client.get(undefined, signal), now);
               where.ok();
-              config.seen?.(options.ip);
+              config.seen?.(options.host);
             } else if (item.kind === "events" && snapshot) {
               for (const event of item.events) snapshot = reduce(snapshot, event);
               buffered?.push(...item.events);
@@ -108,7 +109,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
           if (signal.aborted) return; // stopped mid-read: not a failure
           if (isRejectedKey(error)) return update({ status: "unavailable", detail: "the bridge rejected the key; pair again", state: snapshot });
           // The full read failed after connecting: say so, wait, and start over with a fresh stream.
-          update({ status: "disconnected", detail: String(error), state: snapshot });
+          update({ status: "disconnected", detail: errorText(error), state: snapshot });
           await clock.sleep(5000, signal);
         }
       }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // `home`: the terminal layer. Commands come from cac; one `home <connector>` per manifest, its verbs from src/cli/<connector>.ts.
 import { cac } from "cac";
-import { ConnectorError } from "../connector.ts";
+import { ConnectorError, errorText } from "../connector.ts";
 import { MANIFESTS } from "../manifests.ts";
 import { cacheCommand } from "./cache.ts";
 import { CAST_OPTIONS, CAST_USAGE, castVerbs } from "./cast.ts";
@@ -67,7 +67,7 @@ cli.help();
 
 /** An error as `home` reports it: what went wrong, a coarse code, and the command that fixes it when there is one. */
 function describe(e: unknown): { error: string; code: ErrorCode; fix?: string } {
-  const error = e instanceof Error ? e.message : String(e);
+  const error = errorText(e);
   if (e instanceof CliError) return { error, code: e.code, fix: e.fix };
   if (e instanceof Error && e.name === "CACError") return { error, code: "usage" }; // cac: a missing argument or an unknown option
   if (e instanceof ConnectorError && (e.status === 401 || e.status === 403)) return { error, code: "auth" };
@@ -89,7 +89,7 @@ try {
   try {
     addresses.flush();
   } catch (e) {
-    console.error(`home: address cache not written: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`home: address cache not written: ${errorText(e)}`);
   }
 }
 // stdout is data, stderr everything else: under --json an error is one JSON object on stderr. Exit 2 for usage, 1 for the rest.

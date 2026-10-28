@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { writePrivate } from "../finders.ts";
 import { type AccountFilter, type Category, dollars, type Household, inHousehold, readTransactions, recurring, spendByCategory, spendByMerchant, type Transaction, type TransactionQuery, uncategorised, up, upClient } from "../connectors/up/index.ts";
-import { env, fail, type Options, printJson, text, usage, type Verbs } from "./context.ts";
+import { env, fail, homeTimeZone, type Options, printJson, text, usage, type Verbs } from "./context.ts";
 
 export const UP_USAGE =
   "usage: home up transactions [--since <date>] [--until <date>] [--category <id>] [--tag <label>] [--status HELD|SETTLED] [--limit <n>] [--json|--csv] | categories | uncategorised | spend [--by category|merchant|recurring] | categorise <transaction id> <category id|none> | tag <transaction id> <label> [--remove] | webhooks [get|logs|ping|create|delete] [id|url]";
@@ -47,7 +47,7 @@ export function householdFromEnv(): Household | undefined {
   return { categories: words.filter((w) => !w.startsWith("tag:")), tags: words.filter((w) => w.startsWith("tag:")).map((w) => w.slice(4)) };
 }
 
-export const upFromEnv = () => up({ token: token(), account: accountFromEnv(), household: householdFromEnv(), fetch });
+export const upFromEnv = () => up({ token: token(), account: accountFromEnv(), household: householdFromEnv(), fetch, timeZone: homeTimeZone() });
 
 /** A date argument as ISO; "2026-10-01" is midnight in this machine's zone. */
 const iso = (v: string | undefined, name: string) => {

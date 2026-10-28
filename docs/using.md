@@ -8,12 +8,14 @@ Give every device a fixed address in your router (a DHCP reservation; eero, UniF
 
 **Bun** (jaldi): leave out `fetch` and `hue()` pins with Bun's `tls` fetch option.
 
-**Node** (chota-bot, untested): pass a pinned `fetch`, using `Agent` from `undici`:
+**Node** (chota-bot): Node's `fetch` takes no CA, so Hue and Enphase need the fetches in `@khalido/home/node`, built on undici:
 
 ```ts
-import { Agent } from "undici";
-const dispatcher = new Agent({ connect: { ca, checkServerIdentity: (_host, cert) => cert.subject.CN === bridgeId ? undefined : new Error("wrong bridge") } });
-hue({ ip, bridgeId, key, ca, fetch: (url, init) => fetch(url, { ...init, dispatcher }) });
+import { NODE_TLS, nodePinnedFetch } from "@khalido/home/node";
+loadHome(config, { env: process.env, readFile, tls: NODE_TLS }); // from a home config
+hue({ host, bridgeId, key, ca, fetch: nodePinnedFetch(bridgeId, ca) }); // or one integration
 ```
+
+Checked on Node 24.20 and 26.11 against a local TLS server (2026-10-28): the right CA and CN pass, another certificate or CN is rejected. Not yet against a real bridge.
 
 Pairing, pinning, the event stream and the rate limits are in [`src/connectors/hue/README.md`](../src/connectors/hue/README.md). On the local network the bridge still needs an application key: without one it answers 403. `home pair` gets one with the link button; no cloud account is involved.

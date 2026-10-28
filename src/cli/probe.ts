@@ -10,7 +10,8 @@ import { checkHome } from "../config.ts";
 import { daikinFields, findDaikins } from "../finders.ts";
 import { castNow } from "./cast.ts";
 import { printersNow } from "./printers.ts";
-import { configPathOf, env, fail, fromConfig, type Options, printJson, readConfig, settle } from "./context.ts";
+import { settle } from "../home.ts";
+import { configPathOf, env, fail, fromConfig, type Options, printJson, readConfig } from "./context.ts";
 import { bridge, ca } from "./hue.ts";
 import { place, weatherSources } from "./status.ts";
 
@@ -41,6 +42,22 @@ const tryGet = (url: string, init: RequestInit = {}) =>
 
 const pick = (o: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.map((k) => [k, o[k]]));
 
+/** What `basic_info` and the UDP answer may show: the adapter and firmware, never its name, MAC, Wi-Fi name or password. */
+const DAIKIN_SHOWN = ["ret", "type", "reg", "ver", "rev", "adp_kind", "pv", "cpv", "method", "err", "en_setzone"];
+
+/** The BRP084 reply's response codes only: its `adp_i` node holds the adapter's MAC (pydaikin reads it there). */
+const answered = (reply: { responses?: { fr?: string; rsc?: number }[]; notJson?: string }) =>
+  reply.notJson ? reply : { status: "answers", responses: reply.responses?.map((r) => ({ from: r.fr, code: r.rsc })) };
+
+/** JSON, or the start of the body as text when it is not. */
+const jsonOr = (body: string) => {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { notJson: body.slice(0, 80) };
+  }
+};
+
 export async function probe(o: Options): Promise<void> {
   const configPath = configPathOf(o);
   if (configPath) Object.assign(env, envFromConfig(configPath)); // the config's addresses, for this one command
@@ -61,7 +78,8 @@ export async function probe(o: Options): Promise<void> {
           const control = await tryGet(`http://${d.ip}/aircon/get_control_info`);
           const sensor = await tryGet(`http://${d.ip}/aircon/get_sensor_info`);
           const f = (r: { status: number; body: string }) => (r.status === 200 ? daikinFields(r.body) : { status: r.status, error: r.body.slice(0, 80) });
-          const result: Record<string, unknown> = { ip: d.ip, udp: d.fields, basic_info: f(info), control_info: f(control), sensor_info: f(sensor) };
+          const shown = (r: typeof info) => (r.status === 200 ? pick(daikinFields(r.body), DAIKIN_SHOWN) : f(r));
+          const result: Record<string, unknown> = { ip: d.ip, udp: pick(d.fields, DAIKIN_SHOWN), basic_info: shown(info), control_info: f(control), sensor_info: f(sensor) };
           if (info.status === 404) {
             // Not the BRP069 API. Try the newer JSON one (BRP084): op 2 is a read of the adapter's info, as pydaikin does.
             const body = JSON.stringify({
@@ -71,7 +89,7 @@ export async function probe(o: Options): Promise<void> {
               ],
             });
             const r = await tryGet(`http://${d.ip}/dsiot/multireq`, { method: "POST", headers: { "content-type": "application/json" }, body });
-            result.dsiot = r.status === 200 ? JSON.parse(r.body) : { status: r.status, error: r.body.slice(0, 80) };
+            result.dsiot = r.status === 200 ? answered(jsonOr(r.body)) : { status: r.status, error: r.body.slice(0, 80) };
           }
           return result;
         }),

@@ -1,7 +1,7 @@
 {
   "name": "@khalido/home",
   "version": "0.1.0",
-  "description": "Opinionated, small home control for TypeScript: Hue, Daikin, Enphase and Google Cast on the local network, Amber prices and the weather from the cloud.",
+  "description": "Small, typed home control for TypeScript: Hue, Daikin, Enphase, Google Cast and AirPrint printers on the local network; Amber prices, Up Bank spending and the weather from the cloud.",
   "license": "MIT",
   "author": "Khalid Omar",
   "repository": {
@@ -22,8 +22,16 @@
     "weather",
     "chromecast",
     "google-cast",
-    "bom"
+    "bom",
+    "airprint",
+    "ipp",
+    "printer",
+    "up-bank"
   ],
+  "engines": {
+    "bun": ">=1.4",
+    "node": ">=24"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -74,6 +82,10 @@
       "types": "./dist/connectors/cast/serve.d.ts",
       "import": "./dist/connectors/cast/serve.js"
     },
+    "./node": {
+      "types": "./dist/node-fetch.d.ts",
+      "import": "./dist/node-fetch.js"
+    },
     "./finders": {
       "types": "./dist/finders-entry.d.ts",
       "import": "./dist/finders-entry.js"
@@ -89,6 +101,7 @@
     "dist",
     "docs",
     "!docs/handover.md",
+    "!docs/publishing.md",
     "examples",
     "skills",
     "src",
@@ -113,6 +126,7 @@
     "fast-xml-parser": "^5.11.2",
     "jsonc-parser": "^3.3.1",
     "suncalc": "^2.1.1",
+    "undici": "^8.12.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {

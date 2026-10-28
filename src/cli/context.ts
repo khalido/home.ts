@@ -5,8 +5,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { AddressCache, CachedAddress } from "../discover.ts";
 import { parseJsonc } from "../config.ts";
+import { isTimeZone } from "../clock.ts";
 import { fileCache } from "../finders.ts";
-import { createHome, type Integration, type Part } from "../home.ts";
 
 export const env = process.env;
 
@@ -68,19 +68,10 @@ export const addresses = (() => {
   return { cache, flush: () => pending && file.write(pending) };
 })();
 
-/** Answered: past connecting, and when the state lists sources (the weather), every source has read. */
-const answered = (p: Part) => p.status !== "connecting" && Object.values((p.state as { sources?: Record<string, { read: boolean }> })?.sources ?? {}).every((s) => s.read);
-
-/** Run integrations until each has answered, at most `ms`, then stop them. */
-export async function settle(integrations: Integration<any>[], ms = 15_000): Promise<Record<string, Part>> {
-  const home = createHome(integrations);
-  const parts = () => home.snapshot() as Record<string, Part>; // the CLI handles every connector by name, untyped
-  const stop = new AbortController();
-  const running = home.start(stop.signal);
-  for (const until = Date.now() + ms; Date.now() < until && !Object.values(parts()).every(answered); ) await Bun.sleep(100);
-  stop.abort();
-  await running;
-  return parts();
+/** HOME_TIMEZONE, the env form of the config's `location.timezone`; this machine's zone when unset. */
+export function homeTimeZone(): string | undefined {
+  const zone = env.HOME_TIMEZONE;
+  return zone === undefined || isTimeZone(zone) ? zone : fail(`HOME_TIMEZONE: an IANA time zone, e.g. Australia/Sydney, not ${zone}`);
 }
 
 /** Print as JSON, two-space indented. */

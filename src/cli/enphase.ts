@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { bunGatewayFetch, enphase, mintToken, tokenExpiry } from "../connectors/enphase/index.ts";
 import { daysLeft } from "../connectors/enphase/client.ts";
 import { writePrivate } from "../finders.ts";
-import { env, fail, TOKEN_FILE, type Verbs } from "./context.ts";
+import { env, fail, homeTimeZone, TOKEN_FILE, type Verbs } from "./context.ts";
 
 /** The cached Enphase token, or undefined if `home enphase login` has not run. A corrupt file throws, naming it. */
 export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
@@ -25,7 +25,7 @@ export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
 /** Enphase as an integration from IQ_GATEWAY_HOST and the token file, for `home status`. */
 export function enphaseFromEnv() {
   const t = enphaseToken() ?? fail("no Enphase token", "auth", "home enphase login");
-  return enphase({ host: env.IQ_GATEWAY_HOST!, token: t.token, fetch: bunGatewayFetch() });
+  return enphase({ host: env.IQ_GATEWAY_HOST!, token: t.token, fetch: bunGatewayFetch(), timeZone: homeTimeZone() });
 }
 
 export const enphaseVerbs: Verbs = {

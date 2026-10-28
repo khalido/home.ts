@@ -72,7 +72,16 @@ const mdnsFind = async (type: string, txtKey: string, connector: Connector): Pro
 
 /** Daikin's `key=value,key=value` answers, percent-decoded. */
 export const daikinFields = (text: string) =>
-  Object.fromEntries(text.trim().split(",").map((kv) => kv.split("=")).map(([k, v = ""]) => [k, decodeURIComponent(v)]));
+  Object.fromEntries(text.trim().split(",").map((kv) => kv.split("=")).map(([k, v = ""]) => [k, decoded(v)]));
+
+/** A percent-encoded value, or as sent when it is not valid encoding (a stray "%"): one odd field never fails the read. */
+function decoded(v: string): string {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    return v;
+  }
+}
 
 /** Broadcast pydaikin's discovery packet (UDP 30000 → 30050) and collect who answers within `ms`. */
 export function findDaikins(ms = 1500): Promise<{ ip: string; fields: Record<string, string> }[]> {

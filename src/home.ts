@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { type Clock, realClock } from "./clock.ts";
+import { errorText } from "./connector.ts";
 
 /** A secret in a home config is the name of an environment variable, never the secret: a pasted key fails here. */
 export const envName = z.string().regex(/^[A-Z_][A-Z0-9_]*$/, "an environment variable name (e.g. AMBER_KEY), not the secret itself");
@@ -74,7 +76,7 @@ export function createHome<I extends Integration<any, string>>(integrations: rea
         integrations.map((i) =>
           i
             .run(signal, (part) => set(i.name, part))
-            .catch((error) => set(i.name, { status: "unavailable", detail: String(error) }))
+            .catch((error) => set(i.name, { status: "unavailable", detail: errorText(error) }))
             .finally(() => {
               finished.add(i.name);
               for (const resolve of waiting.get(i.name) ?? []) resolve(); // nothing more will report
@@ -84,4 +86,23 @@ export function createHome<I extends Integration<any, string>>(integrations: rea
       );
     },
   };
+}
+
+/** Answered: past connecting, and when the state lists sources (the weather), every source has read. */
+const answered = (p: Part | undefined) => !!p && p.status !== "connecting" && Object.values((p.state as { sources?: Record<string, { read: boolean }> })?.sources ?? {}).every((s) => s.read);
+
+/**
+ * One read of everything, for a script, a test or a one-shot command: run the integrations until each has answered
+ * (connected or not), at most `ms`, then stop them and return the snapshot.
+ */
+export async function settle<I extends Integration<any, string>>(integrations: readonly I[], ms = 15_000, clock: Clock = realClock): Promise<HomeSnapshot<I>> {
+  const stop = new AbortController();
+  const home = createHome(integrations, (snapshot) => {
+    if (Object.values(snapshot as Record<string, Part>).every(answered)) stop.abort();
+  });
+  const running = home.start(stop.signal);
+  await Promise.race([clock.sleep(ms, stop.signal), running]);
+  stop.abort();
+  await running;
+  return home.snapshot();
 }

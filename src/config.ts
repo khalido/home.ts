@@ -7,7 +7,7 @@ import { cast, type CastConnect, configSchema as castDevice, resolvedFrom } from
 import { bunGatewayFetch, enphase, configSchema as enphaseDevice } from "./connectors/enphase/index.ts";
 import { type AddressCache, addressBook, type Connector, discover, type Finder, type Found, MANY, sameId } from "./discover.ts";
 import { envName, filePath } from "./home.ts";
-import { hue, configSchema as hueDevice } from "./connectors/hue/index.ts";
+import { bunPinnedFetch, hue, configSchema as hueDevice } from "./connectors/hue/index.ts";
 import { printers, configSchema as printersDevice } from "./connectors/printers/index.ts";
 import { up, configSchema as upDevice } from "./connectors/up/index.ts";
 import { manifestOf } from "./manifests.ts";
@@ -159,15 +159,17 @@ export function checkHome(input: unknown, env: Record<string, string | undefined
 }
 
 /**
- * How `loadHome` reaches devices. **Bun only for now**: Hue pins with Bun's `tls` fetch option and Enphase skips
- * verification the same way, and `fetch` reaches only Daikin, Amber and the weather. Per-connector fetches come with a Node consumer.
+ * How `loadHome` reaches devices. `fetch` reaches Daikin, Amber, Up, printers and the weather; Hue and Enphase use `tls`,
+ * Bun's `tls` fetch option by default, `NODE_TLS` from `@khalido/home/node` under Node.
  */
 export type LoadOptions = {
   env: Record<string, string | undefined>;
   /** Reads a path from the config (a CA, a token file); the caller resolves it against the config file's folder. */
   readFile?: (path: string) => string;
-  /** For Daikin, Amber and the weather; the global `fetch` when left out. Hue pins and Enphase skips verification by default (Bun). */
+  /** For Daikin, Amber, Up, printers and the weather; the global `fetch` when left out. */
   fetch?: typeof fetch;
+  /** Hue's pinned fetch and Enphase's unverified one: Bun's by default, `NODE_TLS` from `@khalido/home/node` under Node. */
+  tls?: { hue(bridgeId: string, ca: string): typeof fetch; enphase(): typeof fetch };
   /** BOM's transport: `ftpFetch()` from `@khalido/home/weather/ftp`. Without it a listed `bom` source stops and says why. */
   ftpFetch?: typeof fetch;
   /** Each connector's discovery (the CLI's mDNS and UDP), used only after reads keep failing, to find a device that moved. Cast needs its finder always: it is how Cast finds every address. */
@@ -211,6 +213,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
   const file = (path: string) => options.readFile!(path);
   const env = (name: string) => options.env[name]!;
   const net = options.fetch ?? fetch;
+  const tls = options.tls ?? { hue: bunPinnedFetch, enphase: bunGatewayFetch };
   const book = addressBook(options.cache, { configAt: options.configAt });
   /** Where a polling connector starts: a fresh cached address, else the config's, and its write-back for each good read. */
   const start = (connector: Connector, id: string | undefined, configured: string) => {
@@ -225,8 +228,8 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
   function one(d: Exclude<Device, { connector: "cast" | "printers" }>, at: string): HomeIntegration {
     switch (d.connector) {
       case "hue": {
-        const { host: ip, ...cached } = start("hue", d.bridgeId, d.host);
-        return hue({ ip, ...cached, bridgeId: d.bridgeId, key: env(d.key), ca: file(d.ca), find: options.finders?.hue });
+        const ca = file(d.ca);
+        return hue({ ...start("hue", d.bridgeId, d.host), bridgeId: d.bridgeId, key: env(d.key), ca, fetch: tls.hue(d.bridgeId, ca), find: options.finders?.hue });
       }
       case "daikin":
         return daikin({ ...start("daikin", d.mac, d.host), mac: d.mac, find: options.finders?.daikin, fetch: net });
@@ -234,7 +237,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
         const text = file(d.token).trim();
         const token = text.startsWith("{") ? (JSON.parse(text) as { token?: string }).token : text;
         if (!token) throw new HomeConfigError([`${at}.token: no token in ${d.token}`]);
-        return enphase({ ...start("enphase", d.serial, d.host), token, serial: d.serial, find: options.finders?.enphase, fetch: bunGatewayFetch(), timeZone: config!.location?.timezone });
+        return enphase({ ...start("enphase", d.serial, d.host), token, serial: d.serial, find: options.finders?.enphase, fetch: tls.enphase(), timeZone: config!.location?.timezone });
       }
       case "amber":
         return amber({ key: env(d.key), siteId: d.siteId, fetch: net });

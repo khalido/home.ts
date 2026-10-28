@@ -1,4 +1,5 @@
 import type { Clock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { type WriteLane, writeLane } from "../../lane.ts";
 import { NS } from "./codec.ts";
 import { type Application, MediaStatus, MultizoneStatus, ReceiverStatus } from "./schemas.ts";
@@ -68,7 +69,6 @@ export type WriteContext = {
   serve?: ServeClip;
 };
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const idleApp = (app?: Application) => !app || app.isIdleScreen === true;
 
 function checkLevel(level: number) {
@@ -269,7 +269,7 @@ export function castActions(ctx: WriteContext): CastActions {
         s.connect(ours.transportId!);
         result.played = await play(s, ours.transportId!, { contentId: url, contentType: clip.type ?? "audio/mpeg", streamType: "BUFFERED" }, options.timeoutMs);
       } catch (error) {
-        result.why = message(error);
+        result.why = errorText(error);
       } finally {
         serving.abort();
         served?.close();
@@ -293,7 +293,7 @@ export function castActions(ctx: WriteContext): CastActions {
           if (idleApp(prior) || prior?.appId === DEFAULT_MEDIA_RECEIVER) result.restored.push(`${d.name}: idle`);
           else result.notRestored.push({ name: d.name, why: `${prior?.displayName ?? prior?.appId ?? "an app"} was interrupted and cannot be resumed from here` });
         } catch (error) {
-          result.notRestored.push({ name: d.name, why: `${priorMedia ? "what was playing" : "idle"} not restored: ${message(error)}` });
+          result.notRestored.push({ name: d.name, why: `${priorMedia ? "what was playing" : "idle"} not restored: ${errorText(error)}` });
         }
       }
 
@@ -309,7 +309,7 @@ export function castActions(ctx: WriteContext): CastActions {
               if (m.muted) await receiver(ms, { type: "SET_VOLUME", volume: { muted: true } });
               result.restored.push(`${m.name}: volume${m.muted ? ", muted" : ""}`);
             } catch (error) {
-              result.notRestored.push({ name: m.name, why: `volume not restored: ${message(error)}` });
+              result.notRestored.push({ name: m.name, why: `volume not restored: ${errorText(error)}` });
             }
         }
       }

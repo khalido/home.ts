@@ -5,7 +5,7 @@ import { ConnectorError, fetchTimeout } from "../../connector.ts";
 import { writeLane } from "../../lane.ts";
 
 /** What a Hue client needs: the bridge's LAN address, its application key, and a pinned `fetch`. */
-export type HueOptions = { ip: string; key: string; fetch: typeof fetch; clock?: Clock };
+export type HueOptions = { host: string; key: string; fetch: typeof fetch; clock?: Clock };
 
 /** A failed bridge call. `code` is "link_button" when pairing waits on the bridge's button. */
 export class HueError extends ConnectorError {
@@ -29,7 +29,7 @@ export function mergeBody(older: object, newer: object): object {
 
 /** A typed CLIP v2 client. Reads go straight through; writes go through the bridge's write queue. */
 export function hueClient(options: HueOptions) {
-  const base = `https://${options.ip}`;
+  const base = `https://${options.host}`;
   const lanes = { group: writeLane({ gapMs: WRITE_GAP_MS.group, clock: options.clock }), light: writeLane({ gapMs: WRITE_GAP_MS.light, clock: options.clock }) };
 
   async function call(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<unknown[]> {
@@ -61,8 +61,8 @@ export function hueClient(options: HueOptions) {
 export type HueClient = ReturnType<typeof hueClient>;
 
 /** Ask the bridge for an application key. One call: throws `HueError` with code "link_button" until KO presses it. */
-export async function pair(options: { ip: string; fetch: typeof fetch; deviceType: string }): Promise<{ key: string; clientKey?: string }> {
-  const res = await fetchTimeout(options.fetch, `https://${options.ip}/api`, {
+export async function pair(options: { host: string; fetch: typeof fetch; deviceType: string }): Promise<{ key: string; clientKey?: string }> {
+  const res = await fetchTimeout(options.fetch, `https://${options.host}/api`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ devicetype: options.deviceType, generateclientkey: true }),
@@ -77,7 +77,7 @@ export async function pair(options: { ip: string; fetch: typeof fetch; deviceTyp
 
 /**
  * A `fetch` that trusts only `ca` and accepts only a certificate whose CN is `bridgeId`.
- * Uses Bun's `tls` fetch option; Node ignores it and then rejects the bridge, so it fails closed there (README has Node's setup).
+ * Uses Bun's `tls` fetch option; Node ignores it and then rejects the bridge, so it fails closed there; Node uses `nodePinnedFetch` from `@khalido/home/node`.
  */
 export function bunPinnedFetch(bridgeId: string, ca: string): typeof fetch {
   const checkServerIdentity = (_host: string, cert: { subject?: { CN?: string } }) =>

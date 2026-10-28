@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { asOf, type Clock, realClock } from "../../clock.ts";
+import { errorText } from "../../connector.ts";
 import { envName, type Integration } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
@@ -133,7 +134,7 @@ export function up(config: UpConfig): Integration<UpSnapshot, "up"> {
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
           if (error instanceof UpError && error.status === 401) return update({ status: "unavailable", detail: "Up rejected the token", state: last });
-          update({ status: "disconnected", detail: error instanceof Error ? error.message : String(error), state: last });
+          update({ status: "disconnected", detail: errorText(error), state: last });
         }
         await poll.wait(POLL_MS, signal);
       }

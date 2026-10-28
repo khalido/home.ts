@@ -17,13 +17,13 @@ The schemas here were checked against [openhue-api](https://github.com/openhue/o
 The bridge serves only its leaf certificate, `CN=<bridge id>`, signed by Signify's `root-bridge` CA (valid to 2038-01-19). Trust that CA and nothing else, and check the CN equals your bridge id. Never turn verification off: the key goes out on every request.
 
 - **Bun**: `bunPinnedFetch(bridgeId, ca)`, which `hue()` uses by default. Measured on Bun 1.4.2: 124 ms cold, 16 ms kept alive; a wrong bridge id is rejected.
-- **Node** (untested): `fetch(url, { dispatcher: new Agent({ connect: { ca, checkServerIdentity } }) })` with `Agent` from `undici`. `https.Agent` does not plug into `fetch`.
+- **Node**: `nodePinnedFetch(bridgeId, ca)` from `@khalido/home/node`, undici's `fetch` with an `Agent` holding `ca` and the same CN check. Checked on Node 24.20 and 26.11 against a local TLS server (2026-10-28), not yet a real bridge.
 
 The CA's SHA-256 is `F0:BD:8E:65:09:E8:2F:77:4D:63:BC:00:9D:53:88:C9:69:FE:3D:CF:7D:6D:54:1D:63:51:B7:2B:89:8D:8A:CF`. It comes from a public mirror and passes `openssl verify` against a live BSB002; confirming it against the copy on the developer portal is still to do. It is not in the package yet: pass `ca` yourself (the CLI reads `HUE_CA_FILE`). The plan is a `HUE_BRIDGE_ROOT_CA` export here so pinning is one import.
 
 ## Pairing
 
-`pair({ ip, fetch, deviceType })` makes one `POST /api`. Until someone presses the bridge's link button it throws `HueError` with `code: "link_button"` (bridge error 101). It never retries in a loop; the caller decides how to prompt. Pairing happens once: the key it returns keeps working, and the library never stores it.
+`pair({ host, fetch, deviceType })` makes one `POST /api`. Until someone presses the bridge's link button it throws `HueError` with `code: "link_button"` (bridge error 101). It never retries in a loop; the caller decides how to prompt. Pairing happens once: the key it returns keeps working, and the library never stores it.
 
 ## Events
 

@@ -103,7 +103,7 @@ const fakeFetch = (respond: (url: string, init?: RequestInit) => Response) => {
 describe("client", () => {
   test("get sends the key and parses every resource", async () => {
     const { f, calls } = fakeFetch(() => new Response(resourcesJson));
-    const all = await hueClient({ ip: "192.0.2.2", key: "k", fetch: f }).get();
+    const all = await hueClient({ host: "192.0.2.2", key: "k", fetch: f }).get();
     expect(all).toHaveLength(11);
     expect(calls[0]!.url).toBe("https://192.0.2.2/clip/v2/resource");
     expect((calls[0]!.init!.headers as Record<string, string>)["hue-application-key"]).toBe("k");
@@ -111,14 +111,14 @@ describe("client", () => {
 
   test("bridge errors become a HueError with the bridge's words", async () => {
     const { f } = fakeFetch(() => new Response(JSON.stringify({ errors: [{ description: "device (light) is \"soft off\"" }], data: [] }), { status: 207 }));
-    await expect(hueClient({ ip: "h", key: "k", fetch: f }).put("light", "l", { on: { on: true } })).rejects.toThrow("soft off");
+    await expect(hueClient({ host: "h", key: "k", fetch: f }).put("light", "l", { on: { on: true } })).rejects.toThrow("soft off");
   });
 
   test("writes are spaced: grouped lights 1 s apart, lights 100 ms apart, lanes independent", async () => {
     const { clock, sleeps } = fakeClock();
     const at: [string, number][] = [];
     const { f } = fakeFetch((url) => (at.push([url.split("/")[6]!, clock.now()]), new Response('{"errors":[],"data":[]}')));
-    const c = hueClient({ ip: "h", key: "k", fetch: f, clock });
+    const c = hueClient({ host: "h", key: "k", fetch: f, clock });
     await Promise.all([c.put("grouped_light", "a", {}), c.put("grouped_light", "b", {}), c.recallScene("s"), c.put("light", "x", {}), c.put("light", "y", {})]);
     expect(at.filter(([k]) => k !== "light").map(([, t]) => t)).toEqual([0, 1000, 2000]);
     expect(at.filter(([k]) => k === "light").map(([, t]) => t).every((t, i, a) => i === 0 || t - a[i - 1]! >= 100)).toBe(true);
@@ -129,12 +129,12 @@ describe("client", () => {
 describe("pair", () => {
   test("returns the key and client key", async () => {
     const { f, calls } = fakeFetch(() => new Response('[{"success":{"username":"abc","clientkey":"DEF"}}]'));
-    expect(await pair({ ip: "h", fetch: f, deviceType: "jaldi#mac" })).toEqual({ key: "abc", clientKey: "DEF" });
+    expect(await pair({ host: "h", fetch: f, deviceType: "jaldi#mac" })).toEqual({ key: "abc", clientKey: "DEF" });
     expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ devicetype: "jaldi#mac", generateclientkey: true });
   });
   test("link button not pressed: one call, a typed error", async () => {
     const { f, calls } = fakeFetch(() => new Response('[{"error":{"type":101,"address":"","description":"link button not pressed"}}]'));
-    const error = await pair({ ip: "h", fetch: f, deviceType: "d" }).catch((e) => e);
+    const error = await pair({ host: "h", fetch: f, deviceType: "d" }).catch((e) => e);
     expect(error).toBeInstanceOf(HueError);
     expect(error.code).toBe("link_button");
     expect(calls).toHaveLength(1);
@@ -146,7 +146,7 @@ describe("event stream", () => {
     const { clock, sleeps } = fakeClock();
     let n = 0;
     const { f, calls } = fakeFetch(() => (n++ === 1 ? new Response("nope", { status: 503 }) : new Response(streamOf(streamText))));
-    const items = await collect(hueEvents({ ip: "h", key: "k", fetch: f, clock }), 7);
+    const items = await collect(hueEvents({ host: "h", key: "k", fetch: f, clock }), 7);
     expect(items.map((i) => i.kind)).toEqual(["connected", "events", "events", "disconnected", "disconnected", "connected", "events"]);
     expect(sleeps).toEqual([1000, 5000]); // the stream ending, then the 503
     expect((calls[0]!.init!.headers as Record<string, string>).accept).toBe("text/event-stream");
@@ -157,7 +157,7 @@ describe("event stream failures", () => {
   test("a bridge that accepts and closes at once still backs off", async () => {
     const { clock, sleeps } = fakeClock();
     const { f } = fakeFetch(() => new Response(streamOf("")));
-    await collect(hueEvents({ ip: "h", key: "k", fetch: f, clock }), 8);
+    await collect(hueEvents({ host: "h", key: "k", fetch: f, clock }), 8);
     expect(sleeps).toEqual([1000, 5000, 15000]);
   });
 
@@ -171,7 +171,7 @@ describe("event stream failures", () => {
       if (n >= 3) throw new Error("no route");
       return new Response(quiet());
     });
-    const it = hueEvents({ ip: "h", key: "k", fetch: f, clock });
+    const it = hueEvents({ host: "h", key: "k", fetch: f, clock });
     expect((await it.next()).value).toEqual({ kind: "connected" });
     const next = it.next();
     await advance(IDLE_MS); // 90 s with nothing: a fresh connection, no "disconnected"
@@ -193,20 +193,20 @@ describe("event stream failures", () => {
 
   test("a rejected key stops the stream instead of retrying", async () => {
     const { f, calls } = fakeFetch(() => new Response("", { status: 403 }));
-    const error = await collect(hueEvents({ ip: "h", key: "k", fetch: f })).catch((e) => e);
+    const error = await collect(hueEvents({ host: "h", key: "k", fetch: f })).catch((e) => e);
     expect(error).toBeInstanceOf(HueError);
     expect(calls).toHaveLength(1);
   });
 
   test("an already-aborted signal makes no request", async () => {
     const { f, calls } = fakeFetch(() => new Response(streamOf(streamText)));
-    expect(await collect(hueEvents({ ip: "h", key: "k", fetch: f, signal: AbortSignal.abort() }))).toEqual([]);
+    expect(await collect(hueEvents({ host: "h", key: "k", fetch: f, signal: AbortSignal.abort() }))).toEqual([]);
     expect(calls).toHaveLength(0);
   });
 
   test("recallScene works when pulled off the client", async () => {
     const { f, calls } = fakeFetch(() => new Response('{"errors":[],"data":[]}'));
-    const { recallScene } = hueClient({ ip: "h", key: "k", fetch: f });
+    const { recallScene } = hueClient({ host: "h", key: "k", fetch: f });
     await recallScene("s");
     expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ recall: { action: "active" } });
   });
@@ -215,7 +215,7 @@ describe("event stream failures", () => {
 describe("home", () => {
   test("a rejected key marks hue unavailable and stops", async () => {
     const { f } = fakeFetch(() => new Response("", { status: 403 }));
-    const home = createHome([hue({ ip: "h", bridgeId: "b", key: "k", ca: "", fetch: f })]);
+    const home = createHome([hue({ host: "h", bridgeId: "b", key: "k", ca: "", fetch: f })]);
     await home.start(new AbortController().signal);
     expect(home.snapshot().hue).toMatchObject({ status: "unavailable", detail: "the bridge rejected the key; pair again" });
   });
@@ -230,7 +230,7 @@ describe("home", () => {
     const find = async () => (scans++, [{ connector: "hue" as const, id: "001788FFFE000000", host: "192.0.2.44" }]);
     const parts: Part[] = [];
     const stop = new AbortController();
-    const h = hue({ ip: "192.0.2.2", bridgeId: "001788fffe000000", key: "k", ca: "", fetch: f, clock, find });
+    const h = hue({ host: "192.0.2.2", bridgeId: "001788fffe000000", key: "k", ca: "", fetch: f, clock, find });
     await h.run(stop.signal, (p) => (parts.push(p), p.status === "connected" && stop.abort()));
     expect(parts.slice(0, parts.findIndex((p) => p.status === "connected") + 1).map((p) => p.detail)).toEqual(["no route", "no route", "moved from 192.0.2.2 to 192.0.2.44", "moved from 192.0.2.2 to 192.0.2.44"]);
     expect(parts.at(-1)!.status).toBe("connected");
@@ -247,7 +247,7 @@ describe("home", () => {
     }) as unknown as typeof fetch;
     const find = async () => [{ connector: "hue" as const, id: "001788FFFE000000", host: "192.0.2.44" }];
     const stop = new AbortController();
-    const h = hue({ ip: "192.0.2.2", bridgeId: "001788fffe000000", key: "k", ca: "", fetch: f, clock, find });
+    const h = hue({ host: "192.0.2.2", bridgeId: "001788fffe000000", key: "k", ca: "", fetch: f, clock, find });
     const fromRefresh = await new Promise<Part>((resolve) => {
       void h.run(stop.signal, (p) => {
         if (p.status !== "connected") return;
@@ -272,7 +272,7 @@ describe("home", () => {
       if (gets++ > 0) await held; // the refresh's GET waits until the test lets it go
       return new Response(resourcesJson);
     }) as unknown as typeof fetch;
-    const h = hue({ ip: "h", bridgeId: "b", key: "k", ca: "", fetch: f, clock });
+    const h = hue({ host: "h", bridgeId: "b", key: "k", ca: "", fetch: f, clock });
     const parts: Part[] = [];
     const stop = new AbortController();
     void h.run(stop.signal, (p) => parts.push(p));
@@ -298,7 +298,7 @@ describe("home", () => {
     const broken: Integration = { name: "daikin", refresh: () => {}, run: async () => { throw new Error("no controller"); } };
     const stop = new AbortController();
     const seen: HomeSnapshot[] = [];
-    const home = createHome([hue({ ip: "h", bridgeId: "b", key: "k", ca: "", fetch: f, clock }), broken], (s) => {
+    const home = createHome([hue({ host: "h", bridgeId: "b", key: "k", ca: "", fetch: f, clock }), broken], (s) => {
       seen.push(s);
       if (seen.length === 4) stop.abort();
     });
