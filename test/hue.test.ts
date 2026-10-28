@@ -304,7 +304,7 @@ describe("home", () => {
     });
     await home.start(stop.signal);
     const now = home.snapshot();
-    expect(now.daikin).toEqual({ status: "unavailable", detail: "Error: no controller" });
+    expect(now.daikin).toEqual({ status: "unavailable", detail: "no controller" });
     expect(now.hue!.status).toBe("connected");
     const s = now.hue!.state as HueSnapshot;
     expect(lights(s)[0]!.on).toBe(false);

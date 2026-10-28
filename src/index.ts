@@ -3,7 +3,7 @@
 export { createHome, envName, filePath, settle, type HomeSnapshot, type Integration, type Part, type StateOf, type Status } from "./home.ts";
 export { asOf, type Clock, realClock } from "./clock.ts";
 export { ConnectorError } from "./connector.ts";
-export { type EnergyNow, energyNow, gridText, solarLevel } from "./energy.ts";
+export { bestWindow, type EnergyNow, energyNow, gridText, type PriceWindow, solarLevel } from "./energy.ts";
 export { checkHome, checkPlan, Device, HomeConfig, HomeConfigError, type HomeIntegration, type LoadOptions, loadHome, parseJsonc, Room, type Setup } from "./config.ts";
 export type { AddressCache, CachedAddress, Connector, Finder, Found } from "./discover.ts";
 export { type SunNow, sunNow } from "./connectors/weather/sun.ts";

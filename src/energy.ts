@@ -1,4 +1,4 @@
-import type { AmberState } from "./connectors/amber/client.ts";
+import type { AmberState, PriceInterval } from "./connectors/amber/client.ts";
 import type { EnphaseState } from "./connectors/enphase/client.ts";
 import type { EnphaseSnapshot } from "./connectors/enphase/index.ts";
 
@@ -89,4 +89,58 @@ export function gridText(now: EnergyNow): string {
   if (now.flow === "exporting" && now.surplusW !== undefined) return `exporting ${kw(now.surplusW)}${rate(now.surplusCentsPerHour, "earning", "costing")}`;
   if (now.flow === "importing" && now.gridW !== undefined) return `importing ${kw(now.gridW)}${rate(now.centsPerHour, "costing", "earning")}`;
   return now.flow === "balanced" ? `balanced (${now.gridW} W)` : "";
+}
+
+/** A run of the forecast and its time-weighted averages: import price, feed-in price and the grid's renewable share. */
+export type PriceWindow = { start: string; end: string; importCents: number; exportCents?: number; renewables?: number };
+
+const HOUR_MS = 3_600_000;
+
+/**
+ * The best `hours` to run something in, from Amber's forecast: the cheapest by import price (Amber's `perKwh`), or the
+ * greenest by the grid's renewable share. The window runs over unbroken intervals that each have the number it is judged by,
+ * starting no earlier than `from` (pass the clock's now; it defaults to the forecast's first interval, which began up to
+ * 5 minutes ago). Prices are flat within an interval, so the best window starts or ends on an interval's edge: both are
+ * tried. Averages weigh each interval by the time it covers; the earliest wins a tie. Undefined when nothing fits.
+ */
+export function bestWindow(forecast: PriceInterval[] | undefined, hours: number, options: { by?: "price" | "renewables"; from?: number } = {}): PriceWindow | undefined {
+  if (!(hours > 0 && Number.isFinite(hours))) throw new RangeError(`bestWindow: hours must be above 0, got ${hours}`);
+  const by = options.by ?? "price";
+  const rows = (forecast ?? []).map((r) => ({ ...r, t0: Date.parse(r.start), t1: Date.parse(r.end) }));
+  const from = options.from ?? rows[0]?.t0 ?? 0;
+  const length = Math.round(hours * HOUR_MS); // whole ms, so the covered time adds up to it exactly
+  const starts = [...new Set(rows.flatMap((r) => [Math.max(r.t0, from), r.t1 - length]).filter((t) => t >= from))].sort((a, b) => a - b);
+  let best: PriceWindow | undefined;
+  let bestScore = Infinity;
+  for (const start of starts) {
+    const window = windowAt(rows, start, length, by);
+    const score = window && (by === "price" ? window.importCents : -window.renewables!);
+    if (window && score! < bestScore) (best = window), (bestScore = score!);
+  }
+  return best;
+}
+
+/** The window of `length` ms from `start`, or undefined when an interval in it is missing, or lacks the number `by` needs. */
+function windowAt(rows: (PriceInterval & { t0: number; t1: number })[], start: number, length: number, by: "price" | "renewables"): PriceWindow | undefined {
+  const end = start + length;
+  const sum = { importCents: 0, exportCents: 0, renewables: 0, exportMs: 0, renewablesMs: 0 };
+  let at = start;
+  for (const r of rows) {
+    if (r.t1 <= at) continue;
+    if (at >= end) break;
+    if (r.t0 > at || r.importCents === undefined || (by === "renewables" && r.renewables === undefined)) return undefined; // a gap or a missing number
+    const ms = Math.min(r.t1, end) - at;
+    sum.importCents += r.importCents * ms;
+    if (r.exportCents !== undefined) (sum.exportCents += r.exportCents * ms), (sum.exportMs += ms);
+    if (r.renewables !== undefined) (sum.renewables += r.renewables * ms), (sum.renewablesMs += ms);
+    at += ms;
+  }
+  if (at < end) return undefined;
+  return {
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    importCents: sum.importCents / length,
+    exportCents: sum.exportMs === length ? sum.exportCents / length : undefined,
+    renewables: sum.renewablesMs === length ? sum.renewables / length : undefined,
+  };
 }

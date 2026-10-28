@@ -182,8 +182,8 @@ describe("relocator", () => {
     const where = relocator({ host: "192.0.2.10", id: "00005E005301", clock: { now: () => 0, sleep: async () => {} }, find: async () => Promise.reject(new Error("spawn dns-sd ENOENT")) });
     for (let i = 0; i < 2; i++) await where.failed();
     const r = await where.failed();
-    expect(r).toEqual({ discoveryFailed: "Error: spawn dns-sd ENOENT" });
-    expect(lostDetail(r, "Error: timeout")).toBe("discovery failed: Error: spawn dns-sd ENOENT; Error: timeout");
+    expect(r).toEqual({ discoveryFailed: "spawn dns-sd ENOENT" });
+    expect(lostDetail(r, "Error: timeout")).toBe("discovery failed: spawn dns-sd ENOENT; Error: timeout");
     expect(await where.failed()).toEqual(r); // between scans it still says so
   });
 

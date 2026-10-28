@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { createHome, energyNow, gridText, solarLevel, type Clock } from "../src/index.ts";
+import { bestWindow, createHome, energyNow, gridText, solarLevel, type Clock } from "../src/index.ts";
 import { BALANCED_W } from "../src/energy.ts";
 import { amber, amberClient, POLL_MS } from "../src/connectors/amber/index.ts";
 import { toPrices } from "../src/connectors/amber/client.ts";
 
 // Shapes from a live reply on 2026-10-13, ids removed.
 const current = JSON.parse(await Bun.file(new URL("./fixtures/amber/current.json", import.meta.url)).text());
+// `prices/current?next=96` on 2026-10-28: the current interval, 12 five-minute and 14 half-hour forecasts per channel.
+const forecastReply = JSON.parse(await Bun.file(new URL("./fixtures/amber/forecast.json", import.meta.url)).text());
 
 describe("toPrices", () => {
   test("the current interval of each channel; feed-in flipped to what you are paid", () => {
@@ -19,7 +21,62 @@ describe("toPrices", () => {
       estimate: false,
       nextImportCents: 43.24809,
       intervalEnds: "2026-10-13T07:20:00Z",
+      forecast: [
+        { start: "2026-10-13T07:15:00.000Z", end: "2026-10-13T07:20:00.000Z", importCents: 40.9087, exportCents: 35.27152, renewables: 7.078, descriptor: "low" },
+        { start: "2026-10-13T07:20:00.000Z", end: "2026-10-13T07:25:00.000Z", importCents: 43.24809, exportCents: expect.any(Number), renewables: expect.any(Number), descriptor: expect.any(String) },
+      ],
     });
+  });
+
+  test("the forecast: the current interval then each one ahead, in order, both channels on one row", () => {
+    const f = toPrices(forecastReply).forecast!;
+    expect(f.length).toBe(forecastReply.filter((i: { channelType: string; type: string }) => i.channelType === "general" && i.type !== "ActualInterval").length);
+    for (const [a, b] of f.slice(1).map((r, i) => [f[i]!, r])) expect(a!.end).toBe(b!.start); // unbroken
+    expect(f.every((r) => r.importCents !== undefined && r.exportCents !== undefined)).toBe(true);
+  });
+});
+
+describe("bestWindow", () => {
+  const row = (h: number, importCents?: number, renewables?: number) => ({
+    start: new Date(Date.UTC(2026, 9, 28, h)).toISOString(),
+    end: new Date(Date.UTC(2026, 9, 28, h + 1)).toISOString(),
+    importCents,
+    renewables,
+  });
+  const forecast = [row(0, 30, 10), row(1, 10, 20), row(2, 20, 60), row(3, 40, 50), row(4, 5, 30)];
+
+  test("the cheapest two hours, averaged by time; the greenest by renewables", () => {
+    expect(bestWindow(forecast, 2)).toMatchObject({ start: row(1).start, end: row(3).start, importCents: 15, renewables: 40 });
+    expect(bestWindow(forecast, 2, { by: "renewables" })).toMatchObject({ start: row(2).start, renewables: 55 });
+  });
+
+  test("starts at `from` inside the current interval, and weighs the part hours", () => {
+    const from = Date.parse(row(0).start) + 1_800_000; // half past
+    expect(bestWindow(forecast, 1, { from })?.start).toBe(row(4).start);
+    expect(bestWindow(forecast.slice(0, 2), 1.5, { from })).toMatchObject({ start: new Date(from).toISOString(), importCents: (0.5 * 30 + 10) / 1.5 });
+  });
+
+  test("a window may end on an interval's edge rather than start on one", () => {
+    expect(bestWindow([row(0, 50), row(1, 0), row(2, 100)], 1.5)).toMatchObject({ start: "2026-10-28T00:30:00.000Z", importCents: (0.5 * 50) / 1.5 });
+  });
+
+  test("an hour count that is not a whole number of ms still averages every field; none above 0 throws", () => {
+    expect(bestWindow(forecast, 1.1, { by: "renewables" })?.renewables).toBeNumber();
+    expect(() => bestWindow(forecast, 0)).toThrow(RangeError);
+    expect(() => bestWindow(forecast, -1)).toThrow(RangeError);
+  });
+
+  test("never spans a gap or a missing price, and is undefined when nothing fits", () => {
+    const broken = [row(0, 10), row(2, 10), row(3, undefined), row(4, 10)];
+    expect(bestWindow(broken, 2)).toBeUndefined();
+    expect(bestWindow(forecast, 6)).toBeUndefined();
+    expect(bestWindow(undefined, 1)).toBeUndefined();
+  });
+
+  test("on the live forecast (2026-10-28): the cheapest 2 hours run across the 5- and 30-minute intervals", () => {
+    const w = bestWindow(toPrices(forecastReply).forecast, 2)!;
+    expect(w).toMatchObject({ start: "2026-10-28T04:40:00.000Z", end: "2026-10-28T06:40:00.000Z" });
+    expect(w.importCents).toBeCloseTo(13.7313, 4);
   });
 });
 
@@ -116,8 +173,8 @@ describe("amber integration", () => {
     await home.start(stop.signal);
     expect(calls).toEqual([
       "https://api.amber.com.au/v1/sites",
-      "https://api.amber.com.au/v1/sites/S1/prices/current?next=1",
-      "https://api.amber.com.au/v1/sites/S1/prices/current?next=1",
+      "https://api.amber.com.au/v1/sites/S1/prices/current?next=96",
+      "https://api.amber.com.au/v1/sites/S1/prices/current?next=96",
     ]);
     expect(home.snapshot().amber).toMatchObject({ status: "connected", state: { importCents: 40.9087 } });
   });

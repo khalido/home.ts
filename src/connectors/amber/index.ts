@@ -7,7 +7,7 @@ import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { amberClient, AmberError, type AmberState } from "./client.ts";
 
-export { AmberError, type AmberState, amberClient, type Interval } from "./client.ts";
+export { AmberError, type AmberState, amberClient, type Interval, type PriceInterval } from "./client.ts";
 
 /** Poll every 60 s: prices move in 5-minute intervals and the current one is revised inside it; 5 calls in 5 min, limit 50. */
 export const POLL_MS = 60_000;

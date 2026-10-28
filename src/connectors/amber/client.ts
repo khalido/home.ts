@@ -19,6 +19,7 @@ export const Interval = z.looseObject({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   estimate: z.boolean().optional(), // CurrentInterval: true until the interval's price is final
+  duration: z.number().optional(), // minutes: 5 for the current hour, 30 further out
 });
 export type Interval = z.infer<typeof Interval>;
 
@@ -35,9 +36,19 @@ export type AmberState = {
   estimate?: boolean; // true while the current interval's price can still move; information, not an anomaly
   nextImportCents?: number; // the next interval's forecast
   intervalEnds?: string;
+  forecast?: PriceInterval[]; // the current interval, then Amber's forecast, as far ahead as Amber has one (about 8 hours, 2026-10-28)
 };
 
-/** Map `prices/current?next=1` to the state: the CurrentInterval of each channel, plus the next import forecast. */
+/**
+ * One interval of the forecast, both channels. `start` is the interval's own start: Amber's `startTime` is a second past
+ * it (07:15:01 for 07:15–07:20), so it is taken to the minute. `exportCents` is what you are paid, as in `AmberState`.
+ */
+export type PriceInterval = { start: string; end: string; importCents?: number; exportCents?: number; renewables?: number; descriptor?: string };
+
+/** How many intervals to ask for: more than Amber forecasts (48 half-hours), so the reply is as far as Amber has one. */
+export const NEXT = 96;
+
+/** Map `prices/current?next=…` to the state: the CurrentInterval of each channel, the next import forecast, and the forecast. */
 export function toPrices(intervals: unknown): AmberState {
   const list = z.array(Interval).parse(intervals);
   const pick = (type: string, channel: string) => list.find((i) => i.type === type && i.channelType === channel);
@@ -53,7 +64,31 @@ export function toPrices(intervals: unknown): AmberState {
     estimate: buy?.estimate,
     nextImportCents: pick("ForecastInterval", "general")?.perKwh,
     intervalEnds: buy?.endTime,
+    forecast: forecastOf(list),
   };
+}
+
+const MINUTE = 60_000;
+
+/** The current and forecast intervals, in time order, each channel's price on one row. Undefined when Amber sent none. */
+function forecastOf(list: Interval[]): PriceInterval[] | undefined {
+  const ahead = list.filter((i) => (i.type === "CurrentInterval" || i.type === "ForecastInterval") && i.startTime && i.endTime);
+  const feedIn = new Map(ahead.filter((i) => i.channelType === "feedIn").map((i) => [i.endTime, i]));
+  const rows = ahead
+    .filter((i) => i.channelType === "general")
+    .map((i) => {
+      const sell = feedIn.get(i.endTime);
+      return {
+        start: new Date(Math.floor(Date.parse(i.startTime!) / MINUTE) * MINUTE).toISOString(),
+        end: new Date(Date.parse(i.endTime!)).toISOString(),
+        importCents: i.perKwh,
+        exportCents: sell === undefined ? undefined : -sell.perKwh,
+        renewables: i.renewables,
+        descriptor: i.descriptor,
+      };
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+  return rows.length ? rows : undefined;
 }
 
 /** A read-only client for Amber's API. The key comes in; nothing is stored. */
@@ -69,9 +104,9 @@ export function amberClient(options: { key: string; fetch: typeof fetch }) {
       if (!site) throw new AmberError("no Amber site on this account");
       return site.id;
     },
-    /** Prices now for a site: one call, ~270 ms (measured, Bun 1.4.2). */
+    /** Prices now and the forecast for a site: one call, ~270 ms (measured with `next=1`, Bun 1.4.2). */
     async prices(siteId: string, signal?: AbortSignal): Promise<AmberState> {
-      return toPrices(await get(`/sites/${siteId}/prices/current?next=1`, signal));
+      return toPrices(await get(`/sites/${siteId}/prices/current?next=${NEXT}`, signal));
     },
   };
 }

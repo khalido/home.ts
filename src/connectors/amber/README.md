@@ -4,8 +4,9 @@ Amber Electric's live wholesale-linked prices, read through Amber's public API. 
 
 ## Built
 
-- `amber({ key, fetch })` finds the account's active site once, then polls `GET /v1/sites/{id}/prices/current?next=1` every 60 s (Home Assistant's amberelectric integration polls every minute too). One call takes about 270 ms (measured, Bun 1.4.2).
+- `amber({ key, fetch })` finds the account's active site once, then polls `GET /v1/sites/{id}/prices/current?next=96` every 60 s (Home Assistant's amberelectric integration polls every minute too). One call took about 270 ms with `next=1` (measured, Bun 1.4.2); `next=96` returns about 52 intervals instead of 3.
 - `toPrices` keeps the **CurrentInterval** of each channel: `importCents` (general), `exportCents` (feed-in, sign flipped so it reads as what you are paid), `priceDescriptor` (the general channel's descriptor) and `exportDescriptor`, `spike` (Amber's own `spikeStatus`: `none`, `potential`, `spike`; the library sets no threshold), `renewables`, `estimate`, and the next interval's import forecast.
+- `forecast`: the current interval, then each forecast one, both channels on one row (`PriceInterval`). `next=96` asks for more than Amber has, so the reply runs as far as Amber forecasts: on 2026-10-28 at 3 pm, 12 five-minute intervals then 14 half-hours, to 11 pm. Amber's `startTime` is a second past the interval's start, so `start` is taken to the minute.
 - `estimate: true` means the current interval's price can still move; it is shown as "(estimate)", never as an anomaly.
 - The Amber line in `home status` shows the descriptor, "(estimate)", a spike other than `none`, and a negative price. `energyNow` combines the prices with Enphase; see Energy below.
 - A 401 marks Amber unavailable and stops polling.
@@ -17,6 +18,8 @@ Amber Electric's live wholesale-linked prices, read through Amber's public API. 
 - **Now**: solar, use, grid flow, and what the grid flow costs or earns per hour (`centsPerHour`), plus Amber's descriptor, spike and estimate.
 - **Negative prices**: `negativePrice` is "paid to use" when the import price is below zero, else "exporting at a loss" when the feed-in price is. Both can hold in one interval; the import side wins.
 - **Surplus**: `surplusW` is the export as a positive number (`-gridW` while exporting, else 0; undefined with no grid reading), and `surplusCentsPerHour` what it earns at the export price, negative when exporting costs you, never clamped.
+- **Best window**: `bestWindow(forecast, hours, { by, from })` is the cheapest run of `hours` by import price, or the greenest by renewables, averaged by time over unbroken intervals; undefined when the forecast is shorter or broken. It ranks by `perKwh`, not Amber's `advancedPrice.predicted` (14.70c against 15.56c on the first forecast interval of the fixture). On the 2026-10-28 forecast (`test/fixtures/amber/forecast.json`, read at 3 pm Sydney) the cheapest 2 hours were 3:40–5:40 pm at 13.7c. Solar is not in it: Enphase has no forecast.
+- **Renewables above 100%**: the same forecast has 101.17 and 102.6. Passed through as Amber sends them.
 - **Flow**: `"importing"`, `"exporting"` or `"balanced"`. Balanced is a display rule: within `BALANCED_W` (20 W) of zero the word and any animation say balanced, so a meter wobbling around zero does not flip; `gridW` and `surplusW` stay as read.
 - **Words and drawing**: `gridText(now)` gives the phrase every view shares ("exporting 1.2 kW, earning 42 c/h"), which `home status` prints in its `now` line. `solarLevel(now, capacityW)` scales solar for a drawing against the array's rated size or, without it, today's peak, and says which.
 
