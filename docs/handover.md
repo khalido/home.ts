@@ -6,6 +6,7 @@
 
 - **0.1.0 is ready to publish.** Since `origin/main`: the write lane, the README, dependencies, then this session's work (`f27f67c` onwards), reviewed by `/ko-review` and twice by Gemini. `bun run check` clean, 382 tests (Bun 1.4.4, 2026-10-28). A clean clone passes check, test (bare env, `TZ=UTC`) and build on macOS; the Ubuntu runner is untested until the first push. `bun publish --dry-run` runs `prepublishOnly` (check, test, build) and packs. The tarball, installed with no devDependencies, loads all 14 entry points on Node 24.20, Node 26.11 and Bun, reads the weather live, and type-checks a strict consumer with `skipLibCheck: false`. `docs/handover.md` and `docs/publishing.md` are not in it.
 - **GitHub:** `khalido/home.ts`, **private**. Nothing from this session is pushed. KO pushes, flips it public and publishes; until it is public the npm page's links 404.
+- **chota-bot runs on Bun** since 2026-10-28, so the Node fetches matter for other apps, not chota.
 - **New for consumers** (`CHANGELOG.md`, `docs/using.md`):
   - `health(snapshot, now)` from times `createHome` stamps (`lastGoodAt`, `downSince`); `onChange(snapshot, { name, before, after })`; `home.integration(name)`; `settle`.
   - Writes on the integration: Hue and Daikin `client`, Cast its actions. One client for life with `host` a getter on the relocator, so a move keeps the lane and its waiting writes.
@@ -35,7 +36,7 @@
 
 1. **Left from Gemini's second pass** (not bugs, or KO's call):
    - Google-only weather goes `disconnected` for a poll whose only read (the minute forecast) failed.
-   - Every printer off at night makes printers `down` after 3 polls; chota-bot was told.
+   - Every printer off at night makes printers `down` after 3 polls. chota-bot treats printers apart from its alerts for now; it suggested a per-connector "expected off" option in `health`.
    - `createHome(integrations, onChange?, { clock })` takes the clock third, so a clock with no `onChange` needs `undefined` in the middle.
    - `MANIFESTS` is not exported (KO's 2026-10-16 call).
    - Hue `put` returns `unknown[]`; a write that returns state will change it.
@@ -43,7 +44,7 @@
    - The Node `tls` problem in `loadHome` is checked by hand under Node, with no test (tests run in Bun).
 2. **Writes that return the resulting state** (jaldi, chota): a write resolves with the state it left, and a slot held to its rate shows in `anomaly`.
 3. **Transport NSW** departures for chota (`docs/ideas.md` item 2): a stop, routes, realtime against scheduled, minutes away.
-4. **Printers**: Print-Job behind chota's approval step (the TODO in `printers/client.ts`), after a first live read; `home` with no printer still takes 1.5 s longer (`dns-sd` buffering).
+4. **Printers: print a PDF on the Brother laser** (KO, relayed by chota-bot 2026-10-28): an IPP Print-Job write, PDF in, job state out, through the write lane; chota keeps driving its own receipt printer. First a live read (`home discover`, `home printers`), then Identify-Printer, then Print-Job, each with KO's say-so (the TODO in `printers/client.ts`). Also: `home` with no printer takes 1.5 s longer (`dns-sd` buffering).
 5. **Weather, more**: BOM warnings; Google's hourly as a second `hourly` source.
 6. **Leftovers**:
    - TS 5.6 and older fail on `Uint8Array<…>` in `dist/connectors/printers/codec.d.ts`, but only with `skipLibCheck: false`.
