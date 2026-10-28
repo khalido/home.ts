@@ -579,6 +579,20 @@ describe("weather integration", () => {
     await running;
   });
 
+  test("a refresh inside a billed source's floor still gets an answer, without a read", async () => {
+    const stop = new AbortController();
+    const stuck: Clock = { now: () => at, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
+    let reads = 0;
+    const google: WeatherSource = { name: "google", owns: { now: 1 }, minPollMinutes: 30, read: async () => (reads++, { nextAt: at + 900_000 }) };
+    const home = createHome([weather({ ...sydney, sources: [google], clock: stuck })]);
+    const running = home.start(stop.signal);
+    await Bun.sleep(0);
+    await home.refresh("weather"); // resolves, rather than waiting for the 5-minute sun tick
+    expect(reads).toBe(1);
+    stop.abort();
+    await running;
+  });
+
   test("pollMinutes below 1 is refused", () => {
     expect(() => weather({ ...sydney, pollMinutes: 0 })).toThrow("weather: pollMinutes must be at least 1, got 0");
   });
@@ -598,10 +612,33 @@ describe("weather integration", () => {
     let sleeps = 0;
     const clock: Clock = { now: () => at, sleep: async () => void (++sleeps >= 2 && stop.abort()) };
     const dead: WeatherSource = { name: "bom", owns: { now: 1 }, read: async () => ({ stop: "bom: plain fetch cannot read ftp://", nextAt: Infinity }) };
-    const live = fake("open-meteo", { now: { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), tempC: 16.3 } });
+    const live = fake("open-meteo", { now: { ...meta("open-meteo", true, new Date(at).toISOString()), tempC: 16.3 } });
     const home = createHome([weather({ ...sydney, sources: [dead, live], clock })]);
     await home.start(stop.signal);
     expect(home.snapshot().weather).toMatchObject({ status: "connected", detail: "bom: plain fetch cannot read ftp://", state: { now: { source: "open-meteo" } } });
+  });
+
+  test("a read that brings only the last good slices is a failed read: disconnected, the data kept", async () => {
+    const stop = new AbortController();
+    let sleeps = 0;
+    const clock: Clock = { now: () => at, sleep: async () => void (++sleeps >= 2 && stop.abort()) };
+    const old = fake("open-meteo", { now: { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), tempC: 16.3 }, problem: "open-meteo: fetch failed" });
+    const home = createHome([weather({ ...sydney, sources: [old], clock })]);
+    await home.start(stop.signal);
+    expect(home.snapshot().weather).toMatchObject({ status: "disconnected", detail: "open-meteo: fetch failed", state: { now: { tempC: 16.3 } } });
+  });
+
+  test("a refresh once every source has stopped is answered at once", async () => {
+    const stop = new AbortController();
+    const stuck: Clock = { now: () => at, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
+    const dead: WeatherSource = { name: "google", owns: { now: 1 }, read: async () => ({ stop: "google: key rejected", nextAt: Infinity }) };
+    const home = createHome([weather({ ...sydney, sources: [dead], clock: stuck })]);
+    const running = home.start(stop.signal);
+    await Bun.sleep(0);
+    await home.refresh("weather");
+    expect(home.part("weather")?.status).toBe("unavailable");
+    stop.abort();
+    await running;
   });
 });
 
@@ -614,7 +651,7 @@ describe("dayBlocks", () => {
     expect(b.source).toBe("open-meteo");
     expect(b.today.map((x) => [x.name, x.hours])).toEqual([["afternoon", 2], ["evening", 4]]); // the 16:00 hour has not ended
     expect(b.tomorrow.map((x) => [x.name, x.date, x.hours])).toEqual([["morning", "2026-10-17", 6], ["afternoon", "2026-10-17", 6], ["evening", "2026-10-17", 4]]);
-    expect(b.tomorrow[0]).toEqual({ name: "morning", date: "2026-10-17", from: "2026-10-16T19:00:00.000Z", to: "2026-10-17T01:00:00.000Z", hours: 6, minC: 14.2, maxC: 18.5, rainChance: 45, rainMm: 0.2, windKmh: 13.4, gustKmh: 33.5, condition: "drizzle" });
+    expect(b.tomorrow[0]).toEqual({ name: "morning", date: "2026-10-17", from: "2026-10-16T19:00:00.000Z", to: "2026-10-17T01:00:00.000Z", hours: 6, minC: 14.2, maxC: 18.5, rainChance: 45, rainMm: 0.2, windKmh: 13.4, gustKmh: 33.5, uvIndex: 3.6, condition: "drizzle" });
   });
 
   test("the same hours on a machine in UTC are cut by UTC's day, which is why the home's zone is passed", () => {
@@ -639,14 +676,27 @@ describe("dayBlocks", () => {
     expect(dayBlocks(h, t, zone)!.tomorrow.map((b) => [b.name, b.date])).toEqual([["morning", "2026-04-06"]]);
   });
 
+  test("a consumer's own parts of the day, with UV shown from 3", () => {
+    const own = [{ name: "Morning", from: 6, to: 11 }, { name: "Noon", from: 11, to: 15 }, { name: "Evening", from: 15, to: 20 }, { name: "Night", from: 20, to: 24 }];
+    const b = dayBlocks(hourly, Date.parse("2026-10-16T05:50:00Z"), zone, own)!;
+    expect(b.today.map((x) => [x.name, x.hours, x.late])).toEqual([["Evening", 4, true], ["Night", 4, undefined]]);
+    expect(b.tomorrow.map((x) => x.name)).toEqual(["Morning", "Noon", "Evening", "Night"]);
+    expect(blockText(b.today[1]!, zone)).not.toContain("UV"); // night
+  });
+
+  test("a block a day cannot hold throws", () => {
+    expect(() => dayBlocks(hourly, 0, zone, [{ name: "night", from: 22, to: 6 }])).toThrow(RangeError);
+    expect(() => weather({ ...sydney, blocks: [{ name: "late", from: 20, to: 25 }] })).toThrow(RangeError);
+  });
+
   test("no hourly forecast, no blocks", () => {
     expect(dayBlocks(undefined, at, zone)).toBeUndefined();
   });
 
   test("in words, with the start when a part is under way", () => {
     const b = dayBlocks(hourly, Date.parse("2026-10-16T05:50:00Z"), zone)!;
-    expect(blockText(b.today[0]!, zone)).toBe("afternoon from 16:00 18–18.2 °C, clear, rain 12%, wind 16.5 km/h gusting 41.8");
-    expect(blockText(b.tomorrow[0]!, zone)).toBe("morning 14.2–18.5 °C, drizzle, rain 45% 0.2 mm, wind 13.4 km/h gusting 33.5");
+    expect(blockText(b.today[0]!, zone)).toBe("afternoon from 16:00 18–18.2 °C, clear, rain 12%, wind 16.5 km/h gusting 41.8, UV 3.15");
+    expect(blockText(b.tomorrow[0]!, zone)).toBe("morning 14.2–18.5 °C, drizzle, rain 45% 0.2 mm, wind 13.4 km/h gusting 33.5, UV 3.6");
   });
 });
 

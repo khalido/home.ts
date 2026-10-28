@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Clock, realClock } from "./clock.ts";
+import { asOf, type Clock, realClock } from "./clock.ts";
 import { errorText } from "./connector.ts";
 
 /** A secret in a home config is the name of an environment variable, never the secret: a pasted key fails here. */
@@ -10,8 +10,12 @@ export const filePath = z.string().min(1);
 /** How an integration is doing. "unavailable" means it stopped and will not retry by itself. */
 export type Status = "connecting" | "connected" | "disconnected" | "unavailable";
 
-/** One integration's slice of the home: its status, a human detail, anything odd the device reported, and its state. */
-export type Part<S = unknown> = { status: Status; detail?: string; anomaly?: string; state?: S };
+/**
+ * One integration's slice of the home: its status, a human detail, anything odd the device reported, and its state.
+ * `createHome` stamps the times (UTC ISO); an integration never sets them. `lastGoodAt`: its last report while connected.
+ * `downSince`: when it stopped being connected (or started, if it never has); none while connected.
+ */
+export type Part<S = unknown> = { status: Status; detail?: string; anomaly?: string; state?: S; lastGoodAt?: string; downSince?: string };
 
 /**
  * An integration is a folder in `src/` that exports a factory returning this.
@@ -33,15 +37,30 @@ export type StateOf<I> = I extends Integration<infer S, string> ? S : never;
  */
 export type HomeSnapshot<I extends Integration<any, string> = Integration<unknown, string>> = { [X in I as X["name"]]?: Part<StateOf<X>> };
 
-/** Load a home: run each integration, keep one snapshot, call `onChange` with it after every change. */
-export function createHome<I extends Integration<any, string>>(integrations: readonly I[], onChange?: (home: HomeSnapshot<I>) => void) {
+/** One report: which integration, its part before and after. Typed by name, so `change.after.state` is that integration's state. */
+export type Change<I extends Integration<any, string> = Integration<unknown, string>> = { [X in I as X["name"]]: { name: X["name"]; before: Part<StateOf<X>>; after: Part<StateOf<X>> } }[I["name"]];
+
+/** The times `createHome` keeps on a part, from the one before it: when it was last good, and when it stopped being. */
+function stamped(part: Part, before: Part | undefined, now: string): Part {
+  if (part.status === "connected") return { ...part, lastGoodAt: now, downSince: undefined };
+  return { ...part, lastGoodAt: before?.lastGoodAt, downSince: before?.downSince ?? now }; // an integration's own stamps never count
+}
+
+/**
+ * Load a home: run each integration, keep one snapshot, call `onChange` with it and what changed after every report.
+ * `clock` stamps each part's `lastGoodAt` and `downSince`.
+ */
+export function createHome<I extends Integration<any, string>>(integrations: readonly I[], onChange?: (home: HomeSnapshot<I>, change: Change<I>) => void, options: { clock?: Clock } = {}) {
   type Name = I["name"];
+  const clock = options.clock ?? realClock;
   let snapshot = Object.fromEntries(integrations.map((i) => [i.name, { status: "connecting" }])) as HomeSnapshot<I>;
   const waiting = new Map<string, (() => void)[]>(); // refresh() callers, resolved by the integration's next report
   const finished = new Set<string>(); // integrations whose run has ended: a refresh of one resolves at once, nothing will report
-  const set = (name: Name, part: Part) => {
+  const set = (name: Name, reported: Part) => {
+    const before = (snapshot as Record<string, Part>)[name]!;
+    const part = stamped(reported, before, asOf(clock));
     snapshot = { ...snapshot, [name]: part };
-    onChange?.(snapshot);
+    onChange?.(snapshot, { name, before, after: part } as Change<I>);
     const w = waiting.get(name);
     if (w) {
       waiting.delete(name);
@@ -53,6 +72,8 @@ export function createHome<I extends Integration<any, string>>(integrations: rea
     snapshot: () => snapshot,
     /** One integration's part, typed by its name: `home.part("weather")?.state?.blocks`. */
     part: <N extends Name>(name: N): HomeSnapshot<I>[N] => snapshot[name],
+    /** One integration by name, for its writes: `home.integration("daikin")?.client.write(setPower(true))`. */
+    integration: <N extends Name>(name: N): Extract<I, { name: N }> | undefined => integrations.find((i) => i.name === name) as Extract<I, { name: N }> | undefined,
     /**
      * Read now: one integration by name, or every one. Results arrive through the snapshot and `onChange` as usual; the
      * promise resolves once each target has reported (its next update, good or bad), or at once for one whose run has ended.
@@ -72,6 +93,9 @@ export function createHome<I extends Integration<any, string>>(integrations: rea
     },
     /** Run every integration until `signal` aborts. One failing marks itself unavailable; the rest carry on. */
     async start(signal: AbortSignal): Promise<void> {
+      finished.clear(); // a second start, after the first has stopped, runs them all again
+      const now = asOf(clock); // the wait for a first report counts from here, not from createHome
+      snapshot = Object.fromEntries(Object.entries(snapshot as Record<string, Part>).map(([name, p]) => [name, p.status === "connecting" ? { ...p, downSince: p.downSince ?? now } : p])) as HomeSnapshot<I>;
       await Promise.all(
         integrations.map((i) =>
           i
@@ -97,9 +121,13 @@ const answered = (p: Part | undefined) => !!p && p.status !== "connecting" && Ob
  */
 export async function settle<I extends Integration<any, string>>(integrations: readonly I[], ms = 15_000, clock: Clock = realClock): Promise<HomeSnapshot<I>> {
   const stop = new AbortController();
-  const home = createHome(integrations, (snapshot) => {
-    if (Object.values(snapshot as Record<string, Part>).every(answered)) stop.abort();
-  });
+  const home = createHome(
+    integrations,
+    (snapshot) => {
+      if (Object.values(snapshot as Record<string, Part>).every(answered)) stop.abort();
+    },
+    { clock },
+  );
   const running = home.start(stop.signal);
   await Promise.race([clock.sleep(ms, stop.signal), running]);
   stop.abort();

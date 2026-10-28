@@ -2,10 +2,10 @@ import { type Clock, localTime, realClock } from "../../clock.ts";
 import type { Integration, Status } from "../../home.ts";
 import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
-import { blockText, type DayBlocks, dayBlocks } from "./blocks.ts";
+import { type BlockDef, blockText, checkBlocks, type DayBlocks, dayBlocks } from "./blocks.ts";
 import { openMeteo } from "./open-meteo.ts";
 import { type RainSoon, rainSoon } from "./rain.ts";
-import { DEFAULT_POLL_MINUTES, type ForecastDay, RAIN_HORIZON_MINUTES, type Slices, sourcePollMinutes, type SourceReading, mergeWeather, type WeatherSource } from "./source.ts";
+import { DEFAULT_POLL_MINUTES, type ForecastDay, RAIN_HORIZON_MINUTES, type SliceName, type Slices, sourcePollMinutes, type SourceReading, mergeWeather, type WeatherSource } from "./source.ts";
 import { type SunNow, sunNow } from "./sun.ts";
 
 export {
@@ -30,7 +30,7 @@ export {
 } from "./source.ts";
 export { type SunNext, type SunNow, sunNow } from "./sun.ts";
 export { type RainSoon, rainSoon } from "./rain.ts";
-export { type BlockName, blockText, type DayBlock, type DayBlocks, dayBlocks } from "./blocks.ts";
+export { type BlockDef, BLOCKS, blockText, type DayBlock, type DayBlocks, dayBlocks } from "./blocks.ts";
 export { bom, type BomOptions } from "./bom.ts";
 export { openMeteo, type OpenMeteoOptions } from "./open-meteo.ts";
 export { google, type GoogleOptions } from "./google.ts";
@@ -45,17 +45,20 @@ const MIN_POLL_MS = 60_000;
  * The default is `[openMeteo()]`, which works anywhere with no key. In Australia put `bom({ fetch: ftpFetch(), forecastLocation })`
  * first: it needs the FTP transport, so it is opt-in. `pollMinutes` (default 15) is how often observations and sky are read;
  * forecasts follow their issue times. `timeZone` (IANA, the runtime's when left out) is where the home's day and its times are.
+ * `blocks` are the parts of the day `state.blocks` is cut into (`BLOCKS` by default).
  */
-export type WeatherConfig = { latitude: number; longitude: number; sources?: WeatherSource[]; pollMinutes?: number; timeZone?: string; clock?: Clock };
+export type WeatherConfig = { latitude: number; longitude: number; sources?: WeatherSource[]; pollMinutes?: number; timeZone?: string; blocks?: readonly BlockDef[]; clock?: Clock };
 
 /** The weather in the snapshot: one slice each from the preferred fresh source, the sun, and how each source is doing. */
 export type WeatherState = Slices & {
   sun: SunNow;
   rainSoon?: RainSoon; // recomputed at every report and every 5 minutes; a consumer with its own clock calls `rainSoon(state.rain, now)`
-  blocks?: DayBlocks; // the same: `dayBlocks(state.hourly, now, state.timeZone)`
+  blocks?: DayBlocks; // the same: `dayBlocks(state.hourly, now, state.timeZone, blocks)`
   timeZone?: string; // the config's, which the blocks and the text use
   sources: Record<string, { read: boolean; problem?: string; stopped?: string; anomaly?: string }>;
 };
+
+const SLICE_NAMES = ["now", "forecast", "hourly", "sky", "rain"] as const satisfies readonly SliceName[];
 
 /** Outside weather as a home integration. Each source polls on its own cadence; the sun is computed, never fetched. */
 export function weather(config: WeatherConfig): Integration<WeatherState, "weather"> {
@@ -63,9 +66,13 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
   const clock = config.clock ?? realClock;
   const pollMinutes = config.pollMinutes ?? DEFAULT_POLL_MINUTES;
   if (!(pollMinutes >= 1)) throw new Error(`weather: pollMinutes must be at least 1, got ${config.pollMinutes}`);
+  if (config.blocks) checkBlocks(config.blocks); // a bad block fails here, not at every report
   const place = { latitude: config.latitude, longitude: config.longitude };
   const readings = new Map<string, SourceReading>();
+  const fresh = new Map<string, boolean>(); // whether a source's latest read brought anything new, rather than its last good slices again
   const polls = new Map(sources.map((s) => [s.name, poller(clock)]));
+  let answer: (() => void) | undefined; // reports now: for a refresh no source will answer
+
   return {
     name: "weather",
     /**
@@ -74,6 +81,7 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
      */
     refresh() {
       for (const poll of polls.values()) poll.nudge();
+      if (sources.every((s) => readings.get(s.name)?.stop)) answer?.(); // every source has stopped: none will read, so say so now
     },
     async run(signal, update) {
       const emit = () => {
@@ -85,11 +93,11 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
             return [s.name, { read: r !== undefined, problem: r?.problem, stopped: r?.stop, anomaly: r?.anomaly }];
           }),
         );
-        const any = slices.now || slices.forecast || slices.hourly || slices.sky || slices.rain;
-        const status: Status = any ? "connected" : sources.every((s) => readings.get(s.name)?.stop) ? "unavailable" : "disconnected";
+        // Connected while some source's latest read brought something new; its older slices alone are a failed read, kept as state.
+        const status: Status = sources.some((s) => fresh.get(s.name)) ? "connected" : sources.every((s) => readings.get(s.name)?.stop) ? "unavailable" : "disconnected";
         const notes = (k: "problem" | "stopped" | "anomaly") => Object.values(report).map((r) => r[k]).filter(Boolean).join("; ") || undefined;
         const detail = [notes("stopped"), notes("problem")].filter(Boolean).join("; ") || undefined;
-        update({ status, detail, anomaly: notes("anomaly"), state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), blocks: dayBlocks(slices.hourly, at, config.timeZone), timeZone: config.timeZone, sources: report } });
+        update({ status, detail, anomaly: notes("anomaly"), state: { ...slices, sun: sunNow(place.latitude, place.longitude, at), rainSoon: rainSoon(slices.rain, at), blocks: dayBlocks(slices.hourly, at, config.timeZone, config.blocks), timeZone: config.timeZone, sources: report } });
       };
       const poll = async (source: WeatherSource) => {
         const floorMs = (source.minPollMinutes ?? 0) * 60_000;
@@ -99,16 +107,21 @@ export function weather(config: WeatherConfig): Integration<WeatherState, "weath
           const reading = await source.read({ place, at, pollMinutes: sourcePollMinutes(source, pollMinutes), force, signal });
           if (signal.aborted) return; // an aborted read is not a problem to report
           readings.set(source.name, reading);
+          fresh.set(source.name, SLICE_NAMES.some((k) => (reading[k]?.fetchedAt ? Date.parse(reading[k]!.fetchedAt) >= at : false)));
           emit();
           if (reading.stop) return;
           for (;;) {
             const woken = await polls.get(source.name)!.wait(Math.max(reading.nextAt - clock.now(), MIN_POLL_MS), signal);
-            if (woken && clock.now() - at < floorMs) continue; // a refresh never beats a billed source's floor
+            if (woken && clock.now() - at < floorMs) {
+              emit(); // a refresh never beats a billed source's floor, but it gets an answer: what there is now
+              continue;
+            }
             force = woken && !floorMs;
             break;
           }
         }
       };
+      answer = emit;
       const sun = async () => {
         while (!signal.aborted) {
           await clock.sleep(SUN_MS, signal);

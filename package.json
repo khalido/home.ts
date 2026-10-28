@@ -95,6 +95,7 @@
     "home": "./src/cli/main.ts"
   },
   "files": [
+    "CHANGELOG.md",
     "LICENSE",
     "README.md",
     ".env.example",

@@ -15,6 +15,10 @@ function recorded(options: { gapMs: number; perMinute?: number }) {
 }
 
 describe("writeLane", () => {
+  test("a per-minute cap below 1 is refused", () => {
+    expect(() => writeLane({ gapMs: 100, perMinute: 0 })).toThrow(RangeError);
+  });
+
   test("a burst to one slot: the first goes now, the middle drops, the last lands after the gap", async () => {
     const { send, sends, advance } = recorded({ gapMs: 1000 });
     const results = [21, 22, 23, 24].map((c) => send("ac", c));

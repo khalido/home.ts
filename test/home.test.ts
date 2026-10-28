@@ -68,6 +68,21 @@ describe("createHome.refresh", () => {
   });
 });
 
+describe("createHome.start", () => {
+  test("a second start, after the first has stopped, runs every integration again", async () => {
+    let runs = 0;
+    const i: Integration<number> = { name: "a", refresh() {}, run: (signal) => new Promise((r) => (runs++, signal.addEventListener("abort", () => r()))) };
+    const home = createHome([i]);
+    for (let n = 0; n < 2; n++) {
+      const stop = new AbortController();
+      const running = home.start(stop.signal);
+      stop.abort();
+      await running;
+    }
+    expect(runs).toBe(2);
+  });
+});
+
 describe("settle", () => {
   test("returns once every integration has answered, and stops them", async () => {
     const a = fake("a");
@@ -77,7 +92,7 @@ describe("settle", () => {
     await Promise.resolve();
     a.report();
     b.report();
-    expect((await p).b).toEqual({ status: "connected", state: 0 });
+    expect((await p).b).toMatchObject({ status: "connected", state: 0 });
   });
 
   test("gives up after `ms`, leaving a silent one connecting", async () => {

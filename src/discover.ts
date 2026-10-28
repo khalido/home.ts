@@ -41,8 +41,11 @@ export type Connector = keyof typeof IDENTITY;
 /** Connectors with many devices in one integration (every Cast device and group, every printer); the rest allow one device for now. */
 export const MANY: ReadonlySet<string> = new Set(["cast", "printers"]);
 
-/** Identities compared without case or separators: "00:17:88:B0" is "001788b0". */
-export const sameId = (a: string, b: string) => a.toLowerCase().replace(/[^0-9a-z]/g, "") === b.toLowerCase().replace(/[^0-9a-z]/g, "");
+/** An identity without case, separators or a `urn:uuid:` prefix: "00:17:88:B0" is "001788b0", "urn:uuid:AB-CD" is "abcd". */
+export const idKey = (id: string) => id.toLowerCase().replace(/^urn:uuid:/, "").replace(/[^0-9a-z]/g, "");
+
+/** Identities compared by `idKey`. */
+export const sameId = (a: string, b: string) => idKey(a) === idKey(b);
 
 export type Match = {
   moved: { index: number; id: string; connector: Connector; from: string; to: string }[];
@@ -146,7 +149,7 @@ export const DISCOVERY_PASSES = 2;
 export const DISCOVERY_GAP_MS = 5000;
 
 /** A device's key, across discovery passes and in the address cache: its connector and identity, without case or separators. */
-export const addressKey = (connector: Connector, id: string) => `${connector}:${id.toLowerCase().replace(/[^0-9a-z]/g, "")}`;
+export const addressKey = (connector: Connector, id: string) => `${connector}:${idKey(id)}`;
 export const foundKey = (f: Found) => addressKey(f.connector, f.id);
 
 /** Where a device last answered, and when that was last confirmed. `name` is kept for Cast, whose config entry may be absent. */

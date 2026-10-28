@@ -3,7 +3,7 @@
 Reads one Daikin AC over its local JSON `dsiot` API. `iot_class`: **local_polling**. KO's unit is a Daikin Australia **Alira X** with built-in Wi-Fi (likely; it reports a blank model string).
 
 - `client.ts`: `daikinClient({ host, fetch }).read()` returns `DaikinState` (power, mode, the selected mode's setpoint and fan speed, room °C, humidity, outside °C, `anomaly`). `setPower`, `setMode`, `setTarget`, `setFan` build write requests; `client.write(request)` sends one, through a write lane: 1 s apart and at most 20 a minute (guesses), a waiting write merging the next one field by field (`mergeWrites`). Every request times out at 10 s.
-- `index.ts`: `daikin({ host, fetch, clock })` reads now, then every **120 s** (Home Assistant's `update_interval`). A failed poll is `disconnected` and keeps the last reading with `asOf`; a 404 on `/dsiot/multireq` (not a dsiot unit) is a terminal `unavailable`. There is no key, so nothing else is terminal.
+- `index.ts`: `daikin({ host, fetch, clock })` reads now, then every **120 s** (Home Assistant's `update_interval`). A failed poll is `disconnected` and keeps the last reading with `asOf`; a 404 on `/dsiot/multireq` is a failed read too, saying "not a dsiot Daikin": the address may now be another device's, so discovery looks for the unit. There is no key, so nothing is terminal. Writes go through `daikin().client.write(…)`: one client for the integration's life, at the unit's current address.
 - `home status` reads `DAIKIN_HOST`, else the first unit that answers the UDP broadcast. There is no CLI command that writes.
 
 ## The protocol
@@ -38,7 +38,7 @@ One read-only request, saved with the MAC, SSID, `edid` and the unit's ASCII ids
 
 ## Unconfirmed
 
-- **The write lane's rates** (1 s apart, 20 a minute) are guesses. A move rebuilds the client and its lane: the count starts again, and a write still waiting goes to the old address and fails.
+- **The write lane's rates** (1 s apart, 20 a minute) are guesses. One client lives as long as the integration and reads the unit's address at each send, so a move keeps the lane's count, and a write still waiting goes to the new address.
 - **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16, Bun 1.4.3, see below); mode, setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
   - Setpoint width: pydaikin sends one byte, Alira two (`3200`). One byte, because the live field is one byte (`p_02` `mi 24`, `mx 40`).
   - Method: pydaikin POSTs, Alira PUTs. POST, the method reads already use.

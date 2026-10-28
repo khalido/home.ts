@@ -27,15 +27,14 @@ export function mergeBody(older: object, newer: object): object {
   return out;
 }
 
-/** A typed CLIP v2 client. Reads go straight through; writes go through the bridge's write queue. */
+/** A typed CLIP v2 client. Reads go straight through; writes go through the bridge's write queue. `host` is read at each call, so a getter follows a move. */
 export function hueClient(options: HueOptions) {
-  const base = `https://${options.host}`;
   const lanes = { group: writeLane({ gapMs: WRITE_GAP_MS.group, clock: options.clock }), light: writeLane({ gapMs: WRITE_GAP_MS.light, clock: options.clock }) };
 
   async function call(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<unknown[]> {
     const headers: Record<string, string> = { "hue-application-key": options.key };
     if (body !== undefined) headers["content-type"] = "application/json";
-    const res = await fetchTimeout(options.fetch, base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }, { signal });
+    const res = await fetchTimeout(options.fetch, `https://${options.host}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }, { signal });
     const parsed = Envelope.safeParse(await res.json().catch(() => undefined));
     const errors = parsed.success ? parsed.data.errors.map((e) => e.description) : [];
     if (!res.ok || errors.length) throw new HueError(errors.join("; ") || `HTTP ${res.status} on ${method} ${path}`, { status: res.status });

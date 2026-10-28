@@ -137,6 +137,21 @@ describe("loadHome", () => {
     );
   });
 
+  test("the clock reaches every integration", async () => {
+    const { manualClock } = await import("./clock.ts");
+    const { settle } = await import("../src/home.ts");
+    const prices = await Bun.file(new URL("./fixtures/amber/current.json", import.meta.url)).text();
+    const f = (async (url: string) => new Response(url.endsWith("/sites") ? JSON.stringify([{ id: "S1", status: "active" }]) : prices)) as unknown as typeof fetch;
+    const integrations = loadHome({ devices: [{ id: "prices", connector: "amber", key: "AMBER_KEY" }] }, { env, fetch: f, clock: manualClock().clock });
+    const s = (await settle(integrations, 1000)) as Record<string, { state?: { asOf?: string } }>;
+    expect(s.amber?.state?.asOf).toBe(new Date(0).toISOString()); // the fake clock's time, not the wall's
+  });
+
+  test("a token file that is not JSON is named, not a bare SyntaxError", () => {
+    const broken = (path: string) => (path.endsWith(".json") ? "{ token: " : files(path));
+    expect(() => loadHome(example, { env, readFile: broken })).toThrow(/devices\[2\] \(solar\)\.token: not JSON/);
+  });
+
   test("a file the config needs, with no reader, is named", () => {
     expect(() => loadHome(example, { env })).toThrow("devices[0] (bridge).ca: needs readFile to read hue-root-ca.pem; devices[2] (solar).token: needs readFile to read enphase-token.json");
   });

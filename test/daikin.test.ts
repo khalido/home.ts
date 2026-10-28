@@ -155,10 +155,15 @@ describe("daikin integration", () => {
     expect(home.snapshot().daikin).toMatchObject({ status: "disconnected", detail: expect.stringContaining("HTTP 500"), state: { targetC: 25, asOf: new Date(0).toISOString() } });
   });
 
-  test("no dsiot endpoint marks Daikin unavailable and stops", async () => {
-    const home = createHome([daikin({ host: "ac.local", fetch: unit(() => new Response("", { status: 404 })).f })]);
-    await home.start(new AbortController().signal);
-    expect(home.snapshot().daikin).toMatchObject({ status: "unavailable" });
+  test("no dsiot endpoint is a failed read: disconnected, saying so, and still polling", async () => {
+    let t = 0;
+    const stop = new AbortController();
+    const clock: Clock = { now: () => t, sleep: async (ms) => void ((t += ms), t >= 2 * POLL_MS && stop.abort()) };
+    const { f, calls } = unit(() => new Response("", { status: 404 }));
+    const home = createHome([daikin({ host: "ac.local", fetch: f, clock })]);
+    await home.start(stop.signal);
+    expect(home.snapshot().daikin).toMatchObject({ status: "disconnected", detail: "no /dsiot/multireq at this address: not a dsiot Daikin" });
+    expect(calls()).toBeGreaterThan(1);
   });
 });
 

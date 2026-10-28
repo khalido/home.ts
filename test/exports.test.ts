@@ -4,12 +4,12 @@ import pkg from "../package.json" with { type: "json" };
 // Every entry point's runtime exports, by name. A new export, or an `export *` that drags internals in, fails here:
 // add the name on purpose or keep it internal. Types do not show at runtime; tsc checks those.
 const PUBLIC: Record<string, string[]> = {
-  ".": ["ConnectorError", "Device", "HomeConfig", "HomeConfigError", "Room", "asOf", "bestWindow", "checkHome", "checkPlan", "createHome", "dayBlocks", "energyNow", "envName", "filePath", "gridText", "loadHome", "parseJsonc", "rainSoon", "realClock", "settle", "solarLevel", "sunNow"],
+  ".": ["ConnectorError", "DOWN_POLLS", "Device", "HomeConfig", "HomeConfigError", "PUSH_DOWN_MS", "Room", "STALE_POLLS", "asOf", "bestWindow", "checkHome", "checkPlan", "createHome", "dayBlocks", "energyNow", "envName", "filePath", "gridText", "health", "loadHome", "parseJsonc", "rainSoon", "realClock", "settle", "solarLevel", "sunNow"],
   "./hue": ["HueError", "bunPinnedFetch", "configSchema", "groups", "homeGroupedLightId", "hue", "hueClient", "lights", "manifest", "pair", "scenes"],
   "./daikin": ["DaikinError", "POLL_MS", "acText", "configSchema", "daikin", "daikinClient", "manifest", "setFan", "setMode", "setPower", "setTarget"],
   "./enphase": ["EnphaseError", "POLL_MS", "bunGatewayFetch", "configSchema", "enphase", "enphaseClient", "enphaseText", "manifest", "mintToken", "tokenExpiry"],
   "./amber": ["AmberError", "POLL_MS", "amber", "amberClient", "amberText", "configSchema", "manifest"],
-  "./weather": ["blockText", "bom", "dayBlocks", "google", "manifest", "mergeWeather", "nextPoll", "openMeteo", "rainSoon", "rainText", "sunNow", "weather", "weatherText"],
+  "./weather": ["BLOCKS", "blockText", "bom", "dayBlocks", "google", "manifest", "mergeWeather", "nextPoll", "openMeteo", "rainSoon", "rainText", "sunNow", "weather", "weatherText"],
   "./weather/ftp": ["ftpFetch"],
   "./cast": ["cast", "castDevices", "castText", "configSchema", "manifest", "resolvedFrom"],
   "./printers": ["POLL_MS", "configSchema", "manifest", "printerList", "printerText", "printers"],

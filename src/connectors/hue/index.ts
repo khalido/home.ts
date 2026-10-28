@@ -4,7 +4,7 @@ import { z } from "zod";
 import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import { envName, filePath, type Integration, type Part, type Status } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
-import { bunPinnedFetch, hueClient } from "./client.ts";
+import { bunPinnedFetch, type HueClient, hueClient } from "./client.ts";
 import { hueEvents, isRejectedKey } from "./events.ts";
 import type { HueEvent } from "./schemas.ts";
 import { groups, type HueSnapshot, lights, reduce, snapshotFrom } from "./state.ts";
@@ -32,30 +32,38 @@ export type HueConfig = { host: string; bridgeId: string; key: string; ca: strin
  * Hue as a home integration: a full read on every (re)connect, then patched from the event stream; `refresh` re-reads it all.
  * A bridge that stops answering is looked for by `bridgeId` after three failed reconnects, and followed to its new address.
  */
-export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { readonly client: ReturnType<typeof hueClient> } {
-  let options = { ...config, fetch: config.fetch ?? bunPinnedFetch(config.bridgeId, config.ca) };
-  let client = hueClient(options);
+export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { readonly client: HueClient } {
   const clock = config.clock ?? realClock;
   const where = relocator({ host: config.host, id: config.bridgeId, find: config.find, clock, cached: config.hostCached });
+  // One client for the integration's life, at wherever the bridge is now: a move keeps the write lane and the writes waiting in it.
+  const options = {
+    ...config,
+    fetch: config.fetch ?? bunPinnedFetch(config.bridgeId, config.ca),
+    get host() {
+      return where.host();
+    },
+  };
+  const client = hueClient(options);
   let snapshot: HueSnapshot | undefined;
   let report: ((part: Part<HueSnapshot>) => void) | undefined;
   let status: Status = "connecting";
+  let last: Part<HueSnapshot> = { status }; // the last report, said again to a refresh that cannot read
   let running: AbortSignal | undefined;
   let buffered: HueEvent[] | undefined; // events seen while a refresh's GET is in flight, re-applied on top of it
   let moved: string | undefined; // kept in `detail` so a consumer can persist the new address
   return {
     name: "hue",
-    get client() {
-      return client;
-    },
+    client,
     /**
      * One full GET of every resource, replacing the stream-patched state; events that arrive meanwhile are re-applied on
      * top. Only while connected; a failure keeps the state and says so.
      */
     refresh() {
       where.reset(); // while it is down, the next failed reconnect looks for it at once
-      // Not connected, not running, or a refresh already in flight (whose GET will cover this one): nothing to do.
-      if (status !== "connected" || !report || !running || running.aborted || buffered) return;
+      if (!report || !running || running.aborted) return; // not running: nothing will report
+      // Not connected: nothing to read until the stream is back, so answer with the last report rather than leave the caller waiting out the backoff.
+      if (status !== "connected") return report(last);
+      if (buffered) return; // a refresh already in flight, whose GET covers this one
       const signal = running;
       buffered = [];
       client.get(undefined, signal).then(
@@ -75,7 +83,7 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
     },
     async run(signal, rawUpdate) {
       running = signal;
-      report = (part) => ((status = part.status), rawUpdate(part));
+      report = (part) => ((status = part.status), (last = part), rawUpdate(part));
       const update = report;
       while (!signal.aborted) {
         try {
@@ -84,8 +92,6 @@ export function hue(config: HueConfig): Integration<HueSnapshot, "hue"> & { read
             if (item.kind === "disconnected") {
               const r = await where.failed(signal);
               if (r.moved) {
-                options = { ...options, host: where.host() };
-                client = hueClient(options);
                 moved = r.moved;
                 update({ status: "disconnected", detail: moved, state: snapshot });
                 break; // connect at the new address now

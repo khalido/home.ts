@@ -1,3 +1,4 @@
+import { idKey } from "../../discover.ts";
 import type { IppValue } from "./codec.ts";
 
 /** One consumable as the printer lists it: ink or toner, a drum, a fuser, waste. The level is the printer's own number, unrounded. */
@@ -37,7 +38,7 @@ export type Printer = {
 export type PrintersState = { printers: Record<string, Printer>; asOf: string };
 
 /** An id as the snapshot keys it: a UUID in any form (`urn:uuid:…`, dashed, upper case) is its 32 hex digits; an instance name keeps its letters and digits. */
-export const printerKey = (id: string) => id.toLowerCase().replace(/^urn:uuid:/, "").replace(/[^0-9a-z]/g, "");
+export const printerKey = idKey;
 
 /** The fields of `Printer` that come from Get-Printer-Attributes. */
 export type Reading = Partial<Pick<Printer, "model" | "state" | "stateCode" | "reasons" | "message" | "markers" | "media" | "queuedJobs" | "acceptingJobs" | "formats" | "ippVersions" | "alerts" | "anomaly">> & { uuid?: string };

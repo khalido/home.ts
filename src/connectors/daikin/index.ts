@@ -24,14 +24,26 @@ export type DaikinConfig = { host: string; mac?: string; find?: Finder; fetch: t
 /** What the snapshot holds: the latest reading and when it was taken. */
 export type DaikinSnapshot = DaikinState & { asOf: string };
 
-/** One Daikin AC as a home integration: one read now, then every 120 s. */
-export function daikin(config: DaikinConfig): Integration<DaikinSnapshot, "daikin"> {
+/** What `daikin().client` is: the reads and writes of the unit, at wherever it is now. */
+export type DaikinClient = ReturnType<typeof daikinClient>;
+
+/**
+ * One Daikin AC as a home integration: one read now, then every 120 s. Its writes are `client.write(setPower(true))`: one
+ * client for the integration's life, so the writes share its lane and follow the unit when it moves.
+ */
+export function daikin(config: DaikinConfig): Integration<DaikinSnapshot, "daikin"> & { readonly client: DaikinClient } {
   const clock = config.clock ?? realClock;
   const where = relocator({ host: config.host, id: config.mac, find: config.find, clock, cached: config.hostCached });
-  let client = daikinClient(config);
+  const client = daikinClient({
+    ...config,
+    get host() {
+      return where.host();
+    },
+  });
   const poll = poller(clock);
   return {
     name: "daikin",
+    client,
     refresh: () => (where.reset(), poll.nudge()),
     async run(signal, update) {
       let last: DaikinSnapshot | undefined;
@@ -44,16 +56,15 @@ export function daikin(config: DaikinConfig): Integration<DaikinSnapshot, "daiki
           update({ status: "connected", detail: moved, anomaly: last.anomaly, state: last });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
-          if (error instanceof DaikinError && error.status === 404)
-            return update({ status: "unavailable", detail: "no /dsiot/multireq at this address: not a dsiot Daikin", state: last });
+          // A 404 is a failed read like any other: the address may now be another device's, so discovery looks for the unit.
+          const why = error instanceof DaikinError && error.status === 404 ? "no /dsiot/multireq at this address: not a dsiot Daikin" : error;
           const r = await where.failed(signal);
           if (r.moved) {
-            client = daikinClient({ ...config, host: where.host() });
             moved = r.moved;
             update({ status: "disconnected", detail: moved, state: last });
             continue; // read at the new address now
           }
-          update({ status: "disconnected", detail: lostDetail(r, error), state: last });
+          update({ status: "disconnected", detail: lostDetail(r, why), state: last });
         }
         await poll.wait(POLL_MS, signal);
       }

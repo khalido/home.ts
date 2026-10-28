@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { type Clock, createHome } from "../src/index.ts";
 import { checkPlan, type HomeConfig } from "../src/config.ts";
-import { daikin } from "../src/connectors/daikin/index.ts";
-import { applyFound, DAY_MS, discover, type Found, lostDetail, matchFound, parseAvahi, parseAvahiBrowse, parseBrowse, parseResolve, relocator } from "../src/discover.ts";
+import { daikin, setPower } from "../src/connectors/daikin/index.ts";
+import { addressKey, applyFound, DAY_MS, discover, type Found, lostDetail, matchFound, parseAvahi, parseAvahiBrowse, parseBrowse, parseResolve, relocator, sameId } from "../src/discover.ts";
 
 // Invented addresses (192.0.2.0/24) and identities, in the shape each discovery reports them.
 const text = `// a home
@@ -21,6 +21,14 @@ const found: Found[] = [
   { connector: "hue", id: "0017880000000000", host: "192.0.2.2" }, // new
   { connector: "daikin", id: "00005E005399", host: "192.0.2.45" }, // a second AC
 ];
+
+describe("identities", () => {
+  test("compare without case, separators or a urn:uuid: prefix, in matching and the address book alike", () => {
+    expect(sameId("urn:uuid:E3248000-80CE-11DB-8000-30055C000001", "e324800080ce11db800030055c000001")).toBe(true);
+    expect(addressKey("printers", "urn:uuid:E3248000-80CE-11DB-8000-30055C000001")).toBe(addressKey("printers", "e3248000-80ce-11db-8000-30055c000001"));
+    expect(sameId("00:17:88:B0", "001788b0")).toBe(true);
+  });
+});
 
 describe("matchFound", () => {
   test("by identity: moved, new, known by host with a hint, and a second device skipped", () => {
@@ -206,6 +214,24 @@ describe("a polling connector that moves", () => {
     await home.start(stop.signal);
     expect(details.slice(0, 4)).toEqual(["no route", "no route", "moved from 192.0.2.10 to 192.0.2.44", "moved from 192.0.2.10 to 192.0.2.44"]);
     expect(home.snapshot().daikin).toMatchObject({ status: "connected", detail: "moved from 192.0.2.10 to 192.0.2.44", state: { targetC: 25 } });
+  });
+
+  test("a write after the move goes to the new address, through the integration's own client", async () => {
+    const status = await Bun.file(new URL("./fixtures/daikin/status.json", import.meta.url)).text();
+    const urls: string[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      urls.push(url);
+      if (!url.includes("192.0.2.44")) throw new Error("no route");
+      return new Response(init?.body?.toString().includes('"op":3') ? JSON.stringify({ responses: [{ fr: "/dsiot/edge/adr_0100.dgc_status", rsc: 2004 }] }) : status);
+    }) as unknown as typeof fetch;
+    let t = 0;
+    const stop = new AbortController();
+    const clock: Clock = { now: () => t, sleep: async (ms) => void ((t += ms), t > 5 * 120_000 && stop.abort()) };
+    const find = async (): Promise<Found[]> => [{ connector: "daikin", id: "00005E005301", host: "192.0.2.44" }];
+    const home = createHome([daikin({ host: "192.0.2.10", mac: "00005E005301", find, fetch: f, clock })]);
+    await home.start(stop.signal);
+    await home.integration("daikin")!.client.write(setPower(true));
+    expect(urls.at(-1)).toBe("http://192.0.2.44/dsiot/multireq");
   });
 });
 

@@ -3,7 +3,7 @@ import { ConnectorError, fetchTimeout } from "../../connector.ts";
 // The one place a weather provider plugs in: a `WeatherSource` returns slices, and `mergeWeather` picks one per slice.
 
 /** Sent on every request, so each service can see who is calling rather than a runtime's default string. */
-export const USER_AGENT = "home (+https://github.com/khalido/home)";
+export const USER_AGENT = "home (+https://github.com/khalido/home.ts)";
 
 export type Place = { latitude: number; longitude: number };
 

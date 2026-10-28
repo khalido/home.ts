@@ -7,9 +7,17 @@ My house as a TypeScript import: Philips Hue, a Daikin AC, Enphase solar, Google
 - Find what answers on your network, and check it read-only from the terminal.
 - Combine solar, grid and price into one energy figure.
 
+## Install
+
+```sh
+bun add @khalido/home     # or: npm install @khalido/home
+```
+
+The library runs on Bun 1.4+ and Node 24+. The `home` command needs Bun.
+
 ## Try it
 
-Needs [Bun](https://bun.sh) 1.4 or newer. Not on npm yet, so clone it:
+From a clone:
 
 ```sh
 bun install
@@ -35,7 +43,7 @@ home.start(new AbortController().signal); // connects, reads, keeps reading, rec
 home.part("weather")?.state;              // typed by name, read from memory, never from the device
 ```
 
-The library never reads your environment or a file: you pass addresses, keys and a `fetch`. Under Node, Hue and Enphase take the fetches in `@khalido/home/node`. From a clone, run `bun run build` first: the package's entry points resolve to `dist/`. More in [using it from an app](docs/using.md).
+The library never reads your environment or a file: you pass addresses, keys and a `fetch`. Under Node, Hue and Enphase take the fetches in `@khalido/home/node`. From a clone, run `bun run build` first: the package's entry points resolve to `dist/`. Health, change events, writes and the energy helpers are in [using it from an app](docs/using.md).
 
 ## Connectors
 

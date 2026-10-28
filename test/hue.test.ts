@@ -260,6 +260,19 @@ describe("home", () => {
     expect(fromRefresh.detail).toBe("moved from 192.0.2.2 to 192.0.2.44");
   });
 
+  test("a refresh while the bridge is unreachable answers with the last report, not after the backoff", async () => {
+    const stuck: Clock = { now: () => 0, sleep: (_ms, signal) => new Promise((r) => signal?.addEventListener("abort", () => r(), { once: true })) };
+    const f = (async () => Promise.reject(new Error("no route"))) as unknown as typeof fetch;
+    const home = createHome([hue({ host: "h", bridgeId: "b", key: "k", ca: "", fetch: f, clock: stuck })]);
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    while (home.part("hue")?.status !== "disconnected") await Bun.sleep(1);
+    await home.refresh("hue"); // the backoff sleep never ends on this clock
+    expect(home.part("hue")).toMatchObject({ status: "disconnected" });
+    stop.abort();
+    await running;
+  });
+
   test("a refresh re-applies the events that arrived while its GET was in flight", async () => {
     const { clock } = fakeClock();
     let push!: (text: string) => void;
@@ -304,7 +317,7 @@ describe("home", () => {
     });
     await home.start(stop.signal);
     const now = home.snapshot();
-    expect(now.daikin).toEqual({ status: "unavailable", detail: "no controller" });
+    expect(now.daikin).toMatchObject({ status: "unavailable", detail: "no controller" });
     expect(now.hue!.status).toBe("connected");
     const s = now.hue!.state as HueSnapshot;
     expect(lights(s)[0]!.on).toBe(false);

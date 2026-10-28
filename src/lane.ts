@@ -24,6 +24,7 @@ const MINUTE = 60_000;
  * defaults to the newer body alone.
  */
 export function writeLane(options: LaneOptions) {
+  if (options.perMinute !== undefined && !(options.perMinute >= 1)) throw new RangeError(`writeLane: perMinute must be at least 1, got ${options.perMinute}`);
   const clock = options.clock ?? realClock;
   const queue: Pending[] = []; // in order of each slot's first waiting write
   const sent = new Map<string, number[]>(); // send times per slot, the last minute's

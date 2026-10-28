@@ -1,9 +1,10 @@
 import { type ParseError, parse, printParseErrorCode } from "jsonc-parser";
 import { z } from "zod";
-import { isTimeZone, realClock } from "./clock.ts";
+import { type Clock, isTimeZone, realClock } from "./clock.ts";
+import { errorText } from "./connector.ts";
 import { amber, configSchema as amberDevice } from "./connectors/amber/index.ts";
 import { daikin, configSchema as daikinDevice } from "./connectors/daikin/index.ts";
-import { cast, type CastConnect, configSchema as castDevice, resolvedFrom } from "./connectors/cast/index.ts";
+import { cast, type CastConnect, configSchema as castDevice, resolvedFrom, type ServeClip } from "./connectors/cast/index.ts";
 import { bunGatewayFetch, enphase, configSchema as enphaseDevice } from "./connectors/enphase/index.ts";
 import { type AddressCache, addressBook, type Connector, discover, type Finder, type Found, MANY, sameId } from "./discover.ts";
 import { envName, filePath } from "./home.ts";
@@ -176,6 +177,10 @@ export type LoadOptions = {
   finders?: Partial<Record<Connector, Finder>>;
   /** Cast's transport: `tlsConnect` from `@khalido/home/cast/tls`. Needed when the config lists a Cast device. */
   castConnect?: CastConnect;
+  /** For Cast's `announce` with a clip of bytes: `serveClip` from `@khalido/home/cast/serve`. A URL clip needs none. */
+  castServe?: ServeClip;
+  /** Time for every integration; tests pass a fake. */
+  clock?: Clock;
   /**
    * Addresses kept between runs (`fileCache` from `@khalido/home/finders`, or the caller's own). A cached address newer
    * than the config is tried first; each address that answers is written back when it changed or predates the config. Discovery stays for a miss.
@@ -196,6 +201,15 @@ export type HomeIntegration =
   | ReturnType<typeof printers>
   | ReturnType<typeof weather>;
 
+/** The token in a JSON token file (`home enphase login` writes `{ token, expiresAt }`); a file that is not JSON says so by name. */
+function tokenFromJson(text: string, at: string): string | undefined {
+  try {
+    return (JSON.parse(text) as { token?: string }).token;
+  } catch (error) {
+    throw new HomeConfigError([`${at}: not JSON (${errorText(error)})`]);
+  }
+}
+
 /** Build the integrations a config describes, in its device order, weather last. Throws `HomeConfigError` naming every problem. */
 export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[] {
   const { config, problems } = checkHome(input, options.env);
@@ -213,6 +227,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
   const file = (path: string) => options.readFile!(path);
   const env = (name: string) => options.env[name]!;
   const net = options.fetch ?? fetch;
+  const clock = options.clock ?? realClock;
   const tls = options.tls ?? { hue: bunPinnedFetch, enphase: bunGatewayFetch };
   const book = addressBook(options.cache, { configAt: options.configAt });
   /** Where a polling connector starts: a fresh cached address, else the config's, and its write-back for each good read. */
@@ -229,20 +244,20 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
     switch (d.connector) {
       case "hue": {
         const ca = file(d.ca);
-        return hue({ ...start("hue", d.bridgeId, d.host), bridgeId: d.bridgeId, key: env(d.key), ca, fetch: tls.hue(d.bridgeId, ca), find: options.finders?.hue });
+        return hue({ ...start("hue", d.bridgeId, d.host), bridgeId: d.bridgeId, key: env(d.key), ca, fetch: tls.hue(d.bridgeId, ca), find: options.finders?.hue, clock });
       }
       case "daikin":
-        return daikin({ ...start("daikin", d.mac, d.host), mac: d.mac, find: options.finders?.daikin, fetch: net });
+        return daikin({ ...start("daikin", d.mac, d.host), mac: d.mac, find: options.finders?.daikin, fetch: net, clock });
       case "enphase": {
         const text = file(d.token).trim();
-        const token = text.startsWith("{") ? (JSON.parse(text) as { token?: string }).token : text;
+        const token = text.startsWith("{") ? tokenFromJson(text, `${at}.token`) : text;
         if (!token) throw new HomeConfigError([`${at}.token: no token in ${d.token}`]);
-        return enphase({ ...start("enphase", d.serial, d.host), token, serial: d.serial, find: options.finders?.enphase, fetch: tls.enphase(), timeZone: config!.location?.timezone });
+        return enphase({ ...start("enphase", d.serial, d.host), token, serial: d.serial, find: options.finders?.enphase, fetch: tls.enphase(), timeZone: config!.location?.timezone, clock });
       }
       case "amber":
-        return amber({ key: env(d.key), siteId: d.siteId, fetch: net });
+        return amber({ key: env(d.key), siteId: d.siteId, fetch: net, clock });
       case "up":
-        return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone });
+        return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone, clock });
     }
   }
   function castAll(): ReturnType<typeof cast> {
@@ -253,8 +268,8 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
     });
     // Two passes, as every discovery runs, but done once every entry in the config has answered.
     const all = (found: Found[]) => expect.every((e) => found.some((f) => sameId(f.id, e.castId)));
-    const resolve = async () => resolvedFrom(await discover(options.finders!.cast!, { clock: realClock, done: all }));
-    return cast({ resolve, connect: options.castConnect!, expect, seen: (id, a) => book.seen("cast", id, a) });
+    const resolve = async () => resolvedFrom(await discover(options.finders!.cast!, { clock, done: all }));
+    return cast({ resolve, connect: options.castConnect!, expect, serve: options.castServe, clock, seen: (id, a) => book.seen("cast", id, a) });
   }
   function printersAll(): ReturnType<typeof printers> {
     const entries = config!.devices!.flatMap((x) => {
@@ -262,7 +277,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
       const c = book.fresh("printers", x.uuid);
       return [{ uuid: x.uuid, name: x.name, host: c?.host ?? x.host, port: c?.port ?? x.port, room: x.room, offlineDays: x.offlineDays }];
     });
-    return printers({ printers: entries, fetch: net, find: options.finders?.printers, seen: (uuid, a) => book.seen("printers", uuid, a) });
+    return printers({ printers: entries, fetch: net, find: options.finders?.printers, clock, seen: (uuid, a) => book.seen("printers", uuid, a) });
   }
   if (config.location) {
     const { latitude, longitude, bomForecast } = config.location;
@@ -272,7 +287,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
       google: () => google({ key: env(config.weather!.googleKey!), fetch: net }),
     };
     const sources = config.weather?.sources?.map((s) => make[s]());
-    integrations.push(weather({ latitude, longitude, sources, pollMinutes: config.weather?.pollMinutes, timeZone: config.location.timezone }));
+    integrations.push(weather({ latitude, longitude, sources, pollMinutes: config.weather?.pollMinutes, timeZone: config.location.timezone, clock }));
   }
   return integrations;
 }
