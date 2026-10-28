@@ -116,7 +116,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.3",
+    "@types/bun": "^1.4.4",
     "mitata": "^1.0.34",
     "typescript": "^7.0.2"
   }

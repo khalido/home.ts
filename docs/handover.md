@@ -1,10 +1,10 @@
 # Handover
 
-2026-10-19. Read `AGENTS.md` first, then this.
+2026-10-28. Read `AGENTS.md` first, then this.
 
 ## Where things stand
 
-- Eight connectors: Hue, Daikin, Enphase, Cast, printers, Amber, Up, weather. All but Hue and printers have read live. `bun run check` clean, 339 tests. The global `home` is a `bun link` to this repo.
+- Eight connectors: Hue, Daikin, Enphase, Cast, printers, Amber, Up, weather. All but Hue and printers have read live. `bun run check` clean, 349 tests. The global `home` is a `bun link` to this repo.
 - **GitHub:** `khalido/home.ts`, **private**, `main` only, one squashed first commit under the noreply address (old history on the local branch `pre-squash`, never pushed). KO reviews it and flips it public himself. The fx workflow stays unpinned while KO develops it.
 - **Every export is named** (no `export *`); `test/exports.test.ts` fails when an entry point's list changes. All entry points load on Node 26.11.1 from `dist/`.
 - **Weather by the hour** landed today: an `hourly` slice (Open-Meteo, 48 hours from the home's midnight) and `dayBlocks`, morning 6–12, afternoon 12–18, evening 18–22, with one `condition` word. Times and blocks follow the home's time zone (`location.timezone`, or `HOME_TIMEZONE` for `home` from env). Read live for Sydney CBD, also with `TZ=UTC`.
@@ -12,7 +12,10 @@
 - **The snapshot is typed by name**: `home.part("weather")?.state` is a `WeatherState`; `loadHome` returns `HomeIntegration[]`.
 - **`docs/devices.md`** (public): devices worth buying, with the TIMMERFLOTTE verdict.
 - **The CLI has an output contract** (`docs/cli.md`, Output), after kotools: stdout data, stderr notes, `--json` errors as `{error, code, fix}` on stderr, exit 0/1/2, `home <connector>` exits 1 when not connected. `test/cli.test.ts` holds it.
-- **Writes go through a write lane** (`src/lane.ts`, KO's call 2026-10-19, `docs/decisions.md`): spaced, the waiting writes to one slot merged, a fast slot slowed and never refused. Hue, Daikin and Cast volume use it; Up's writes and Cast announcements do not. Uncommitted until `/ko-review` and KO's word. A slowed slot is not yet in any `anomaly`: that lands with item 9.
+- **Writes go through a write lane** (`src/lane.ts`, KO's call 2026-10-19, `docs/decisions.md`): spaced, the waiting writes to one slot merged, a fast slot slowed and never refused. Hue, Daikin and Cast level and mute use it; Up's writes and Cast announcements do not. Reviewed and committed, never run against a real device. A slowed slot is not yet in any `anomaly`: that lands with item 9.
+- **Going public**: a Sonnet audit (2026-10-19) found no secrets, addresses, ids or personal data in the tree or `main`'s history, and no copied GPL code. The README is trimmed for a visitor. KO keeps the KO/jaldi/chota voice in `docs/`.
+- **Dependencies**: `bunfig.toml` holds installs to versions at least 3 days old (KO, via dotfiles, 2026-10-23); all at latest, `bun audit` clean (2026-10-28). The actions in `fx.yml` stay on tags, not SHAs, while KO develops fx.
+- **Unpushed**: `main` is several commits ahead of `origin` (the write lane, the README, dependencies). KO decides when to push.
 - No write has reached a real device except `setPower(true)` on the Daikin at KO's request.
 
 ## Waiting on KO
@@ -24,6 +27,10 @@
 - **Daikin presets**: cool 26 °C and heat 25 °C in the home config's Daikin entry; `home ac cool|heat|off`; the first mode and setpoint write runs with KO's say-so.
 - **npm**: read [bun publish](https://bun.com/docs/pm/cli/publish) against `docs/publishing.md`; publish only on KO's word.
 - Delete the merged `worktree-agent-*` branches when convenient.
+
+## Check first
+
+- **The write lane** (`src/lane.ts`, `test/lane.test.ts`): read it fresh. Leftovers from `/ko-review`: a device move rebuilds the client and its lane, so the per-minute count restarts and a waiting write goes to the old address (noted in the Daikin README); Hue's `mergeBody` can send `color_temperature` and `color` together, and which wins is unverified; `perMinute: 0` would crash (no caller passes it). The first live Hue write (after pairing) should be a burst, to see one merged send.
 
 ## Next, in order
 

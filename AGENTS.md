@@ -62,7 +62,7 @@ Before writing one, search Home Assistant's [integration list](https://www.home-
 
 | Where | Holds |
 |---|---|
-| `README.md` | for a visitor: what this is, the map, the connectors, install, links |
+| `README.md` | for a visitor: what this is, the connectors, install, links |
 | `AGENTS.md` (this file; `CLAUDE.md` imports it) | rules and how the code is shaped |
 | `src/connectors/<name>/README.md` | everything about one connector: protocol, what the live device said, sources |
 | `docs/decisions.md` | KO's decisions and why, newest last; overrides other docs where they conflict |
