@@ -16,6 +16,7 @@
 - **Behaviour changes:** Hue `ip` is `host`. A Daikin 404 is `disconnected` and rediscovers. Weather is `connected` only while a read brought something new, and its re-reports keep the last read's `lastGoodAt`. `refresh()` answers rather than waiting out a backoff or a billed source's floor. A move is reported by the read at the new address. Under Node, `loadHome` names a missing `tls`. Error details carry the cause. `settle` and `health` take options objects.
 - **Live, read-only, 2026-10-28:** Amber's forecast and `bestWindow`; weather with blocks and UV. The Enphase gateway refused connections from Bun and Node all day (ECONNREFUSED), so `nodeGatewayFetch` is checked only against a local self-signed server. `nodePinnedFetch` is checked against a local TLS server, not a real bridge.
 - No write has reached a real device except `setPower(true)` on the Daikin at KO's request.
+- **Hacker News sweep (Gemini Flash, 2026-10-30): nothing taken.** Its MCP idea is already ruled out (`docs/up.md`), provenance and matter.js are already planned, and KO expects the Daikin local API to keep working. Don't repeat it.
 
 ## Publishing (KO)
 
