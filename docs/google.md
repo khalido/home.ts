@@ -61,7 +61,7 @@ chota's morning print needs an hourly slice (rain chance, mm, condition) for lin
 
 **Auth.** The caller passes `getToken(): Promise<string>`. The library stores no token. chota passes its better-auth token. A `home calendar login` in the CLI (loopback OAuth, token file in `~/.config/home/`, 0600, like `home enphase login`) comes later and needs an OAuth client in Google Cloud.
 
-**State.** The next 14 days per calendar, trimmed to id, title, start, end, all-day, location. Not kept by default: description, attendees, links. All-day events are dates, not instants; they use the home's `timeZone` from the config, never the machine's. Weather has this bug today (`hhmm` in `weather/index.ts`). Calendar must not copy it.
+**State.** The next 14 days per calendar, trimmed to id, title, start, end, all-day, location. Not kept by default: description, attendees, links. All-day events are dates, not instants; they use the home's `timeZone` from the config, never the machine's. Weather's `hhmmIn` does the same.
 
 **Helpers**, pure: `eventsOn(day)`, `next()`, `search(text)`. One owner for "what is today".
 

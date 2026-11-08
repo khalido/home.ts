@@ -3,6 +3,7 @@
 ```sh
 home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, printers, spotify, up, weather
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
+home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
 home lights off               # one write to the whole-home group
 home room <name> on|off|<1-100>
 home scene <name>
@@ -12,7 +13,7 @@ home discover [--json] [--passes n]  # which smart-home devices answer here (mDN
 home cache [clear]            # the addresses kept between runs, or delete them so the next run discovers afresh
 home config check [path]      # validate a home config: what it would set up, secrets as set or unset by name, every problem
 home discover --write [path]  # with a config (the path, else --config or HOME_CONFIG): match what answers by identity, add new devices, update moved hosts and renamed Cast names in place
-home probe                    # read-only, no keys: Hue's public config, Daikin by UDP broadcast, the IQ Gateway's /info, each weather source, each Cast device's status
+home probe                    # read-only, no keys: Hue's public config, Daikin by UDP broadcast, the IQ Gateway's /info, each weather source, each Cast device's and printer's status
 home locate "<street address>" [--write [path]]  # latitude and longitude from OpenStreetMap's Nominatim; --write sets them in the config's location (and timezone, when absent, to this machine's)
 home cast announce --to <name> (--say "<text>" | --file <path>) [--volume 0-100]  # play a clip, then put back what was playing and the volume
 home cast volume <name> <0-100>

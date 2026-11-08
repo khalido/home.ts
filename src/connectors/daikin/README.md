@@ -4,7 +4,7 @@ Reads one Daikin AC over its local JSON `dsiot` API. `iot_class`: **local_pollin
 
 - `client.ts`: `daikinClient({ host, fetch }).read()` returns `DaikinState` (power, mode, the selected mode's setpoint and fan speed, room °C, humidity, outside °C, `anomaly`). `setPower`, `setMode`, `setTarget`, `setFan` build write requests; `client.write(request)` sends one, through a write lane: 1 s apart and at most 20 a minute (guesses), a waiting write merging the next one field by field (`mergeWrites`). Every request times out at 10 s.
 - `index.ts`: `daikin({ host, fetch, clock })` reads now, then every **120 s** (Home Assistant's `update_interval`). A failed poll is `disconnected` and keeps the last reading with `asOf`; a 404 on `/dsiot/multireq` is a failed read too, saying "not a dsiot Daikin": the address may now be another device's, so discovery looks for the unit. There is no key, so nothing is terminal. Writes go through `daikin().client.write(…)`: one client for the integration's life, at the unit's current address.
-- `home status` reads `DAIKIN_HOST`, else the first unit that answers the UDP broadcast. There is no CLI command that writes.
+- `home status` reads `DAIKIN_HOST`, or a home config's address, with discovery by `mac` if the unit moves. There is no CLI command that writes.
 
 ## The protocol
 

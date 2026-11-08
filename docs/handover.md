@@ -32,7 +32,7 @@ On Bun on a Raspberry Pi 5 (Pi OS Lite Trixie arm64, Wi-Fi), one long-lived `loa
 | Spend to categorise        | `part("up").state`, `setCategory`                                                    | writes untried                                                                  |
 | Admin page, alerts         | `health()`, `onChange`                                                               | an "expected off" option, so a printer off at night isn't `down`                |
 
-On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so the address cache matters more. `cast/serve.d.ts` needs `@types/node`. Check Vite's SSR build keeps `@khalido/home` external.
+On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so the address cache matters more. Check Vite's SSR build keeps `@khalido/home` external.
 
 ## Waiting on KO
 
@@ -45,12 +45,12 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 
 ## Next, in order
 
-0. **0.1.1**, after chota-bot's live tests of Cast and spotify on the Pi (the list is in chota-bot's handover; results come back here). Include Gemini's doc fixes: `docs/config.md:31` says the CLI uses `Bun.JSONC.parse` (it's `jsonc-parser`) and `:27` omits printers; Daikin's README claims a UDP fallback `home status` lacks; the weather README's user agent; `docs/google.md:64` describes a fixed bug; `skills/draw-home` names KO-local paths and the private `sfl-mes`.
+0. **0.1.1**, after chota-bot's live tests of Cast and spotify on the Pi (the list is in chota-bot's handover; results come back here).
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.
 4. **Weather**: BOM warnings; Google's hourly as a second source; compare with chota's weather tool first.
-5. **Leftovers**: TS 5.6 and older fail on `Uint8Array<…>` in `printers/codec.d.ts` with `skipLibCheck: false`; `cast/serve.d.ts` names `NodeJS.Dict`; `exports.test.ts` imports `src`, not `dist`; `FROM_ENV` and `loadHome` build integrations two ways; `withSpotify` and `withCast` in the CLI are near-copies (two, under the rule of three).
+5. **Leftovers**: TS 5.6 and older fail on `Uint8Array<…>` in `printers/codec.d.ts` with `skipLibCheck: false`; `exports.test.ts` imports `src`, not `dist`; `FROM_ENV` and `loadHome` build integrations two ways; `withSpotify` and `withCast` in the CLI are near-copies (two, under the rule of three).
 6. **A docs site** later: GitHub Pages from an Actions build (not a `gh-pages` branch or a committed folder), serving `llms.txt`.
 
 After live tests: spotify's socket flags as one `phase` union with a pure `next()` (chota-bot's idea; its `whatsapp-conn.ts` is a small example); `repairedFor` never clears, so a track stalls-and-repairs once per run; a Cast `play(target, url)` for streams. For a 0.2.0: writes in one shape across connectors, Up's client exposed, Cast's volume 0–1 against spotify's 0–100.

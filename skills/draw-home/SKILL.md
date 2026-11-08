@@ -12,8 +12,6 @@ The library does not draw. This guide is for the coding agent that does: turn wh
 
 Start from `examples/home.svg` and `examples/home.jsonc`. Never start from a blank file. If the person already has a `home.jsonc`, edit its `rooms` and `plan` in place, keeping its comments, and leave every other field alone.
 
-This is the home-sized version of the sfl-mes `device-drawing` skill (`~/code/sfl-mes/.claude/skills/device-drawing/`), which draws single machines; read it when a rule here seems thin.
-
 ## 1. Sources, before any geometry
 
 Make a **room table** first, in the SVG's header comment: each room, its floor, its name as the person says it, and the source (plan sheet and page, or photo). Nothing is drawn that has no row.
@@ -27,7 +25,7 @@ Make a **room table** first, in the SVG's header comment: each room, its floor, 
 
 - Rooms as rectangles, or simple paths for L-shapes; walls, the front door, stairs. Front of the house in the same place on every floor; one floor per band of the canvas, labelled, ground below.
 - **Style: a flat plan by default.** `README.md` beside this file lists the drawing references (iso-glow, Anatomy, Hairline, iso-figure) with what each is good for.
-- **Isometric options.** A glowing fine-line drawing in the [iso-glow](https://isoglow.dev/) style suits a live view; an isometric cutaway in the **Anatomy** style (solid figures, MIT, `~/code/refs/anatomy/`, [skills.wheresryan.sh/anatomy](https://skills.wheresryan.sh/anatomy)) is an option when the person asks for it: read its `SKILL.md` craft rules and `examples/desk-computer/` (in the Anatomy repo), keep this contract, and draw rooms as low boxes with the markers on their floors.
+- **Isometric options.** A glowing fine-line drawing in the [iso-glow](https://isoglow.dev/) style suits a live view; an isometric cutaway in the **Anatomy** style (solid figures, MIT, [skills.wheresryan.sh/anatomy](https://skills.wheresryan.sh/anatomy)) is an option when the person asks for it: read its `SKILL.md` craft rules and `examples/desk-computer/` (in the Anatomy repo), keep this contract, and draw rooms as low boxes with the markers on their floors.
 
 ## 3. The contract (an app draws on this; keep it exact)
 
@@ -38,7 +36,7 @@ Make a **room table** first, in the SVG's header comment: each room, its floor, 
 5. The SVG fills its host (`width: 100%; height: 100%`; the viewBox holds everything).
 6. **Zoomable**: one root `<g id="plan">` holding every floor, no fixed pixel sizes, labels sized so they still read when a single room fills the screen. Each room group's `getBBox()` is its zoom target, so keep a room's label and marker inside its shape.
 
-**What an app does with it** (from sfl-mes's live contract): it draws each device's state into its room's marker from `home.snapshot()`. A missing part is "no data": grey marker, no value, never a stale number shown as live. Values are shown as read, never clamped; odd ones (`Part.anomaly`) get a flag. Hover names the device. Controls live in the app's side panel, not in the SVG.
+**What an app does with it:** it draws each device's state into its room's marker from `home.snapshot()`. A missing part is "no data": grey marker, no value, never a stale number shown as live. Values are shown as read, never clamped; odd ones (`Part.anomaly`) get a flag. Hover names the device. Controls live in the app's side panel, not in the SVG.
 
 **Energy on the plan** (the numbers are the library's, the drawing and animation are the app's):
 
@@ -48,7 +46,7 @@ Make a **room table** first, in the SVG's header comment: each room, its floor, 
 
 **Interactive, in the app**: wheel or pinch zooms and drag pans (animate the `viewBox`, or a transform on `#plan`); clicking a room zooms to its bounding box and opens that room's devices in the side panel; Escape or double-click returns to the whole house; arrow keys move between rooms. Respect reduced motion (jump, do not animate). A flat plan only zooms and pans.
 
-**SVG with a camera** (the interactive option, Anatomy's approach and sfl-mes's "spin"): build the house once as a model in metres (each room a box: x, y, width, depth, floor height; walls and doors on it), and render it to SVG through a camera `{ azimuth, elevation, target, zoom }` with Anatomy's `fitProjection` (`~/code/refs/anatomy/kit/iso-kit.mjs`). The scene is a pure function of the camera, so zooming, orbiting and "fly to this room" are a redraw with a new camera, eased; drag orbits, wheel zooms, click a room sets the target to its centre. The rendered SVG still meets the contract above: one `<g class="room">` per room and a marker projected to the room's top corner on every redraw. Keep the model in its own file named by `plan.json` in the config (sizes are data, not hard-coded in the drawing), and spring back to the default camera on Escape.
+**SVG with a camera** (the interactive option, Anatomy's approach): build the house once as a model in metres (each room a box: x, y, width, depth, floor height; walls and doors on it), and render it to SVG through a camera `{ azimuth, elevation, target, zoom }` with Anatomy's `fitProjection` (`kit/iso-kit.mjs` in the Anatomy repo). The scene is a pure function of the camera, so zooming, orbiting and "fly to this room" are a redraw with a new camera, eased; drag orbits, wheel zooms, click a room sets the target to its centre. The rendered SVG still meets the contract above: one `<g class="room">` per room and a marker projected to the room's top corner on every redraw. Keep the model in its own file named by `plan.json` in the config (sizes are data, not hard-coded in the drawing), and spring back to the default camera on Escape.
 
 ## 4. home.jsonc
 

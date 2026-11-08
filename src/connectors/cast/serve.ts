@@ -15,10 +15,20 @@ const ipv4 = (a: string) =>
 const network = (address: string, netmask: string) =>
   ipv4(address) - (ipv4(address) % (2 ** 32 - ipv4(netmask)));
 
+type NetworkAddress = {
+  family: string;
+  address: string;
+  netmask: string;
+  internal: boolean;
+};
+
 /** This machine's IPv4 on the subnet that holds `host`, or with no host, its first non-internal IPv4. */
 export function lanAddress(
   host?: string,
-  interfaces = networkInterfaces(),
+  interfaces: Record<
+    string,
+    NetworkAddress[] | undefined
+  > = networkInterfaces(),
 ): string {
   const all = Object.values(interfaces)
     .flatMap((list) => list ?? [])

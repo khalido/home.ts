@@ -7,6 +7,8 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 ### Fixed
 
 - **spotify:** a frame or open event from a socket that had already ended (dropped, or closed after 10 s of silence) no longer changes the state or the next socket's status.
+- **cast:** `@khalido/home/cast/serve`'s types no longer name `NodeJS.Dict`, so they compile without `@types/node`.
+- **Docs:** corrected the config parser, the printers exception to one device per connector, Daikin's `home status` address, and the weather user agent. `skills/draw-home` no longer points at private paths.
 
 ## [0.1.0] - 2026-11-08
 
