@@ -79,4 +79,4 @@ Before writing one, search Home Assistant's [integration list](https://www.home-
 
 ## Checks
 
-`bun run check` (three type-checks, including the runtime-neutral build) and `bun test` must pass before a change ships. Run `/ko-review` before committing a real change. Commit with explicit file paths, in plain prose.
+`bun run check` (`bun fmt --check`, then `bun check` on the three configs, including the runtime-neutral build) and `bun test` must pass before a change ships. Run `bun fmt` before committing; Bun's defaults, no config beyond what it leaves alone (`bunfig.toml`). Run `/ko-review` before committing a real change. Commit with explicit file paths, in plain prose.
