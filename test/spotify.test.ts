@@ -74,6 +74,16 @@ function setup(config: { maxVolume?: number; url?: string; repairStalls?: boolea
 
 const tick = () => Bun.sleep(1);
 
+/** A write, the lane's gap, Soloist's command_result, then `events` (what Soloist reports after). Returns the write's result and the frame sent. */
+async function sent(h: ReturnType<typeof setup>, sock: FakeSocket, call: () => Promise<Applied>, ...events: Record<string, unknown>[]) {
+  const p = call();
+  await h.advance(100);
+  const frame = sock.ack();
+  await tick();
+  for (const e of events) sock.push(e);
+  return { frame, result: await p };
+}
+
 describe("toSpotifyUri", () => {
   test("open.spotify.com links become URIs", () => {
     expect(toSpotifyUri("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x1")).toBe("spotify:track:4uLU6hMCjMI75M1A2tKUQC");
@@ -314,16 +324,6 @@ describe("the integration", () => {
 });
 
 describe("writes", () => {
-  /** A write, the lane's gap, Soloist's command_result, then `events` (what Soloist reports after). Returns the write's result and the frame sent. */
-  async function sent(h: Awaited<ReturnType<typeof setup>>, sock: FakeSocket, call: () => Promise<Applied>, ...events: Record<string, unknown>[]) {
-    const p = call();
-    await h.advance(100);
-    const frame = sock.ack();
-    await tick();
-    for (const e of events) sock.push(e);
-    return { frame, result: await p };
-  }
-
   test("each command's frame, resolved once Soloist reports the change", async () => {
     const h = setup();
     const sock = await h.online({ status: "paused", item: TRACK, position: { position_ms: 50_000, timestamp_ms: 0, speed: 0 } });
@@ -499,12 +499,8 @@ describe("confirming", () => {
   test("next at the end of the queue confirms on idle", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK });
-    const p = h.s.next();
-    await h.advance(100);
-    sock.ack();
-    await tick();
-    sock.push({ type: "playback_state", status: "idle", item: { uri: "" } });
-    expect((await p).confirmed).toBe(true);
+    const { result } = await sent(h, sock, () => h.s.next(), { type: "playback_state", status: "idle", item: { uri: "" } });
+    expect(result.confirmed).toBe(true);
     await h.stop();
   });
 
@@ -943,7 +939,7 @@ describe("spotifyChanges", () => {
 
 describe("stalls (Soloist issue #5)", () => {
   /** Answer the get_state a stall check sends with this position, Soloist's clock at `atMs`. */
-  async function answer(h: Awaited<ReturnType<typeof setup>>, sock: FakeSocket, ms: number, atMs: number) {
+  async function answer(h: ReturnType<typeof setup>, sock: FakeSocket, ms: number, atMs: number) {
     await tick();
     expect(sock.sent.at(-1)).toMatchObject({ command: "get_state" });
     sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40, position: { position_ms: ms, timestamp_ms: atMs, speed: 1 } });

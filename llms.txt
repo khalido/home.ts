@@ -1,0 +1,32 @@
+# @khalido/home
+
+> A small TypeScript library and `home` command for one home: Philips Hue, a Daikin AC, Enphase solar, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber Electric prices, Up Bank spending and the weather from the cloud. Runs on Bun 1.4+ and Node 24+; the CLI needs Bun. MIT.
+
+The library never reads the environment or a file: callers pass addresses, keys and a `fetch`. `createHome` runs integrations and keeps one typed snapshot; `loadHome` builds them from a home config that names env vars, never secrets. Every field a device reports is optional, and odd readings pass through in `anomaly` rather than being corrected. Writes go through a per-device lane: spaced, bursts merged.
+
+## Start here
+
+- [README](https://raw.githubusercontent.com/khalido/home.ts/main/README.md): what it is, install, the connectors
+- [Using it from an app](https://raw.githubusercontent.com/khalido/home.ts/main/docs/using.md): createHome, loadHome, health, change events, writes, energy
+- [The home config](https://raw.githubusercontent.com/khalido/home.ts/main/docs/config.md): devices by identity, rooms, discovery
+- [The home command](https://raw.githubusercontent.com/khalido/home.ts/main/docs/cli.md): status, probe, discover, per-connector verbs
+- [Agent skill: use-home](https://raw.githubusercontent.com/khalido/home.ts/main/skills/use-home/SKILL.md): reading safely, connecting, the rules for writes
+
+## Connectors
+
+- [hue](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/hue/README.md): lights, rooms, scenes over the bridge's event stream
+- [daikin](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/daikin/README.md): the AC over its local API
+- [enphase](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/enphase/README.md): solar from the IQ Gateway
+- [cast](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/cast/README.md): Cast devices and groups, volume, announcements
+- [printers](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/printers/README.md): AirPrint printers over IPP
+- [spotify](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/spotify/README.md): a Spotify Soloist speaker: state, confirmed writes, duck and interrupt, change events, stall watch
+- [amber](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/amber/README.md): live electricity prices and forecast
+- [up](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/up/README.md): household spending by category
+- [weather](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/weather/README.md): BOM, Open-Meteo and Google; hourly, day blocks, rain soon
+
+## Optional
+
+- [Why it is shaped this way](https://raw.githubusercontent.com/khalido/home.ts/main/docs/philosophy.md)
+- [Decisions](https://raw.githubusercontent.com/khalido/home.ts/main/docs/decisions.md): what was decided and why, newest last
+- [Adding a connector](https://raw.githubusercontent.com/khalido/home.ts/main/AGENTS.md)
+- [Changelog](https://raw.githubusercontent.com/khalido/home.ts/main/CHANGELOG.md)

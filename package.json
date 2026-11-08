@@ -104,6 +104,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
+    "llms.txt",
     ".env.example",
     "dist",
     "docs",

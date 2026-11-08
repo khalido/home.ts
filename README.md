@@ -66,6 +66,7 @@ Each connector's README says what has run against a real device and what has not
 - [The `home` command](docs/cli.md) and [the home config](docs/config.md)
 - [Why it is shaped this way](docs/philosophy.md) and [decisions](docs/decisions.md)
 - To add a connector, follow [AGENTS.md](AGENTS.md)
+- For agents: [llms.txt](llms.txt)
 
 I use it from jaldi, a Mac launcher, and chota-bot, a family bot on a Raspberry Pi, both on Bun; the docs name both.
 
