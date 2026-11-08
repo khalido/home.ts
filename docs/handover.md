@@ -40,12 +40,12 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 - First writes, each with KO's say-so: Up categorise, Daikin presets, a Hue burst, spotify on the Pi.
 - Package Settings → Publishing access → "Require two-factor authentication and disallow tokens", now a release has gone through.
 - jaldi hasn't been told 0.1.0 or 0.1.1 are out: no session is open there.
-- `fx.yml`: add `AI_GATEWAY_API_KEY` and allow Actions to create PRs, or disable it. The repo is public now, so a new issue starts it and it has no key.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged: `git worktree remove`, `git branch -D`; keep `pre-squash`.
 
 ## Next, in order
 
-0. **chota-bot's live writes on the Pi** (the list is in its handover; its reads all passed 2026-11-09): the first-play cap on 0.1.1, then announce, a group, volume, mute, stop. Results come back here for the READMEs and a 0.1.2.
+0. **0.1.2, the first-play cap (not built; KO: not yet).** Live on 0.1.1 (chota-bot, Pi, 2026-11-09) the cap said "lowered it" while the volume stayed at 56: `applyCap` writes `capNote` and sets `capped` before the write, and only a throw counts as failure. Likely Soloist dropped a `set_volume` sent while inactive; run 1, sent after `device_changed` active, worked. Build: say "lowered" only once confirmed, else `detail`; retry within the window, including on going active; open the window on any start signal (event order varies between runs); a tolerance of 1 when confirming a volume (reports are rounded); hold the `track` event until it has a name. README: the first volume is likely WirePlumber's saved level, with no config-only fix (restore off skips the default too; WirePlumber 0.5.8 source); a Music-role stream at a set level changes later Spotify loudness; a phone press can fire track, resumed, stopped, started, track over 3 s and a 0.8 s sign-out; volume before activation isn't the real level. Then chota-bot's `activate` test, re-run first-play at full volume.
+   0a. **chota-bot's other live writes on the Pi** (the list is in its handover; reads all passed 2026-11-09): announce, a group, volume, mute, stop, each with KO's OK.
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.
