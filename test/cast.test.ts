@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
-import { manualClock } from "./clock.ts";
+import { idleClock, manualClock } from "./clock.ts";
 import {
   cast,
   type CastConnect,
@@ -353,15 +353,7 @@ const until = async (check: () => boolean, ms = 2000) => {
     if (Date.now() > end) throw new Error("timed out");
 };
 
-const idle: Clock = {
-  now: () => Date.now(),
-  sleep: (ms, signal) =>
-    new Promise((r) =>
-      signal?.aborted
-        ? r()
-        : signal?.addEventListener("abort", () => r(), { once: true }),
-    ),
-};
+const idle = idleClock();
 
 describe("cast()", () => {
   test("connects to every entry, reads status, and reports connected once all have answered; abort closes every socket", async () => {

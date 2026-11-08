@@ -5,8 +5,8 @@ import {
   energyNow,
   gridText,
   solarLevel,
-  type Clock,
 } from "../src/index.ts";
+import { stopAt } from "./clock.ts";
 import { BALANCED_W } from "../src/energy.ts";
 import { amber, amberClient, POLL_MS } from "../src/connectors/amber/index.ts";
 import { toPrices } from "../src/connectors/amber/client.ts";
@@ -336,12 +336,8 @@ describe("amber integration", () => {
 
   test("finds the site once, then polls prices every 60 s", async () => {
     const { f, calls } = amberApi();
-    let t = 0;
     const stop = new AbortController();
-    const clock: Clock = {
-      now: () => t,
-      sleep: async (ms) => void ((t += ms), t >= 2 * POLL_MS && stop.abort()),
-    };
+    const clock = stopAt(stop, 2 * POLL_MS);
     const home = createHome([amber({ key: "k", fetch: f, clock })]);
     await home.start(stop.signal);
     expect(calls).toEqual([

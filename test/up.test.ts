@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
-import type { Clock, Part } from "../src/index.ts";
+import type { Part } from "../src/index.ts";
+import { idleClock } from "./clock.ts";
 import { loadHome } from "../src/index.ts";
 import {
   dollars,
@@ -536,13 +537,7 @@ describe("the integration", () => {
     account?: { accountType?: "TRANSACTIONAL"; ownershipType?: "JOINT" },
     household?: Household,
   ) {
-    const clock: Clock = {
-      now: () => NOW,
-      sleep: (_ms, signal) =>
-        new Promise((resolve) =>
-          signal?.addEventListener("abort", () => resolve(), { once: true }),
-        ),
-    };
+    const clock = idleClock(() => NOW);
     const { f, calls } = fakeUp(routes);
     const integration = up({
       token: "t",

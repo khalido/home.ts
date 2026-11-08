@@ -1,6 +1,7 @@
 import type { AmberState, PriceInterval } from "./connectors/amber/client.ts";
 import type { EnphaseState } from "./connectors/enphase/client.ts";
 import type { EnphaseSnapshot } from "./connectors/enphase/index.ts";
+import { kw } from "./manifest.ts";
 
 /** The home's energy right now: power from Enphase, prices from Amber, and what the grid flow costs per hour. */
 export type EnergyNow = {
@@ -112,7 +113,6 @@ export function solarLevel(
  * "balanced (-10 W)", or "" with no grid reading. Rounded for reading only; the numbers above stay as read.
  */
 export function gridText(now: EnergyNow): string {
-  const kw = (w: number) => `${(w / 1000).toFixed(1)} kW`;
   const rate = (c: number | undefined, positive: string, negative: string) =>
     c === undefined
       ? ""

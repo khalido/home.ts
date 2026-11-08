@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createHome, type Clock } from "../src/index.ts";
+import { createHome } from "../src/index.ts";
+import { stopAt } from "./clock.ts";
 import {
   daikin,
   daikinClient,
@@ -200,12 +201,8 @@ describe("daikin integration", () => {
 
   test("reads now, then every 120 s", async () => {
     const { f, calls } = unit(() => new Response(JSON.stringify(status)));
-    let t = 0;
     const stop = new AbortController();
-    const clock: Clock = {
-      now: () => t,
-      sleep: async (ms) => void ((t += ms), t >= 2 * POLL_MS && stop.abort()),
-    };
+    const clock = stopAt(stop, 2 * POLL_MS);
     const home = createHome([daikin({ host: "ac.local", fetch: f, clock })]);
     await home.start(stop.signal);
     expect(calls()).toBe(2);
@@ -222,12 +219,8 @@ describe("daikin integration", () => {
         ? new Response(JSON.stringify(status))
         : new Response("", { status: 500 }),
     );
-    let t = 0;
     const stop = new AbortController();
-    const clock: Clock = {
-      now: () => t,
-      sleep: async (ms) => void ((t += ms), t >= 2 * POLL_MS && stop.abort()),
-    };
+    const clock = stopAt(stop, 2 * POLL_MS);
     const home = createHome([daikin({ host: "ac.local", fetch: f, clock })]);
     await home.start(stop.signal);
     expect(home.snapshot().daikin).toMatchObject({
@@ -238,12 +231,8 @@ describe("daikin integration", () => {
   });
 
   test("no dsiot endpoint is a failed read: disconnected, saying so, and still polling", async () => {
-    let t = 0;
     const stop = new AbortController();
-    const clock: Clock = {
-      now: () => t,
-      sleep: async (ms) => void ((t += ms), t >= 2 * POLL_MS && stop.abort()),
-    };
+    const clock = stopAt(stop, 2 * POLL_MS);
     const { f, calls } = unit(() => new Response("", { status: 404 }));
     const home = createHome([daikin({ host: "ac.local", fetch: f, clock })]);
     await home.start(stop.signal);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
-import { manualClock } from "./clock.ts";
+import { idleClock, manualClock } from "./clock.ts";
 import {
   cast,
   type CastConnect,
@@ -258,15 +258,7 @@ function fakeHome(list: Fake[], script: Script = {}) {
   };
 }
 
-const idle: Clock = {
-  now: () => Date.now(),
-  sleep: (_ms, signal) =>
-    new Promise((r) =>
-      signal?.aborted
-        ? r()
-        : signal?.addEventListener("abort", () => r(), { once: true }),
-    ),
-};
+const idle = idleClock();
 const until = async (check: () => boolean, ms = 2000) => {
   for (const end = Date.now() + ms; !check(); await Bun.sleep(2))
     if (Date.now() > end) throw new Error("timed out");

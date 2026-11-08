@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createHome, type Clock } from "../src/index.ts";
+import { stopAfter } from "./clock.ts";
 import {
   enphase,
   enphaseClient,
@@ -311,10 +312,7 @@ describe("client and home", () => {
     const { f, calls } = gateway();
     const seen: string[] = [];
     const stop = new AbortController();
-    const clock: Clock = {
-      now: () => Date.UTC(2027, 0, 1),
-      sleep: async () => stop.abort(),
-    };
+    const clock = stopAfter(stop, 1, Date.UTC(2027, 0, 1));
     await createHome([
       enphase({
         host: "https://192.0.2.21/",

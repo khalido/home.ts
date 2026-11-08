@@ -22,3 +22,32 @@ export function manualClock() {
   };
   return { clock, advance };
 }
+
+/** Time stands at `at`; the `n`th sleep stops the run. */
+export const stopAfter = (stop: AbortController, n: number, at = 0): Clock => {
+  let sleeps = 0;
+  return {
+    now: () => at,
+    sleep: async () => void (++sleeps >= n && stop.abort()),
+  };
+};
+
+/** Time starts at 0 and each sleep moves it on; reaching `until` stops the run. */
+export const stopAt = (stop: AbortController, until: number): Clock => {
+  let t = 0;
+  return {
+    now: () => t,
+    sleep: async (ms) => void ((t += ms), t >= until && stop.abort()),
+  };
+};
+
+/** Sleeps never end on their own, only when their signal aborts. */
+export const idleClock = (now: () => number = Date.now): Clock => ({
+  now,
+  sleep: (_ms, signal) =>
+    new Promise((resolve) =>
+      signal?.aborted
+        ? resolve()
+        : signal?.addEventListener("abort", () => resolve(), { once: true }),
+    ),
+});

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type Clock, createHome } from "../src/index.ts";
+import { createHome } from "../src/index.ts";
+import { idleClock, stopAfter } from "./clock.ts";
 import type { Part } from "../src/home.ts";
 import {
   blockText,
@@ -894,11 +895,7 @@ describe("mergeWeather", () => {
 describe("weather integration", () => {
   test("composes the sources and the sun into one part", async () => {
     const stop = new AbortController();
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => at,
-      sleep: async () => void (++sleeps >= 3 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 3, at);
     const sources = [
       fake("bom", {
         now: { ...meta("bom", false, "2026-10-13T09:10:00Z"), tempC: 16.4 },
@@ -931,11 +928,7 @@ describe("weather integration", () => {
   test("the hourly forecast becomes day blocks in the config's time zone, recomputed at each report", async () => {
     const stop = new AbortController();
     const t = Date.parse("2026-10-16T05:50:00Z");
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => t,
-      sleep: async () => void (++sleeps >= 3 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 3, t);
     const hourly = openMeteoSlices(openMeteoJson, t).hourly!;
     const home = createHome([
       weather({
@@ -958,13 +951,7 @@ describe("weather integration", () => {
 
   test("refresh reads every source now, with force, before the interval is up", async () => {
     const stop = new AbortController();
-    const stuck: Clock = {
-      now: () => at,
-      sleep: (_ms, signal) =>
-        new Promise((resolve) =>
-          signal?.addEventListener("abort", () => resolve(), { once: true }),
-        ),
-    };
+    const stuck = idleClock(() => at);
     const forces: (boolean | undefined)[] = [];
     const source: WeatherSource = {
       name: "open-meteo",
@@ -984,11 +971,7 @@ describe("weather integration", () => {
 
   test("a source's floor wins over a shorter shared interval", async () => {
     const stop = new AbortController();
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => at,
-      sleep: async () => void (++sleeps >= 2 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 2, at);
     const asked: number[] = [];
     const billed: WeatherSource = {
       name: "google",
@@ -1015,13 +998,7 @@ describe("weather integration", () => {
 
   test("refresh forces a source without a floor, and leaves a billed source alone inside its floor", async () => {
     const stop = new AbortController();
-    const stuck: Clock = {
-      now: () => at,
-      sleep: (_ms, signal) =>
-        new Promise((resolve) =>
-          signal?.addEventListener("abort", () => resolve(), { once: true }),
-        ),
-    };
+    const stuck = idleClock(() => at);
     const forces: Record<string, (boolean | undefined)[]> = {
       google: [],
       "open-meteo": [],
@@ -1051,13 +1028,7 @@ describe("weather integration", () => {
 
   test("a refresh inside a billed source's floor still gets an answer, without a read", async () => {
     const stop = new AbortController();
-    const stuck: Clock = {
-      now: () => at,
-      sleep: (_ms, signal) =>
-        new Promise((resolve) =>
-          signal?.addEventListener("abort", () => resolve(), { once: true }),
-        ),
-    };
+    const stuck = idleClock(() => at);
     let reads = 0;
     const google: WeatherSource = {
       name: "google",
@@ -1084,11 +1055,7 @@ describe("weather integration", () => {
 
   test("unavailable once every source has stopped", async () => {
     const stop = new AbortController();
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => at,
-      sleep: async () => void (++sleeps >= 2 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 2, at);
     const dead: WeatherSource = {
       name: "google",
       owns: { now: 1 },
@@ -1104,11 +1071,7 @@ describe("weather integration", () => {
 
   test("one stopped source and one live one: connected, with the stop in detail", async () => {
     const stop = new AbortController();
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => at,
-      sleep: async () => void (++sleeps >= 2 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 2, at);
     const dead: WeatherSource = {
       name: "bom",
       owns: { now: 1 },
@@ -1136,11 +1099,7 @@ describe("weather integration", () => {
 
   test("a read that brings only the last good slices is a failed read: disconnected, the data kept", async () => {
     const stop = new AbortController();
-    let sleeps = 0;
-    const clock: Clock = {
-      now: () => at,
-      sleep: async () => void (++sleeps >= 2 && stop.abort()),
-    };
+    const clock = stopAfter(stop, 2, at);
     const old = fake("open-meteo", {
       now: { ...meta("open-meteo", true, "2026-10-13T09:15:00Z"), tempC: 16.3 },
       problem: "open-meteo: fetch failed",
@@ -1189,13 +1148,7 @@ describe("weather integration", () => {
 
   test("a refresh once every source has stopped is answered at once", async () => {
     const stop = new AbortController();
-    const stuck: Clock = {
-      now: () => at,
-      sleep: (_ms, signal) =>
-        new Promise((resolve) =>
-          signal?.addEventListener("abort", () => resolve(), { once: true }),
-        ),
-    };
+    const stuck = idleClock(() => at);
     const dead: WeatherSource = {
       name: "google",
       owns: { now: 1 },
