@@ -4,9 +4,8 @@
 
 ## Where things stand
 
-- **0.1.0 is on npm** (2026-11-09, `bun publish` from the tag). A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
-- **`main` is past the tag** with what goes in 0.1.1: the spotify late-socket fix (in `CHANGELOG.md`), the shared test clocks, and `publish.yml`.
-- **Releases now stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). Not yet run once.
+- **0.1.1 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
+- **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It worked first time on 0.1.1.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. No write has reached a device except `setPower(true)` on the Daikin at KO's request.
 
 ## spotify (Soloist)
@@ -39,13 +38,14 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 - Hue pairing (`home pair`, `.env`, `HUE_CA_FILE`, then `home hue`).
 - Enphase: why the gateway refuses connections (`home discover`), then a read on Node with `NODE_TLS`.
 - First writes, each with KO's say-so: Up categorise, Daikin presets, a Hue burst, spotify on the Pi.
-- The trusted publisher on npmjs.com: `khalido`, `home.ts`, `publish.yml`, both boxes unticked. It expires unless a release goes through within 2 days of creating it, so create it when 0.1.1 is ready, and approve the staged version within the 2 days.
+- Package Settings → Publishing access → "Require two-factor authentication and disallow tokens", now a release has gone through.
+- jaldi hasn't been told 0.1.0 or 0.1.1 are out: no session is open there.
 - `fx.yml`: add `AI_GATEWAY_API_KEY` and allow Actions to create PRs, or disable it. The repo is public now, so a new issue starts it and it has no key.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged: `git worktree remove`, `git branch -D`; keep `pre-squash`.
 
 ## Next, in order
 
-0. **0.1.1**, after chota-bot's live writes on the Pi (the list is in chota-bot's handover; its reads all passed 2026-11-09). Hold its maxVolume first-play test until 0.1.1 is out. Its report that `home cast` hid an offline device didn't reproduce: 8 lines and the detail, read live 2026-11-09.
+0. **chota-bot's live writes on the Pi** (the list is in its handover; its reads all passed 2026-11-09): the first-play cap on 0.1.1, then announce, a group, volume, mute, stop. Results come back here for the READMEs and a 0.1.2.
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.

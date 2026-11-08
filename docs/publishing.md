@@ -85,7 +85,7 @@ On npmjs.com → the package → Settings → Trusted Publisher:
 - **2 days.** A new publisher must complete a first publish within 2 days or it expires. npm doesn't say whether staging alone counts, so approve within the 2 days. To fix an expired one, delete it and create it again.
 - **Fixed fields.** To change the provider, repo or filename, delete the connection and create a new one.
 
-For home.ts this is still to do when 0.1.1 is ready, and the workflow hasn't run yet.
+For home.ts this is set up. 0.1.1 went through it on 2026-11-09, with provenance.
 
 ## The workflow
 
@@ -105,6 +105,8 @@ npm stage list @khalido/home
 ```bash
 npm stage approve <stage-id>
 ```
+
+To skip the approval once releases are routine: tick **Allow `npm publish`** on the trusted publisher and change the workflow's last step to `npm publish`. A release then goes live with no 2FA. I'm keeping the approval for now.
 
 If the run fails on auth, fix the publisher and run `gh run rerun <id>`. If it fails on the code, fix it and release a new patch version, because a rerun builds the same tag.
 
