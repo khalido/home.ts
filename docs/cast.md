@@ -20,7 +20,7 @@ Each answered a TLS connect plus receiver `GET_STATUS` (nothing launched, no sou
 
 **Groups.** The group is its own mDNS entry resolving to Display A's host on its own high port, with Display A's certificate: a group lives on whichever member leads it. Multizone `GET_STATUS` on the group port lists the members (Display A, Display B, Speaker A) with their volumes; on Display A's own port it lists only itself, and `GET_CASTING_GROUPS` is refused. TXT `rm` does not mark membership (a member has it empty), so membership comes only from `MULTIZONE_STATUS`.
 
-Not probed: media status (nothing was playing), socket lifetime, members' status while the group plays, and Node's `tls` (chota-bot runs Node).
+Not probed: media status (nothing was playing), socket lifetime, members' status while the group plays, and Node's `tls` (no Node caller yet).
 
 ## Library pick
 

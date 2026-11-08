@@ -26,7 +26,7 @@ CastV2 is TLS to port 8009 (a group: its own port), carrying length-prefixed pro
 - **Groups.** A group is its own mDNS entry, at its leader's address on a high port, and presents **its leader's certificate**. Multizone status on the group's port lists the members (by `deviceId`, the same dashed id) with their volumes; on a device's own port it lists only that device, so membership is read from group sockets only. TXT `rm` does not mark membership. `GET_CASTING_GROUPS` is refused.
 - **Receiver status**: hubs and the Chromecast Ultra run Backdrop (`E8C28D3C`) with `isIdleScreen: true`; the speakers report no application; the TV Streamer reports `isStandBy: true`, `isActiveInput: false` and a `fixed` volume; the Ultra's volume is `attenuation`.
 - No device sent a `PING` in 12 s of listening, so our 5 s ping is what keeps the socket's silence check honest.
-- Not seen yet: media status (nothing was playing), a group playing, a leader change, member changes, and Node's `tls` (chota-bot runs Node).
+- Not seen yet: media status (nothing was playing), a group playing, a leader change, member changes, and Node's `tls` (no Node caller yet).
 
 ## TLS: verification off, the name checked
 

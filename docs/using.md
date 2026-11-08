@@ -6,9 +6,9 @@ Give every device a fixed address in your router (a DHCP reservation; eero, UniF
 
 ## Bun and Node
 
-**Bun** (jaldi): leave out `fetch` and `hue()` pins with Bun's `tls` fetch option.
+**Bun** (jaldi, chota-bot): leave out `fetch` and `hue()` pins with Bun's `tls` fetch option.
 
-**Node** (chota-bot): Node's `fetch` takes no CA, so Hue and Enphase need the fetches in `@khalido/home/node`, built on undici:
+**Node**: Node's `fetch` takes no CA, so Hue and Enphase need the fetches in `@khalido/home/node`, built on undici:
 
 ```ts
 import { NODE_TLS, nodePinnedFetch } from "@khalido/home/node";

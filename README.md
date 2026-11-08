@@ -1,6 +1,6 @@
 # @khalido/home
 
-My house as a TypeScript import: Philips Hue, a Daikin AC, Enphase solar, Google Cast speakers and screens, and AirPrint printers on the local network, plus Amber Electric's live prices, Up Bank spending and the weather. One small library and a `home` command. No server, no cloud of its own.
+My house as a TypeScript import: Philips Hue, a Daikin AC, Enphase solar, Google Cast speakers and screens, AirPrint printers and a Spotify Soloist speaker on the local network, plus Amber Electric's live prices, Up Bank spending and the weather. One small library and a `home` command. No server, no cloud of its own.
 
 - Read every device into one typed snapshot, kept current by event stream or on a timer.
 - Turn lights on, set the AC, change speaker volume. Writes are spaced and merged, so a burst never floods a device.
@@ -67,7 +67,7 @@ Each connector's README says what has run against a real device and what has not
 - [Why it is shaped this way](docs/philosophy.md) and [decisions](docs/decisions.md)
 - To add a connector, follow [AGENTS.md](AGENTS.md)
 
-I use it from jaldi, a Mac launcher (Bun), and chota-bot, a family bot (Node); the docs name both.
+I use it from jaldi, a Mac launcher, and chota-bot, a family bot on a Raspberry Pi, both on Bun; the docs name both.
 
 ## Licence
 

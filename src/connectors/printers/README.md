@@ -26,7 +26,7 @@ Discovery is mDNS `_ipp._tcp` and `_ipps._tcp` ([Apple's AirPrint TXT keys](http
 
 **TLS.** Printers sign their own certificates. `fetch` verifies them, and the read fails with its error in `detail`; nothing here turns verification off. If a printer only speaks IPPS, the fix is the caller's `fetch` (pin the certificate, as Hue's does), not this package's.
 
-**Node.** Node's `fetch` refuses port 631 (it is on the WHATWG bad-port list, as IPP's well-known port). Bun does not. A Node caller (chota-bot) would need a `fetch` that allows it, or the IPPS entry on 443. Not tried.
+**Node.** Node's `fetch` refuses port 631 (it is on the WHATWG bad-port list, as IPP's well-known port). Bun does not. A Node caller would need a `fetch` that allows it, or the IPPS entry on 443. Not tried.
 
 ## Unverified
 
