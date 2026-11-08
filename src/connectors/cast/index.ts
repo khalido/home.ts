@@ -401,7 +401,8 @@ export function cast(
           // A cached address that fails is only stale: discover now and try where it answers, still "connecting".
           cached = false;
           await discover();
-          continue;
+          // Unless discovery can't find it: then the address is the one that just failed, and a second try only waits out the timeout. The backoff still retries.
+          if (!lastFound || lastFound.has(id)) continue;
         }
         const why = errorText(error);
         // A cached address the last discovery did not find says so, as a polling connector's does.

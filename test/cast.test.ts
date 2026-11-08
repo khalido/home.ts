@@ -536,9 +536,13 @@ describe("cast()", () => {
       port: d.port,
     }));
     const others = devices.filter((d) => d.id !== speaker.id);
+    let tries = 0;
     const running = cast({
       resolve: async () => others,
-      connect: net.connect,
+      connect: (o) => {
+        if (o.host === "192.0.2.250") tries++;
+        return net.connect(o);
+      },
       clock: idle,
       expect: expect_,
     }).run(stop.signal, (p) => parts.push(p));
@@ -550,6 +554,7 @@ describe("cast()", () => {
     expect(
       parts.at(-1)!.state!.devices[castKey(speaker.id)]!.detail,
     ).toStartWith("not found by discovery; ");
+    expect(tries).toBe(1); // no second wait on the address that just failed
     stop.abort();
     await running;
   });
