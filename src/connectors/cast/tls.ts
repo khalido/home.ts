@@ -18,7 +18,7 @@ export const tlsConnect: CastConnect = ({
   host,
   port,
   signal,
-  timeoutMs = 10_000,
+  timeoutMs = 3000,
 }) =>
   new Promise<CastChannel>((resolve, reject) => {
     const socket = connect({ host, port, rejectUnauthorized: false });

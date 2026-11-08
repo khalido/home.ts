@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+
+- **cast:** `tlsConnect` gives up after 3 s, down from 10 s, so one offline device holds up a one-shot read for less. `home cast` with one device down: 13.3 s to 6.3 s (Bun 1.4.4, macOS, 2026-11-09).
+
 ### Fixed
 
 - **spotify:** `maxVolume`'s first-play window now opens on a start through `buffering` too: idle → buffering → playing escaped it.
