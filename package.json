@@ -121,7 +121,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "check": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "check": "bun check --no-script && bun check --no-script -p tsconfig.build.json && bun check --no-script -p tsconfig.node.json",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.node.json",
     "bench": "bun bench/bench.ts",
     "prepublishOnly": "bun run check && bun test && bun run build",

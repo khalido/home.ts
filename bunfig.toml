@@ -1,3 +1,3 @@
 [install]
 # Supply-chain worms ship as fresh releases: never install a version younger than 3 days.
-minimumReleaseAge = 259200
+minimumReleaseAge = "3d"
