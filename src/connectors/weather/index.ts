@@ -246,18 +246,34 @@ export function weather(
 /** "20:20" in the home's time zone (the runtime's when unset), or "?". */
 const hhmmIn = (iso: string | undefined, timeZone?: string) =>
   iso ? localTime(Date.parse(iso), timeZone) : "?";
-const day = (d?: ForecastDay) =>
+const day = (d?: ForecastDay, rainLeft?: number) =>
   d
     ? [
         d.minC === undefined && d.maxC === undefined
           ? ""
           : `${d.minC ?? "?"}–${d.maxC ?? "?"} °C`,
         d.text?.replace(/\.$/, "").toLowerCase() ?? "",
-        d.rainChance === undefined ? "" : `${d.rainChance}% chance of rain`,
+        d.rainChance === undefined
+          ? ""
+          : rainLeft !== undefined && rainLeft < d.rainChance
+            ? `${rainLeft}% chance of rain the rest of the day`
+            : `${d.rainChance}% chance of rain`,
       ]
         .filter(Boolean)
         .join(" ")
     : "?";
+
+/** The highest hourly chance left today, all 24 hours of it, when the hourly forecast is the same source and day as the forecast: sources are never mixed. */
+const rainLeftToday = (
+  w: Pick<Slices, "forecast" | "hourly"> & { timeZone?: string },
+  at: number,
+) => {
+  if (!w.hourly || w.hourly.source !== w.forecast?.source) return undefined;
+  const rest = dayBlocks(w.hourly, at, w.timeZone, [
+    { name: "rest", from: 0, to: 24 },
+  ])?.today[0];
+  return rest?.date === w.forecast.today?.date ? rest?.rainChance : undefined;
+};
 
 /** "rain in 30 min, ends in 55 min, 70%, 0.8 mm, moderate (google)", "raining, ends in 25 min", or "no rain for 2 h"; nothing when the forecast covers none of the window. */
 export function rainText(
@@ -310,7 +326,7 @@ export function weatherText(
     : "";
   const f = w.forecast;
   const forecast = f
-    ? `today ${day(f.today)}, tomorrow ${day(f.tomorrow)} (${f.source}${f.modelled ? " modelled" : ""})`
+    ? `today ${day(f.today, rainLeftToday(w, Date.parse(sun.at)))}, tomorrow ${day(f.tomorrow)} (${f.source}${f.modelled ? " modelled" : ""})`
     : "";
   const k = w.sky;
   const skyParts = k

@@ -1023,6 +1023,60 @@ describe("the first play's volume (Soloist issue #23)", () => {
     await h.stop();
   });
 
+  test("idle → buffering → playing is a start: lowered at buffering and again on the jump after playing", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "buffering" });
+    expect(sock.sent).toEqual([
+      { type: "command", command: "set_volume", volume: 60 },
+    ]);
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 60 });
+    await h.advance(100);
+    await h.advance(10_000); // a long buffer: the window is over, until playing
+    sock.push({ type: "playback_changed", status: "playing" });
+    sock.push({ type: "volume_changed", volume: 100 }); // issue #23's jump
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["set_volume", "set_volume"]);
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 60 });
+    sock.push({ type: "volume_changed", volume: 95 }); // turned up after that: theirs to keep
+    expect(sock.commands()).toEqual(["set_volume", "set_volume"]);
+    await h.stop();
+  });
+
+  test("a sign-in whose first status is buffering is a start too", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = h.sockets[0]!;
+    sock.open();
+    sock.push({ type: "auth_state", logged_in: false });
+    sock.push({ type: "auth_state", logged_in: true });
+    sock.push({
+      type: "playback_state",
+      status: "buffering",
+      item: TRACK,
+      volume: 100,
+    });
+    await h.advance(100);
+    sock.push({ type: "queue_changed", upcoming: [] });
+    await h.advance(100);
+    expect(sock.sent.at(-1)).toEqual({
+      type: "command",
+      command: "set_volume",
+      volume: 60,
+    });
+    await h.stop();
+  });
+
+  test("paused → buffering → playing is a resume: left alone", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ status: "paused", volume: 90 });
+    sock.push({ type: "playback_changed", status: "buffering" });
+    sock.push({ type: "playback_changed", status: "playing" });
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
   test("also when the volume arrives after the status", async () => {
     const h = setup({ maxVolume: 60 });
     const sock = await h.online({ volume: 30 });

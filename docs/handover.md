@@ -13,7 +13,7 @@
 
 Built 8 Nov in three groups agreed with chota-bot, each reviewed (`/ko-review`, plus Gemini and a Sonnet pass on group 1): confirmed writes (`{ state, confirmed }`), `duck` and `interrupt` (`{ value, music, why? }`), `upNext`, `setRepeat`, `speakerState`, `spotifyChanges` with `own` marking, and the stall watch (issue #5) with opt-in `repairStalls`. The connector README has all of it, the protocol and the Unverified list. Pure helpers are in `changes.ts`; the integration's closure stays whole in `index.ts`, since its parts share one state.
 
-- **Never run against a real Soloist.** chota's Pi ran Soloist through `soloist ctl` only. First live check, on the Pi with `SOLOIST_WS=ws://127.0.0.1:9091`: `home spotify` read-only, then each write with KO's say-so (KO listens on it; don't write while he is).
+- **Reads seen live** on chota's Pi, 2026-11-09. No write has run through the connector: each with KO's say-so (KO listens on it; don't write while he is).
 - **Search lives in chota-bot** (KO, 8 Nov); the library stays device control. Research in `docs/ideas.md`.
 - `drafts/soloist/` (git-ignored) is chota's old client and units: delete once chota switches.
 
@@ -27,7 +27,7 @@ On Bun on a Raspberry Pi 5 (Pi OS Lite Trixie arm64, Wi-Fi), one long-lived `loa
 | AC status and set          | `part("daikin").state`, `client.write(...)`                                          | 120 s poll; `write` returns `void`; only `setPower` tried live                  |
 | Morning brief              | `energyNow`, `bestWindow`                                                            | Enphase unreachable since 28 Oct                                                |
 | Announce on Nest speakers  | `integration("cast").announce` + `serveClip`                                         | never run on a device; check `serveClip` picks the LAN address, not Tailscale's |
-| Music                      | `integration("spotify")`, `speakerState`, `spotifyChanges`, `duck` around `announce` | never run against Soloist                                                       |
+| Music                      | `integration("spotify")`, `speakerState`, `spotifyChanges`, `duck` around `announce` | reads live; writes untried                                                      |
 | Print a PDF on the Brother | none                                                                                 | Next item 3                                                                     |
 | Spend to categorise        | `part("up").state`, `setCategory`                                                    | writes untried                                                                  |
 | Admin page, alerts         | `health()`, `onChange`                                                               | an "expected off" option, so a printer off at night isn't `down`                |
@@ -45,7 +45,7 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 
 ## Next, in order
 
-0. **0.1.1**, after chota-bot's live tests of Cast and spotify on the Pi (the list is in chota-bot's handover; results come back here).
+0. **0.1.1**, after chota-bot's live writes on the Pi (the list is in chota-bot's handover; its reads all passed 2026-11-09). Hold its maxVolume first-play test until 0.1.1 is out. Its report that `home cast` hid an offline device didn't reproduce: 8 lines and the detail, read live 2026-11-09.
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.

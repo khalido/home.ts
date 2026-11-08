@@ -1297,3 +1297,50 @@ describe("weather text in the home's time zone", () => {
     );
   });
 });
+
+describe("today's chance of rain in the text", () => {
+  const sun = sunNow(sydney.latitude, sydney.longitude, at); // 09:20Z
+  const forecast = {
+    ...meta("open-meteo", true, "2026-10-13T09:15:00Z"),
+    today: { date: "2026-10-13", rainChance: 94 },
+  };
+  const hourly = (source: string, chances: [string, number][]) => ({
+    ...meta(source, true, "2026-10-13T09:15:00Z"),
+    hours: chances.map(([hhmm, rainChance]) => ({
+      at: `2026-10-13T${hhmm}:00Z`,
+      rainChance,
+    })),
+  });
+  const text = (h: ReturnType<typeof hourly>, f = forecast) =>
+    weatherText({ forecast: f, hourly: h, timeZone: "UTC" }, sun);
+  const passed = [
+    ["02:00", 94],
+    ["12:00", 6],
+    ["15:00", 2],
+  ] as [string, number][];
+
+  test("after the rain has passed, the most still to come, and it says so", () => {
+    const t = text(hourly("open-meteo", passed));
+    expect(t).toContain("6% chance of rain the rest of the day");
+    expect(t).not.toContain("94%");
+  });
+  test("an hour late at night still counts", () => {
+    expect(
+      text(
+        hourly("open-meteo", [
+          ["12:00", 6],
+          ["23:00", 94],
+        ]),
+      ),
+    ).toContain("94% chance of rain");
+  });
+  test("another source's hours, or another day's forecast, leave the day's figure", () => {
+    expect(text(hourly("google", passed))).not.toContain("rest of the day");
+    expect(
+      text(hourly("open-meteo", passed), {
+        ...forecast,
+        today: { date: "2026-10-12", rainChance: 94 },
+      }),
+    ).not.toContain("rest of the day");
+  });
+});

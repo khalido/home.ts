@@ -216,6 +216,19 @@ describe("discover when passes throw", () => {
       }),
     ).rejects.toThrow("spawn dns-sd ENOENT");
   });
+  test("an error stopOn accepts ends it at once, with no second pass", async () => {
+    let calls = 0;
+    await expect(
+      discover(
+        async () => {
+          calls++;
+          throw new Error("avahi-browse not found");
+        },
+        { clock, stopOn: () => true },
+      ),
+    ).rejects.toThrow("avahi-browse not found");
+    expect(calls).toBe(1);
+  });
   test("one pass threw: the other's answers, as before", async () => {
     let n = 0;
     const hub: Found = {

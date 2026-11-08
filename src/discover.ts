@@ -374,7 +374,8 @@ export function addressBook(
 /**
  * Run one discovery `passes` times, `gapMs` apart, and return the union (first answer wins). `onPass` sees each pass's
  * additions as they come; `done` ends it early once what was looked for has answered. A pass that throws adds nothing;
- * when every pass threw, discovery never ran, so it throws the last error rather than reporting nothing found.
+ * when every pass threw, discovery never ran, so it throws the last error rather than reporting nothing found. An error
+ * `stopOn` accepts is thrown at once: no later pass could do better.
  */
 export async function discover<T = Found>(
   pass: () => Promise<T[]>,
@@ -384,6 +385,7 @@ export async function discover<T = Found>(
     gapMs?: number;
     key?: (t: T) => string;
     done?: (all: T[]) => boolean;
+    stopOn?: (error: unknown) => boolean;
     onPass?: (n: number, added: T[]) => void;
     signal?: AbortSignal;
   },
@@ -401,9 +403,11 @@ export async function discover<T = Found>(
       );
     if (options.signal?.aborted) break;
     ran++;
-    const answers = await pass().catch(
-      (error) => (errors.push(error), [] as T[]),
-    );
+    const answers = await pass().catch((error) => {
+      if (options.stopOn?.(error)) throw error;
+      errors.push(error);
+      return [] as T[];
+    });
     const added = answers.filter((t) => !all.has(key(t)) && all.set(key(t), t));
     options.onPass?.(n, added);
     if (options.done?.([...all.values()])) break;

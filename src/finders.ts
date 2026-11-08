@@ -31,6 +31,9 @@ import {
 // does not slow a scan. Without the tool the mDNS finders throw, naming it, rather than "nothing answered".
 // `fileCache` keeps the addresses discovery found in a file between runs, so the next run connects straight away.
 
+/** The system's mDNS tool is not installed: discovery can't run until it is. */
+export class MissingTool extends Error {}
+
 /**
  * Run a long-lived `dns-sd` query (or `avahi-browse`, by `command`) and return what it printed. It never exits by itself, so it is stopped once `done`
  * says the answer is in, or `quietMs` after the last output, or at `maxMs`. The system's mDNS cache usually answers in
@@ -68,11 +71,11 @@ export function dnsSd(
     proc.on("error", (error: NodeJS.ErrnoException) => {
       (clearTimeout(timer), clearTimeout(quiet));
       reject(
-        new Error(
-          error.code === "ENOENT"
-            ? `${command} not found; mDNS discovery needs it${install ? ` (${install})` : ""}`
-            : `${command}: ${error.message}`,
-        ),
+        error.code === "ENOENT"
+          ? new MissingTool(
+              `${command} not found; mDNS discovery needs it${install ? ` (${install})` : ""}`,
+            )
+          : new Error(`${command}: ${error.message}`),
       );
     });
     proc.on("close", finish);

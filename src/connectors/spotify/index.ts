@@ -199,6 +199,7 @@ export function spotify(
   let signedIn = false; // signed out → in on this socket: the first status after it counts as a start if it is playing
   let capUntil = -Infinity;
   let capped = false; // the cap has been sent in this window
+  let startBuffering = false; // a start from idle is still buffering
   let capNote: string | undefined; // the last first-play lowering, in `anomaly` until the speaker goes idle
   let frameNote: string | undefined; // a frame the schema rejected, or an error nothing was waiting for
   let note: string | undefined; // a write the integration made itself that failed (the cap, interrupt's resume), in `detail`
@@ -352,7 +353,7 @@ export function spotify(
       publish();
     });
 
-  /** Within the window after idle → playing, a volume above the cap is lowered to it, once (issue #23). */
+  /** Within the window after a start from idle, a volume above the cap is lowered to it, once (issue #23). */
   const applyCap = () => {
     if (
       cap === undefined ||
@@ -429,10 +430,14 @@ export function spotify(
       (f.type === "playback_state" || f.type === "playback_changed") &&
       f.status !== undefined
     ) {
-      // A start is idle → playing, or a sign-in whose first status is playing: a phone picked the speaker and played (issue #23).
+      // A start is idle → playing or buffering, or a sign-in whose first status is either: a phone picked the speaker and played (issue #23).
+      // Soloist's jump to 100 comes about 100 ms after `playing` (issue #23), so a start through buffering opens the window again then.
       const started =
-        f.status === "playing" && (statusKnown ? before === "idle" : signedIn);
+        ((f.status === "playing" || f.status === "buffering") &&
+          (statusKnown ? before === "idle" : signedIn)) ||
+        (f.status === "playing" && startBuffering);
       if (started) ((capUntil = clock.now() + CAP_WINDOW_MS), (capped = false));
+      startBuffering = f.status === "buffering" && (started || startBuffering);
       signedIn = false;
       if (f.status === "idle") capNote = undefined;
       statusKnown = true;
@@ -472,6 +477,7 @@ export function spotify(
         queueAsked = false;
         statusKnown = false;
         signedIn = false;
+        startBuffering = false;
         pending?.finish(offline());
         for (const w of [...waiters]) w(); // a write waiting to confirm stops waiting
         seen = undefined;

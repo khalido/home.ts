@@ -14,7 +14,13 @@ import {
   KNOWN_SERVICES,
   matchFound,
 } from "../discover.ts";
-import { browse, daikinFound, FINDERS, findDaikins } from "../finders.ts";
+import {
+  browse,
+  daikinFound,
+  FINDERS,
+  findDaikins,
+  MissingTool,
+} from "../finders.ts";
 import {
   addresses,
   configPathOf,
@@ -83,6 +89,7 @@ export async function discover(o: Options): Promise<void> {
     clock: realClock,
     passes,
     key: (x) => (x.found ? foundKey(x.found) : `${x.what}:${x.name}`),
+    stopOn: (error) => error instanceof MissingTool,
     onPass: (n, added) => {
       if (o.json) return;
       const tty = process.stderr.isTTY;

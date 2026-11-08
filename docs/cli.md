@@ -25,6 +25,7 @@ home spotify pause | play [link] | next | volume <0-100>  # the Soloist speaker 
 ## Output
 
 - **stdout is data, stderr everything else.** Notes such as "nothing to categorise" or "no webhooks" go to stderr, so `home … | jq` never sees them.
+- **Bun on PATH.** The command starts with `#!/usr/bin/env bun`. A non-login SSH shell may not have `~/.bun/bin` on its PATH: run `PATH="$HOME/.bun/bin:$PATH" home`.
 - **`--json` shapes.** `home --json` is one object keyed by connector, with `now` (`energyNow`) first. `home <connector> --json` is that connector's object: `status`, `needs`, `access`, `detail`, `anomaly`, then its state (the weather adds `line`, its text). Lists (`home up transactions`, `uncategorised`, `spend --by merchant`) are arrays, `[]` when empty.
 - **Errors under `--json`** are one object on stderr: `{"error": "…", "code": "usage" | "auth" | "network" | "error", "fix": "home enphase login"}`; `fix` is there only when one command resolves it. In text: `home: <error> (run \`<fix>\`)`.
 - **Exit codes.** 0 success, empty results included. 1 a failure, and `home <connector>` when that connector is not `connected`, so a script can test one. 2 a wrong command, verb or argument. `home` alone lists every connector and exits 0 whatever their state.
