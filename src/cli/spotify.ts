@@ -2,7 +2,7 @@
 // Soloist to answer (at most 5 s), sends the command and closes.
 import { spotify } from "../connectors/spotify/index.ts";
 import type { Part } from "../home.ts";
-import type { SpotifyState } from "../connectors/spotify/index.ts";
+import { type Applied, type SpotifyState, spotifyText } from "../connectors/spotify/index.ts";
 import { env, fail, usage, type Verbs } from "./context.ts";
 
 /** SOLOIST_MAX_VOLUME as a number 0–100, or undefined when unset. */
@@ -33,14 +33,16 @@ async function withSpotify<T>(act: (s: ReturnType<typeof spotify>) => Promise<T>
   }
 }
 
+/** What a write left, in a line: the speaker as Soloist then reported it, or that it has not reported the change yet. */
+const said = ({ state, confirmed }: Applied) => console.log(confirmed ? spotifyText(state) : `sent; Soloist has not reported it yet (${spotifyText(state)})`);
+
 export const spotifyVerbs: Verbs = {
-  pause: () => withSpotify((s) => s.pause()),
-  next: () => withSpotify((s) => s.next()),
-  play: ([link]) => withSpotify((s) => s.play(link)),
+  pause: () => withSpotify((s) => s.pause()).then(said),
+  next: () => withSpotify((s) => s.next()).then(said),
+  play: ([link]) => withSpotify((s) => s.play(link)).then(said),
   async volume([value]) {
     const n = Number(value);
     if (value === undefined || value.trim() === "" || !(n >= 0 && n <= 100)) usage(SPOTIFY_USAGE);
-    const sent = await withSpotify((s) => s.setVolume(n));
-    if (sent !== n) console.log(`set to ${sent} (maxVolume or rounding)`);
+    said(await withSpotify((s) => s.setVolume(n)));
   },
 };

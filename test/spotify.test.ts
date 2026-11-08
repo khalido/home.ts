@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Part } from "../src/index.ts";
 import { manualClock } from "./clock.ts";
-import { manifest, positionMs, spotify, spotifyText, type SocketLike, type SpotifyState, toSpotifyUri } from "../src/connectors/spotify/index.ts";
+import { type Applied, manifest, positionMs, spotify, spotifyText, type SocketLike, type SpotifyState, toSpotifyUri } from "../src/connectors/spotify/index.ts";
+import type { ConnectorError } from "../src/connector.ts";
 import { fold, oddities } from "../src/connectors/spotify/client.ts";
 
 // Against a fake Soloist, frames shaped as the WebSocket API reference shows them (read 2026-11-08). Nothing here has met a real Soloist.
@@ -56,12 +57,15 @@ function setup(config: { maxVolume?: number; url?: string } = {}) {
   const abort = new AbortController();
   const running = s.run(abort.signal, (p) => parts.push(p));
   const last = () => parts.at(-1)!;
-  /** Open the newest socket and say what Soloist says on connect when signed in. */
-  const online = (playback: Record<string, unknown> = {}) => {
+  /** Open the newest socket, say what Soloist says on connect when signed in, answer the get_queue that follows, and let the lane's gap pass. `sent` starts empty. */
+  const online = async (playback: Record<string, unknown> = {}) => {
     const sock = sockets.at(-1)!;
     sock.open();
     sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
     sock.push({ type: "playback_state", status: "idle", item: { uri: "", entity_type: "" }, volume: 40, options: { shuffle: false, repeat: "off" }, ...playback });
+    sock.push({ type: "queue_changed", previous: [], upcoming: [] });
+    await advance(100);
+    sock.sent.length = 0;
     return sock;
   };
   const stop = async () => (abort.abort(), await running);
@@ -148,7 +152,7 @@ describe("the integration", () => {
     const h = setup();
     expect(h.sockets[0]!.url).toBe("ws://127.0.0.1:9091");
     expect(h.parts).toEqual([]);
-    h.online({ status: "paused", item: TRACK });
+    await h.online({ status: "paused", item: TRACK });
     expect(h.last()).toMatchObject({ status: "connected", state: { loggedIn: true, deviceName: "Kitchen", status: "paused", volume: 40, track: { name: "Song A" } } });
     expect(h.last().detail).toBeUndefined();
     h.sockets[0]!.push({ type: "volume_changed", volume: 55 });
@@ -169,7 +173,7 @@ describe("the integration", () => {
     expect(h.sockets).toHaveLength(2);
     await h.advance(1);
     expect(h.sockets).toHaveLength(3);
-    h.online();
+    await h.online();
     expect(h.last().status).toBe("connected");
     await h.stop();
     await h.advance(120_000);
@@ -181,7 +185,7 @@ describe("the integration", () => {
     h.sockets[0]!.close(); // never opened
     await tick();
     await h.advance(1000);
-    h.online({ status: "playing", item: TRACK });
+    await h.online({ status: "playing", item: TRACK });
     h.sockets[1]!.close();
     await tick();
     expect(h.last()).toMatchObject({ status: "disconnected", detail: "Soloist closed the socket", state: { status: "playing", track: { name: "Song A" } } });
@@ -259,7 +263,7 @@ describe("the integration", () => {
 
   test("refresh sends get_state while connected, and reconnects at once while down", async () => {
     const h = setup();
-    const sock = h.online();
+    const sock = await h.online();
     h.s.refresh();
     expect(sock.sent.at(-1)).toEqual({ type: "command", command: "get_state" });
     sock.close();
@@ -273,7 +277,7 @@ describe("the integration", () => {
 
   test("a query waits its turn: its error is not blamed on a write sent after it", async () => {
     const h = setup();
-    const sock = h.online();
+    const sock = await h.online();
     h.s.refresh();
     const paused = h.s.pause();
     expect(sock.commands()).toEqual(["get_state"]);
@@ -283,18 +287,18 @@ describe("the integration", () => {
     await h.advance(100);
     expect(sock.commands()).toEqual(["get_state", "pause"]);
     sock.ack();
-    await paused;
+    sock.push({ type: "playback_changed", status: "paused" });
+    expect((await paused).confirmed).toBe(true);
     await h.stop();
   });
 
   test("a frame the schema rejects is an anomaly; unknown frame types are skipped", async () => {
     const h = setup();
-    const sock = h.online();
+    const sock = await h.online();
     sock.push({ type: "volume_changed", volume: "loud" });
     expect(h.last().anomaly).toBe("a volume_changed the schema did not recognise");
     expect(h.last().state?.volume).toBe(40);
     const n = h.parts.length;
-    sock.push({ type: "queue_changed", previous: [], upcoming: [] });
     sock.push({ type: "something_new" });
     expect(h.parts.length).toBe(n);
     sock.push({ type: "volume_changed", volume: 120 });
@@ -310,39 +314,66 @@ describe("the integration", () => {
 });
 
 describe("writes", () => {
-  test("each command's frame, resolved by its command_result", async () => {
+  /** A write, the lane's gap, Soloist's command_result, then `events` (what Soloist reports after). Returns the write's result and the frame sent. */
+  async function sent(h: Awaited<ReturnType<typeof setup>>, sock: FakeSocket, call: () => Promise<Applied>, ...events: Record<string, unknown>[]) {
+    const p = call();
+    await h.advance(100);
+    const frame = sock.ack();
+    await tick();
+    for (const e of events) sock.push(e);
+    return { frame, result: await p };
+  }
+
+  test("each command's frame, resolved once Soloist reports the change", async () => {
     const h = setup();
-    const sock = h.online();
-    const cases: [() => Promise<unknown>, Record<string, unknown>][] = [
-      [() => h.s.play("https://open.spotify.com/album/alb1?si=1"), { command: "play", uri: "spotify:album:alb1" }],
-      [() => h.s.play(), { command: "play" }],
-      [() => h.s.resume(), { command: "play" }],
-      [() => h.s.pause(), { command: "pause" }],
-      [() => h.s.next(), { command: "skip_next" }],
-      [() => h.s.prev(), { command: "skip_prev" }],
-      [() => h.s.seek(30_000), { command: "seek", position_ms: 30_000 }],
-      [() => h.s.setVolume(50), { command: "set_volume", volume: 50 }],
-      [() => h.s.queue("spotify:track:t1"), { command: "add_to_queue", uri: "spotify:track:t1" }],
-      [() => h.s.setShuffle(true), { command: "set_shuffle", enabled: true }],
+    const sock = await h.online({ status: "paused", item: TRACK, position: { position_ms: 50_000, timestamp_ms: 0, speed: 0 } });
+    const other = entity("spotify:track:other", "Song B");
+    const cases: [() => Promise<Applied>, Record<string, unknown>, Record<string, unknown>[]][] = [
+      [() => h.s.play("https://open.spotify.com/album/alb1?si=1"), { command: "play", uri: "spotify:album:alb1" }, [{ type: "context_changed", context: entity("spotify:album:alb1", "Album A") }, { type: "playback_changed", status: "playing" }]],
+      [() => h.s.pause(), { command: "pause" }, [{ type: "playback_changed", status: "paused" }]],
+      [() => h.s.resume(), { command: "play" }, [{ type: "playback_changed", status: "playing" }]],
+      [() => h.s.next(), { command: "skip_next" }, [{ type: "track_changed", item: other }]],
+      [() => h.s.prev(), { command: "skip_prev" }, [{ type: "track_changed", item: TRACK }]],
+      [() => h.s.seek(30_000), { command: "seek", position_ms: 30_000 }, [{ type: "position_sync", position: { position_ms: 30_010, timestamp_ms: 1, speed: 1 } }]],
+      [() => h.s.setVolume(50), { command: "set_volume", volume: 50 }, [{ type: "volume_changed", volume: 50 }]],
+      [() => h.s.queue("spotify:track:t1"), { command: "add_to_queue", uri: "spotify:track:t1" }, [{ type: "queue_changed", upcoming: [{ uid: "q1", source: "queue", item: entity("spotify:track:t1", "Queued") }] }]],
+      [() => h.s.setShuffle(true), { command: "set_shuffle", enabled: true }, [{ type: "options_changed", options: { shuffle: true, repeat: "off" } }]],
     ];
-    for (const [call, frame] of cases) {
-      const p = call();
-      await h.advance(100); // the lane's gap
-      expect(sock.ack()).toEqual({ type: "command", ...frame });
-      await p;
+    for (const [call, frame, events] of cases) {
+      const r = await sent(h, sock, call, ...events);
+      expect(r.frame).toEqual({ type: "command", ...frame });
+      expect(r.result.confirmed).toBe(true);
     }
+    expect(h.last().state).toMatchObject({ status: "playing", volume: 50, shuffle: true, upNext: [{ uri: "spotify:track:t1", name: "Queued" }] });
     await h.stop();
   });
 
-  test("Soloist's error rejects the command in flight; offline and bad input reject without sending", async () => {
+  test("a change Soloist never reports resolves after 2 s, unconfirmed, with the state as it stands", async () => {
     const h = setup();
-    await expect(h.s.pause()).rejects.toThrow("Soloist is not connected at ws://127.0.0.1:9091");
-    const sock = h.online();
+    const sock = await h.online({ volume: 40 });
+    const p = h.s.setVolume(70);
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    await h.advance(1999);
+    let done = false;
+    void p.then(() => (done = true));
+    await tick();
+    expect(done).toBe(false);
+    await h.advance(1);
+    expect(await p).toMatchObject({ confirmed: false, state: { volume: 40 } });
+    await h.stop();
+  });
+
+  test("Soloist's error rejects the command in flight; offline and bad input reject without sending, each with a code", async () => {
+    const h = setup();
+    await expect(h.s.pause()).rejects.toMatchObject({ code: "offline", message: "Soloist is not connected at ws://127.0.0.1:9091" });
     await h.advance(100); // the refused pause still took its turn in the lane
+    const sock = await h.online();
     const p = h.s.next();
     sock.push({ type: "error", message: "command requires authentication" });
-    await expect(p).rejects.toThrow("Soloist refused skip_next: command requires authentication");
-    await expect(h.s.play("friday")).rejects.toThrow("not a Spotify link");
+    await expect(p).rejects.toMatchObject({ code: "refused", message: "Soloist refused skip_next: command requires authentication" });
+    await expect(h.s.play("friday")).rejects.toMatchObject({ code: "invalid" });
     await expect(h.s.queue("spotify:album:alb1")).rejects.toThrow("only a Spotify track");
     await expect(h.s.setVolume(120)).rejects.toThrow("0–100");
     await expect(h.s.seek(-1)).rejects.toThrow("0 or more");
@@ -352,7 +383,7 @@ describe("writes", () => {
 
   test("an error with nothing waiting is an anomaly", async () => {
     const h = setup();
-    const sock = h.online();
+    const sock = await h.online();
     sock.push({ type: "error", message: "something went wrong" });
     expect(h.last().anomaly).toBe("Soloist said: something went wrong");
     await h.stop();
@@ -360,51 +391,163 @@ describe("writes", () => {
 
   test("a command with no answer times out after 3 s; a drop fails it at once", async () => {
     const h = setup();
-    const sock = h.online();
-    const p = h.s.pause();
-    const caught = p.catch((e: Error) => e.message);
+    const sock = await h.online();
+    const caught = h.s.pause().catch((e: ConnectorError) => [e.code, e.message]);
     await h.advance(3000);
-    expect(await caught).toBe("Soloist did not answer pause in 3 s");
+    expect(await caught).toEqual(["timeout", "Soloist did not answer pause in 3 s"]);
     await h.advance(100);
     const q = h.s.next();
     sock.close();
-    await expect(q).rejects.toThrow("not connected");
+    await expect(q).rejects.toMatchObject({ code: "offline" });
     await h.stop();
   });
 
-  test("a requested volume is held to maxVolume and rounded; the volume sent comes back", async () => {
+  test("a requested volume is held to maxVolume and rounded; state.volume is what Soloist reported", async () => {
     const h = setup({ maxVolume: 60 });
-    const sock = h.online();
-    const p = h.s.setVolume(90);
-    expect(sock.ack()).toMatchObject({ command: "set_volume", volume: 60 });
-    expect(await p).toBe(60);
-    await h.advance(100);
-    const q = h.s.setVolume(33.4);
-    expect(sock.ack()).toMatchObject({ volume: 33 });
-    expect(await q).toBe(33);
+    const sock = await h.online();
+    const a = await sent(h, sock, () => h.s.setVolume(90), { type: "volume_changed", volume: 60 });
+    expect(a.frame).toMatchObject({ command: "set_volume", volume: 60 });
+    expect(a.result).toMatchObject({ confirmed: true, state: { volume: 60 } });
+    const b = await sent(h, sock, () => h.s.setVolume(33.4), { type: "volume_changed", volume: 33 });
+    expect(b.frame).toMatchObject({ volume: 33 });
     await h.stop();
   });
 
-  test("the lane: volumes waiting merge to the last; two skips stay two", async () => {
+  test("the lane: volumes waiting merge to the last, and each confirms on its own value; two skips stay two", async () => {
     const h = setup();
-    const sock = h.online();
+    const sock = await h.online({ item: TRACK });
     const a = h.s.setVolume(10);
     const b = h.s.setVolume(20);
     const c = h.s.setVolume(30);
     sock.ack();
+    sock.push({ type: "volume_changed", volume: 10 });
     await a;
     await h.advance(100);
     expect(sock.ack()).toMatchObject({ volume: 30 });
-    expect(await Promise.all([b, c])).toEqual([20, 30]); // each resolves with what it asked for; the device got 30
+    sock.push({ type: "volume_changed", volume: 30 });
+    expect((await c).confirmed).toBe(true);
+    await h.advance(2000);
+    expect((await b).confirmed).toBe(false); // it asked for 20; the device got 30
     await h.advance(100);
     const n1 = h.s.next();
     const n2 = h.s.next();
     sock.ack();
+    sock.push({ type: "track_changed", item: entity("spotify:track:b", "B") });
     await n1;
     await h.advance(100);
     sock.ack();
+    sock.push({ type: "track_changed", item: entity("spotify:track:c", "C") });
     await n2;
     expect(sock.commands()).toEqual(["set_volume", "set_volume", "skip_next", "skip_next"]);
+    await h.stop();
+  });
+
+  test("the queue: asked for once on connect, then kept from queue_changed", async () => {
+    const h = setup();
+    const sock = h.sockets[0]!;
+    sock.open();
+    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({ type: "playback_state", status: "playing", item: TRACK });
+    expect(sock.sent).toEqual([{ type: "command", command: "get_queue", limit: 10 }]);
+    sock.push({ type: "queue_changed", previous: [], upcoming: [{ uid: "1", source: "context", item: entity("spotify:track:n", "Next") }, { uid: "2", item: { uri: "" } }] });
+    expect(h.last().state?.upNext).toEqual([{ uri: "spotify:track:n", type: "track", name: "Next", artists: [] }]);
+    sock.push({ type: "playback_state", status: "playing", item: TRACK });
+    expect(sock.commands()).toEqual(["get_queue"]);
+    await h.stop();
+  });
+});
+
+describe("confirming", () => {
+  test("a pause merged into a later play never confirms the pause; the play confirms", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK });
+    const first = h.s.setVolume(50); // holds the lane, so the next two wait together
+    const pause = h.s.pause();
+    const play = h.s.play();
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 50 });
+    await first;
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ command: "play" });
+    await tick();
+    await h.advance(2000);
+    expect((await play).confirmed).toBe(true); // already playing
+    expect((await pause).confirmed).toBe(false);
+    await h.stop();
+  });
+
+  test("prev: a position update early in the track is not a prev; a restart from 5 s in is", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, position: { position_ms: 1000, timestamp_ms: 0, speed: 1 } });
+    const early = h.s.prev();
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    sock.push({ type: "position_sync", position: { position_ms: 1200, timestamp_ms: 100, speed: 1 } });
+    await h.advance(2000);
+    expect((await early).confirmed).toBe(false);
+    sock.push({ type: "position_sync", position: { position_ms: 40_000, timestamp_ms: 2100, speed: 1 } });
+    const late = h.s.prev();
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    sock.push({ type: "position_sync", position: { position_ms: 0, timestamp_ms: 2200, speed: 1 } });
+    expect((await late).confirmed).toBe(true);
+    await h.stop();
+  });
+
+  test("next at the end of the queue confirms on idle", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK });
+    const p = h.s.next();
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    sock.push({ type: "playback_state", status: "idle", item: { uri: "" } });
+    expect((await p).confirmed).toBe(true);
+    await h.stop();
+  });
+
+  test("the first-play cap's write confirms on its own volume, not at once", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "playing" });
+    const v = h.s.setVolume(30); // merges into the cap's waiting write? no: the cap's is in flight; this waits behind it
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 60 });
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ volume: 30 });
+    sock.push({ type: "volume_changed", volume: 30 });
+    expect(await v).toMatchObject({ confirmed: true, state: { volume: 30 } });
+    await h.stop();
+  });
+
+  test("a get_queue Soloist doesn't answer holds the lane 1 s, quietly", async () => {
+    const h = setup();
+    const sock = h.sockets[0]!;
+    sock.open();
+    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40 });
+    const v = h.s.setVolume(20);
+    await h.advance(1000);
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["get_queue", "set_volume"]);
+    expect(h.last().anomaly).toBeUndefined();
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 20 });
+    await v;
+    await h.stop();
+  });
+
+  test("a drop during the wait ends it early, unconfirmed", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK });
+    const p = h.s.pause();
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    sock.close();
+    expect((await p).confirmed).toBe(false);
     await h.stop();
   });
 });
@@ -412,7 +555,7 @@ describe("writes", () => {
 describe("the first play's volume (Soloist issue #23)", () => {
   test("idle → playing above the cap is lowered to it, once, and said in anomaly", async () => {
     const h = setup({ maxVolume: 60 });
-    const sock = h.online({ volume: 100 });
+    const sock = await h.online({ volume: 100 });
     sock.push({ type: "playback_changed", status: "playing" });
     expect(sock.sent).toEqual([{ type: "command", command: "set_volume", volume: 60 }]);
     expect(h.last().anomaly).toBe("started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)");
@@ -435,13 +578,15 @@ describe("the first play's volume (Soloist issue #23)", () => {
     expect(sock.commands()).toEqual(["get_state"]);
     sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 100 });
     await h.advance(100);
+    sock.push({ type: "queue_changed", upcoming: [] }); // the get_queue that follows a first playback_state
+    await h.advance(100);
     expect(sock.sent.at(-1)).toEqual({ type: "command", command: "set_volume", volume: 60 });
     await h.stop();
   });
 
   test("also when the volume arrives after the status", async () => {
     const h = setup({ maxVolume: 60 });
-    const sock = h.online({ volume: 30 });
+    const sock = await h.online({ volume: 30 });
     sock.push({ type: "playback_changed", status: "playing" });
     expect(sock.sent).toEqual([]);
     sock.push({ type: "volume_changed", volume: 100 });
@@ -451,7 +596,7 @@ describe("the first play's volume (Soloist issue #23)", () => {
 
   test("not resuming from pause, not after the window, not connecting mid-song, not without a cap", async () => {
     const h = setup({ maxVolume: 60 });
-    const sock = h.online({ status: "paused", volume: 90 });
+    const sock = await h.online({ status: "paused", volume: 90 });
     sock.push({ type: "playback_changed", status: "playing" });
     expect(sock.sent).toEqual([]);
     sock.push({ type: "playback_changed", status: "idle" });
@@ -463,11 +608,11 @@ describe("the first play's volume (Soloist issue #23)", () => {
     await h.stop();
 
     const mid = setup({ maxVolume: 60 });
-    expect(mid.online({ status: "playing", volume: 90 }).sent).toEqual([]);
+    expect((await mid.online({ status: "playing", volume: 90 })).sent).toEqual([]);
     await mid.stop();
 
     const free = setup();
-    const s = free.online({ volume: 100 });
+    const s = await free.online({ volume: 100 });
     s.push({ type: "playback_changed", status: "playing" });
     expect(s.sent).toEqual([]);
     await free.stop();
@@ -477,9 +622,10 @@ describe("the first play's volume (Soloist issue #23)", () => {
 describe("interrupt", () => {
   test("pauses, runs fn once the pause shows, then resumes", async () => {
     const h = setup();
-    const sock = h.online({ status: "playing", item: TRACK });
+    const sock = await h.online({ status: "playing", item: TRACK });
     const order: string[] = [];
     const done = h.s.interrupt(async () => (order.push("announce"), "said"));
+    await tick(); // an aside starts on the next turn
     expect(sock.ack()).toMatchObject({ command: "pause" });
     await tick();
     expect(order).toEqual([]);
@@ -488,76 +634,195 @@ describe("interrupt", () => {
     expect(order).toEqual(["announce"]);
     await h.advance(100);
     expect(sock.ack()).toMatchObject({ command: "play" });
-    expect(await done).toBe("said");
+    sock.push({ type: "playback_changed", status: "playing" });
+    expect(await done).toEqual({ value: "said", music: "restored" });
     expect(sock.commands()).toEqual(["pause", "play"]);
     await h.stop();
   });
 
   test("resumes even when fn throws", async () => {
     const h = setup();
-    const sock = h.online({ status: "playing", item: TRACK });
+    const sock = await h.online({ status: "playing", item: TRACK });
     const caught = h.s.interrupt(() => Promise.reject(new Error("chime failed"))).catch((e: Error) => e.message);
+    await tick(); // an aside starts on the next turn
     sock.ack();
-    await tick();
     sock.push({ type: "playback_changed", status: "paused" });
     await h.advance(100);
     sock.ack();
+    sock.push({ type: "playback_changed", status: "playing" });
     expect(await caught).toBe("chime failed");
     expect(sock.commands()).toEqual(["pause", "play"]);
     await h.stop();
   });
 
-  test("runs fn after 2 s if the pause never shows", async () => {
+  test("someone resuming or skipping from a phone meanwhile keeps their choice", async () => {
     const h = setup();
-    const sock = h.online({ status: "playing", item: TRACK });
+    const sock = await h.online({ status: "playing", item: TRACK });
+    const a = h.s.interrupt(() => sock.push({ type: "playback_changed", status: "playing" }));
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "playback_changed", status: "paused" });
+    expect(await a).toEqual({ value: undefined, music: "kept", why: "someone changed it meanwhile: it is playing" });
+    await h.advance(100);
+    const b = h.s.interrupt(() => sock.push({ type: "track_changed", item: entity("spotify:track:other", "Other") }));
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "playback_changed", status: "paused" });
+    expect(await b).toMatchObject({ music: "kept", why: "the track changed meanwhile" });
+    expect(sock.commands()).toEqual(["pause", "pause"]);
+    await h.stop();
+  });
+
+  test("runs fn after 2 s if the pause never shows, and then does not resume", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK });
     let ran = false;
     const done = h.s.interrupt(() => (ran = true));
+    await tick(); // an aside starts on the next turn
     sock.ack();
     await tick();
     await h.advance(1999);
     expect(ran).toBe(false);
     await h.advance(1);
     expect(ran).toBe(true);
-    sock.ack();
-    await done;
+    expect(await done).toMatchObject({ music: "kept", why: "Soloist never reported the pause" });
     await h.stop();
   });
 
-  test("a failed pause still runs fn, without a resume, and says so in detail", async () => {
+  test("a failed pause still runs fn, without a resume, and says so in detail and the result", async () => {
     const h = setup();
-    const sock = h.online({ status: "playing", item: TRACK });
+    const sock = await h.online({ status: "playing", item: TRACK });
     const p = h.s.interrupt(() => "a");
+    await tick(); // an aside starts on the next turn
     sock.push({ type: "error", message: "command requires authentication" });
-    expect(await p).toBe("a");
+    const why = "pause before interrupt failed: Soloist refused pause: command requires authentication";
+    expect(await p).toEqual({ value: "a", music: "untouched", why });
     expect(sock.commands()).toEqual(["pause"]);
-    expect(h.last().detail).toBe("pause before interrupt failed: Soloist refused pause: command requires authentication");
+    expect(h.last().detail).toBe(why);
     await h.stop();
   });
 
   test("a failed write's detail clears on the next write that works", async () => {
     const h = setup();
-    const sock = h.online({ status: "playing", item: TRACK });
+    const sock = await h.online({ status: "playing", item: TRACK });
     const p = h.s.interrupt(() => "a");
+    await tick(); // an aside starts on the next turn
     sock.push({ type: "error", message: "busy" });
     await p;
     expect(h.last().detail).toContain("pause before interrupt failed");
     const v = h.s.setVolume(30);
     await h.advance(100);
     sock.ack();
-    await v;
     sock.push({ type: "volume_changed", volume: 30 });
+    await v;
     expect(h.last().detail).toBeUndefined();
     await h.stop();
   });
 
   test("not playing, or not connected: just runs fn", async () => {
     const h = setup();
-    const sock = h.online({ status: "paused", item: TRACK });
-    expect(await h.s.interrupt(() => 42)).toBe(42);
+    const sock = await h.online({ status: "paused", item: TRACK });
+    expect(await h.s.interrupt(() => 42)).toEqual({ value: 42, music: "untouched", why: "it was not playing" });
     expect(sock.sent).toEqual([]);
     sock.push({ type: "playback_changed", status: "playing" });
     sock.close();
-    expect(await h.s.interrupt(() => 43)).toBe(43);
+    expect(await h.s.interrupt(() => 43)).toEqual({ value: 43, music: "untouched", why: "Soloist is not connected" });
+    await h.stop();
+  });
+});
+
+describe("duck", () => {
+  test("lowers the volume while fn runs, then puts the earlier one back", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
+    const order: string[] = [];
+    const done = h.s.duck(() => order.push(`announce at ${h.last().state?.volume}`), { to: 20 });
+    await tick(); // an aside starts on the next turn
+    expect(sock.ack()).toMatchObject({ command: "set_volume", volume: 20 });
+    sock.push({ type: "volume_changed", volume: 20 });
+    await tick();
+    expect(order).toEqual(["announce at 20"]);
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ command: "set_volume", volume: 70 });
+    sock.push({ type: "volume_changed", volume: 70 });
+    expect(await done).toEqual({ value: 1, music: "restored" });
+    await h.stop();
+  });
+
+  test("restores above maxVolume when that is where it was: the cap is for requests", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 80 });
+    const done = h.s.duck(() => "x", { to: 20 });
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 20 });
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ volume: 80 });
+    sock.push({ type: "volume_changed", volume: 80 });
+    expect((await done).music).toBe("restored");
+    await h.stop();
+  });
+
+  test("someone setting the volume meanwhile keeps it", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
+    const done = h.s.duck(() => sock.push({ type: "volume_changed", volume: 45 }), { to: 20 });
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 20 });
+    expect(await done).toEqual({ value: undefined, music: "kept", why: "someone set the volume to 45 meanwhile" });
+    expect(sock.commands()).toEqual(["set_volume"]);
+    await h.stop();
+  });
+
+  test("restores even when fn throws", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
+    const caught = h.s.duck(() => Promise.reject(new Error("chime failed")), { to: 20 }).catch((e: Error) => e.message);
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 20 });
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ volume: 70 });
+    sock.push({ type: "volume_changed", volume: 70 });
+    expect(await caught).toBe("chime failed");
+    await h.stop();
+  });
+
+  test("not playing, already quiet, or a bad level: just fn, or refused", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 15 });
+    expect(await h.s.duck(() => 1, { to: 20 })).toEqual({ value: 1, music: "untouched", why: "it was already at 15" });
+    sock.push({ type: "playback_changed", status: "paused" });
+    expect(await h.s.duck(() => 2, { to: 5 })).toEqual({ value: 2, music: "untouched", why: "it was not playing" });
+    await expect(h.s.duck(() => 3, { to: 140 })).rejects.toMatchObject({ code: "invalid" });
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("one aside at a time: a duck during an interrupt waits for it", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
+    const order: string[] = [];
+    const first = h.s.interrupt(() => order.push("interrupt"));
+    await tick(); // an aside starts on the next turn
+    const second = h.s.duck(() => order.push("duck"), { to: 20 });
+    await tick(); // an aside starts on the next turn
+    sock.ack();
+    sock.push({ type: "playback_changed", status: "paused" });
+    await h.advance(100);
+    sock.ack();
+    sock.push({ type: "playback_changed", status: "playing" });
+    await first;
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ command: "set_volume", volume: 20 });
+    sock.push({ type: "volume_changed", volume: 20 });
+    await h.advance(100);
+    sock.ack();
+    sock.push({ type: "volume_changed", volume: 70 });
+    await second;
+    expect(order).toEqual(["interrupt", "duck"]);
+    expect(sock.commands()).toEqual(["pause", "play", "set_volume", "set_volume"]);
     await h.stop();
   });
 });

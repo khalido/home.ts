@@ -4,7 +4,7 @@ import { ConnectorError, errorText } from "../../connector.ts";
 import type { Integration, Part, Status } from "../../home.ts";
 import { writeLane } from "../../lane.ts";
 import type { Manifest } from "../../manifest.ts";
-import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri } from "./client.ts";
+import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, positionMs, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri } from "./client.ts";
 
 export { positionMs, type PositionAnchor, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri, type Track } from "./client.ts";
 
@@ -28,33 +28,61 @@ export type SpotifyConfig = {
   clock?: Clock;
 };
 
-/** The writes, on the object `spotify()` returns. Each resolves when Soloist accepts the command (`command_result`): sent, not yet applied; the state follows. */
+/** What a write left: the state once Soloist reported the change (`confirmed`), or the state as it stood when `CONFIRM_MS` ran out without it. */
+export type Applied = { state: SpotifyState; confirmed: boolean };
+
+/**
+ * What happened to the music around `duck` or `interrupt`'s `fn`: `untouched` (it was not playing, not connected, already
+ * quiet, or the pause or lowering failed, so `fn` ran over it), `restored` (put back as it was), `kept` (someone changed it
+ * meanwhile, or the pause never showed: left as it is) or `failed` (the resume or restore failed or Soloist has not
+ * reported it, so the music may be left paused or quiet). `why` says which, except for `restored`.
+ */
+export type Music = "untouched" | "restored" | "kept" | "failed";
+export type Aside<T> = { value: T; music: Music; why?: string };
+
+/**
+ * The writes, on the object `spotify()` returns. Each resolves once Soloist reports the change it asked for, with the state
+ * then (`confirmed: true`), or after `CONFIRM_MS` with the state as it stands (`confirmed: false`). Each rejects with a
+ * `ConnectorError` whose `code` is `offline`, `waiting` (nobody has picked the speaker), `refused`, `timeout` or `invalid`.
+ */
 export type SpotifyActions = {
-  /** Play a Spotify link or URI (track, album, playlist, episode), or resume what is loaded when none is given. */
-  play(linkOrUri?: string): Promise<void>;
-  pause(): Promise<void>;
-  resume(): Promise<void>;
-  next(): Promise<void>;
-  prev(): Promise<void>;
+  /** Play a Spotify link or URI (track, album, playlist, artist, episode, show), or resume what is loaded when none is given. */
+  play(linkOrUri?: string): Promise<Applied>;
+  pause(): Promise<Applied>;
+  resume(): Promise<Applied>;
+  next(): Promise<Applied>;
+  prev(): Promise<Applied>;
   /** Jump to a position in the current track, in ms. */
-  seek(ms: number): Promise<void>;
-  /** Set the volume 0–100, held to `maxVolume` and rounded to a whole percent. Resolves to the volume sent. */
-  setVolume(volume: number): Promise<number>;
-  /** Add a track to the queue: Soloist queues tracks only. */
-  queue(track: string): Promise<void>;
-  setShuffle(on: boolean): Promise<void>;
-  /** Pause if playing, run `fn`, then resume, even if `fn` throws. Not playing (or not connected): just run `fn`. For "pause the music, say this, carry on". */
-  interrupt<T>(fn: () => Promise<T> | T): Promise<T>;
+  seek(ms: number): Promise<Applied>;
+  /** Set the volume 0–100, held to `maxVolume` and rounded to a whole percent: `state.volume` is what Soloist then reports. */
+  setVolume(volume: number): Promise<Applied>;
+  /** Add a track to the queue (Soloist queues tracks only); confirmed when it shows in `upNext`. */
+  queue(track: string): Promise<Applied>;
+  setShuffle(on: boolean): Promise<Applied>;
+  /**
+   * Pause if playing, run `fn`, then resume, unless someone changed it meanwhile (resumed, stopped or skipped it from a
+   * phone): then it is theirs and stays. The resume runs even if `fn` throws. Not playing or not connected: just `fn`.
+   * One `interrupt` or `duck` at a time; a second waits for the first, so never call either from inside `fn` (it would wait
+   * forever). Two announcements back to back belong in one `fn`, or the music comes back between them.
+   */
+  interrupt<T>(fn: () => Promise<T> | T): Promise<Aside<T>>;
+  /**
+   * Lower the volume to `to` while `fn` runs, then put the earlier volume back, unless someone set the volume meanwhile.
+   * For a short announcement over the music. Not playing, not connected or already at `to` or below: just `fn`.
+   */
+  duck<T>(fn: () => Promise<T> | T, options: { to: number }): Promise<Aside<T>>;
 };
 
 /** How long a command waits for Soloist's answer. Loopback answers in milliseconds; a stated guess. */
 const COMMAND_TIMEOUT_MS = 3000;
+/** How long a query holds the lane for its answer: a query Soloist doesn't answer (an empty queue may send nothing) shouldn't hold the writes behind it long. */
+const QUERY_TIMEOUT_MS = 1000;
 /** A socket that has said nothing this long after opening is closed: Soloist sends `auth_state` at once on connect. */
 const HELLO_MS = 10_000;
 /** After an idle → playing change, a volume above the cap is lowered for this long: the volume can come before or after the status (issue #23). */
 const CAP_WINDOW_MS = 10_000;
-/** How long `interrupt` waits for the pause to show before running `fn`. */
-const PAUSE_WAIT_MS = 2000;
+/** How long a write waits for Soloist to report the change it asked for. Loopback events arrive in milliseconds; a stated guess. */
+const CONFIRM_MS = 2000;
 /** Between two commands. Soloist publishes no limit; it is on loopback; a stated guess. */
 const WRITE_GAP_MS = 100;
 const MIN_BACKOFF_MS = 1000;
@@ -82,6 +110,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   let whole = false; // signed in, the first playback_state has come too (or HELLO_MS passed): a one-shot read sees the track
   let down: string | undefined; // why the last socket ended, while there is none open
   let statusKnown = false; // Soloist has told this socket its status: only then is idle → playing an edge
+  let queueAsked = false; // get_queue sent on this socket
   let signedIn = false; // signed out → in on this socket: the first status after it counts as a start if it is playing
   let capUntil = -Infinity;
   let capped = false; // the cap has been sent in this window
@@ -118,7 +147,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     new Promise<void>((resolve, reject) => {
       const s = socket;
       if (!s || !open || s.readyState !== OPEN) return reject(offline());
-      if (state.loggedIn === false && !answers) return reject(new ConnectorError(NOT_SIGNED_IN, { code: "logged-out" }));
+      if (state.loggedIn === false && !answers) return reject(new ConnectorError(NOT_SIGNED_IN, { code: "waiting" }));
       const stop = new AbortController();
       const p = {
         command: name,
@@ -134,17 +163,42 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       };
       pending = p;
       s.send(commandFrame(name, fields));
-      void clock.sleep(COMMAND_TIMEOUT_MS, stop.signal).then(() => stop.signal.aborted || p.finish(new ConnectorError(`Soloist did not answer ${name} in ${COMMAND_TIMEOUT_MS / 1000} s`, { code: "timeout" })));
+      const ms = answers ? QUERY_TIMEOUT_MS : COMMAND_TIMEOUT_MS;
+      void clock.sleep(ms, stop.signal).then(() => stop.signal.aborted || p.finish(new ConnectorError(`Soloist did not answer ${name} in ${ms / 1000} s`, { code: "timeout" })));
     });
 
-  type Body = { command: string; fields?: Record<string, unknown>; answers?: string };
-  const send = (body: Body) => command(body.command, body.fields, body.answers);
+  /** A command, and for a write how to tell it took: `took(now, before, at)`, `before` the state and `at` the time it was sent. */
+  type Body = { command: string; fields?: Record<string, unknown>; answers?: string; took?: (now: SpotifyState, before: SpotifyState, at: number) => boolean };
+  const send = async (body: Body) => {
+    const before = state;
+    const at = clock.now();
+    await command(body.command, body.fields, body.answers);
+    return { before, at };
+  };
   let once = 0; // skips and queued tracks never merge: two nexts are two skips
   const write = (slot: string, body: Body) => lane.send(slot, body, send);
-  /** Ask Soloist for its state, through the lane; queries merge into one. A refusal is an anomaly, a drop is the status's to say. */
-  const query = (name: "get_state" | "get_auth_state") =>
-    void write("query", { command: name, answers: name === "get_state" ? "playback_state" : "auth_state" }).catch((error) => {
-      if (error instanceof ConnectorError && error.code === "offline") return;
+  /**
+   * A write through the lane, resolved once the state shows that this caller's own change took, or `CONFIRM_MS` after
+   * Soloist accepted the command that carried it (a merged write's may be another's: a pause merged into a later play never
+   * confirms). A drop ends the wait early, unconfirmed.
+   */
+  const change = async (slot: string, body: Body): Promise<Applied> => {
+    const sent = await write(slot, body);
+    const took = () => body.took?.(state, sent.before, sent.at) ?? true;
+    await waitFor(() => took() || !open, CONFIRM_MS);
+    return { state, confirmed: took() };
+  };
+  /** The track restarted: a new anchor near 0 when it had been 5 s or more in (a prev past the first seconds, a next on repeat-track). */
+  const restarted = (s: SpotifyState, b: SpotifyState, at: number) => s.position !== b.position && (s.position?.ms ?? Infinity) < 5000 && (positionMs(b, at) ?? 0) >= 5000;
+  const newTrack = (s: SpotifyState, b: SpotifyState) => !!s.track && s.track.uri !== b.track?.uri;
+  const invalid = (message: string) => new ConnectorError(message, { code: "invalid" });
+  const volumeTo = (v: number) => change("volume", { command: "set_volume", fields: { volume: v }, took: (s) => s.volume === v });
+  /** Ask Soloist for something, through the lane; the same query twice merges. A refusal is an anomaly, a drop is the status's to say. */
+  const ANSWERS = { get_state: "playback_state", get_auth_state: "auth_state", get_queue: "queue_changed" } as const;
+  const query = (name: keyof typeof ANSWERS, fields?: Record<string, unknown>) =>
+    void write(`query-${name}`, { command: name, fields, answers: ANSWERS[name] }).catch((error) => {
+      // A drop is the status's to say; an unanswered get_queue may just be an empty queue (unverified).
+      if (error instanceof ConnectorError && (error.code === "offline" || (error.code === "timeout" && name === "get_queue"))) return;
       frameNote = `${name} failed: ${errorText(error)}`;
       publish();
     });
@@ -154,7 +208,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     if (cap === undefined || capped || state.volume === undefined || clock.now() > capUntil || state.volume <= cap) return;
     capped = true;
     capNote = `started at volume ${state.volume}, above maxVolume ${cap}; lowered it (Soloist issue #23)`;
-    write("volume", { command: "set_volume", fields: { volume: cap } }).catch((error) => ((note = `lowering the volume to ${cap} failed: ${errorText(error)}`), publish()));
+    change("volume", { command: "set_volume", fields: { volume: cap }, took: (s) => s.volume === cap }).catch((error) => ((note = `lowering the volume to ${cap} failed: ${errorText(error)}`), publish()));
   };
 
   const handle = (data: unknown) => {
@@ -165,7 +219,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       return;
     }
     const type = (raw as { type?: unknown } | null)?.type;
-    if (typeof type !== "string" || !FRAME_TYPES.has(type)) return; // queue_changed and anything new: not read here
+    if (typeof type !== "string" || !FRAME_TYPES.has(type)) return; // anything new: not read here
     const parsed = Frame.safeParse(raw);
     if (!parsed.success) return (frameNote = `a ${type} the schema did not recognise`), publish();
     const f = parsed.data;
@@ -186,7 +240,10 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       // A first sign-in (someone picked the speaker) sends only auth_state; the docs don't promise a playback_state after it.
       else if (f.logged_in === true && wasSignedIn === false) (signedIn = true), query("get_state");
     }
-    if (f.type === "playback_state") whole = true;
+    if (f.type === "playback_state") {
+      if (!queueAsked) (queueAsked = true), query("get_queue", { limit: 10 }); // queue_changed pushes changes only, so ask once per socket
+      whole = true;
+    }
     if (pending?.answers === f.type) pending.finish();
     if ((f.type === "playback_state" || f.type === "playback_changed") && f.status !== undefined) {
       // A start is idle → playing, or a sign-in whose first status is playing: a phone picked the speaker and played (issue #23).
@@ -223,9 +280,11 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
         open = false;
         heard = false;
         whole = false;
+        queueAsked = false;
         statusKnown = false;
         signedIn = false;
         pending?.finish(offline());
+        for (const w of [...waiters]) w(); // a write waiting to confirm stops waiting
         resolve({ why: was ? why : `nothing answered at ${url}`, opened: was });
       };
       const stop = () => (end("stopped"), s.close());
@@ -255,50 +314,114 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     waiters.delete(check);
   };
 
+  /** Not connected or not playing: the reason `duck` and `interrupt` just run `fn`. */
+  const notPlaying = () => (!open ? "Soloist is not connected" : state.status === "playing" || state.status === "buffering" ? undefined : "it was not playing");
+  /** A write the integration made itself that failed: in `detail`, and the reason returned. */
+  const failed = (why: string) => ((note = why), publish(), why);
+  let asides: Promise<unknown> = Promise.resolve();
+  /**
+   * Run `fn` between `enter` and `leave`, one aside at a time. `enter` returns why it changed nothing (then `fn` just runs);
+   * `leave` puts things back, or says why not, and runs even if `fn` throws.
+   */
+  const aside = <T>(fn: () => Promise<T> | T, enter: () => Promise<string | undefined>, leave: () => Promise<Left>) => {
+    const run = async (): Promise<Aside<T>> => {
+      const skipped = await enter();
+      if (skipped) return { value: await fn(), music: "untouched", why: skipped };
+      let value: T;
+      try {
+        value = await fn();
+      } catch (error) {
+        await leave(); // its outcome is in `detail` when it fails; the error is fn's
+        throw error;
+      }
+      return { value, ...(await leave()) };
+    };
+    const p = asides.then(run, run);
+    asides = p.catch(() => {});
+    return p;
+  };
+  type Left = Omit<Aside<never>, "value">;
+  const putBack = (r: Applied, what: string): Left => (r.confirmed ? { music: "restored" } : { music: "failed", why: failed(`sent the ${what}; Soloist has not reported it`) });
+
   const actions: SpotifyActions = {
-    play(linkOrUri) {
-      if (linkOrUri === undefined) return write("transport", { command: "play" });
+    async play(linkOrUri) {
+      if (linkOrUri === undefined) return change("transport", { command: "play", took: (s) => s.status === "playing" });
       const uri = toSpotifyUri(linkOrUri);
-      if (!uri) return Promise.reject(new RangeError(`not a Spotify link or URI: ${linkOrUri}`));
-      return write("transport", { command: "play", fields: { uri } });
+      if (!uri) throw invalid(`not a Spotify link or URI: ${linkOrUri}`);
+      return change("transport", { command: "play", fields: { uri }, took: (s) => s.status === "playing" && (s.track?.uri === uri || s.context?.uri === uri) });
     },
-    pause: () => write("transport", { command: "pause" }),
-    resume: () => write("transport", { command: "play" }),
-    next: () => write(`once-${++once}`, { command: "skip_next" }),
-    prev: () => write(`once-${++once}`, { command: "skip_prev" }),
-    seek(ms) {
-      if (!Number.isFinite(ms) || ms < 0) return Promise.reject(new RangeError(`a position in ms, 0 or more, not ${ms}`));
-      return write("seek", { command: "seek", fields: { position_ms: ms } });
+    pause: () => change("transport", { command: "pause", took: (s) => s.status === "paused" }),
+    resume: () => change("transport", { command: "play", took: (s) => s.status === "playing" }),
+    // The end of the queue goes idle; repeat-track restarts it.
+    next: () => change(`once-${++once}`, { command: "skip_next", took: (s, b, at) => newTrack(s, b) || (s.status === "idle" && b.status !== "idle") || restarted(s, b, at) }),
+    prev: () => change(`once-${++once}`, { command: "skip_prev", took: (s, b, at) => newTrack(s, b) || restarted(s, b, at) }),
+    async seek(ms) {
+      if (!Number.isFinite(ms) || ms < 0) throw invalid(`a position in ms, 0 or more, not ${ms}`);
+      return change("seek", { command: "seek", fields: { position_ms: ms }, took: (s, b) => s.position !== b.position && Math.abs((s.position?.ms ?? -Infinity) - ms) < 2000 });
     },
     async setVolume(volume) {
-      if (!Number.isFinite(volume) || volume < 0 || volume > 100) throw new RangeError(`volume is 0–100, not ${volume}`);
-      const v = Math.round(cap === undefined ? volume : Math.min(volume, cap));
-      await write("volume", { command: "set_volume", fields: { volume: v } });
-      return v;
+      if (!Number.isFinite(volume) || volume < 0 || volume > 100) throw invalid(`volume is 0–100, not ${volume}`);
+      return volumeTo(Math.round(cap === undefined ? volume : Math.min(volume, cap)));
     },
-    queue(track) {
+    async queue(track) {
       const uri = toSpotifyUri(track);
-      if (!uri?.startsWith("spotify:track:")) return Promise.reject(new RangeError(`only a Spotify track can be queued, not ${track}`));
-      return write(`once-${++once}`, { command: "add_to_queue", fields: { uri } });
+      if (!uri?.startsWith("spotify:track:")) throw invalid(`only a Spotify track can be queued, not ${track}`);
+      return change(`once-${++once}`, { command: "add_to_queue", fields: { uri }, took: (s) => !!s.upNext?.some((t) => t.uri === uri) });
     },
-    setShuffle: (on) => write("shuffle", { command: "set_shuffle", fields: { enabled: on } }),
-    async interrupt(fn) {
-      const playing = () => state.status === "playing" || state.status === "buffering";
-      if (!open || !playing()) return fn();
-      try {
-        await actions.pause();
-      } catch (error) {
-        // What interrupts the music matters more than the music: run it anyway, and leave the music as it is.
-        note = `pause before interrupt failed: ${errorText(error)}`;
-        publish();
-        return fn();
-      }
-      await waitFor(() => !playing(), PAUSE_WAIT_MS);
-      try {
-        return await fn();
-      } finally {
-        await actions.resume().catch((error) => ((note = `resume after interrupt failed: ${errorText(error)}`), publish()));
-      }
+    setShuffle: (on) => change("shuffle", { command: "set_shuffle", fields: { enabled: on }, took: (s) => s.shuffle === on }),
+    interrupt(fn) {
+      let track: string | undefined;
+      let shown = false; // the pause showed
+      return aside(
+        fn,
+        async () => {
+          const no = notPlaying();
+          if (no) return no;
+          track = state.track?.uri;
+          try {
+            shown = (await actions.pause()).confirmed; // a pause that never shows still runs fn: what interrupts matters more
+          } catch (error) {
+            return failed(`pause before interrupt failed: ${errorText(error)}`);
+          }
+        },
+        async () => {
+          if (state.status !== "paused") return { music: "kept", why: shown ? `someone changed it meanwhile: it is ${state.status ?? "in an unknown state"}` : "Soloist never reported the pause" };
+          if (state.track?.uri !== track) return { music: "kept", why: "the track changed meanwhile" };
+          try {
+            return putBack(await actions.resume(), "resume");
+          } catch (error) {
+            return { music: "failed", why: failed(`resume after interrupt failed: ${errorText(error)}`) };
+          }
+        },
+      );
+    },
+    duck(fn, { to }) {
+      if (!Number.isFinite(to) || to < 0 || to > 100) return Promise.reject(invalid(`duck's volume is 0–100, not ${to}`));
+      let earlier = 0;
+      let shown = false; // the lowered volume showed
+      return aside(
+        fn,
+        async () => {
+          const no = notPlaying();
+          if (no) return no;
+          if (state.volume === undefined) return "its volume is not known";
+          if (state.volume <= to) return `it was already at ${state.volume}`;
+          earlier = state.volume;
+          try {
+            shown = (await volumeTo(Math.round(to))).confirmed;
+          } catch (error) {
+            return failed(`lowering the volume for duck failed: ${errorText(error)}`);
+          }
+        },
+        async () => {
+          if (state.volume !== Math.round(to)) return { music: "kept", why: shown ? `someone set the volume to ${state.volume} meanwhile` : "Soloist never reported the lower volume" };
+          try {
+            return putBack(await volumeTo(earlier), `volume ${earlier}`);
+          } catch (error) {
+            return { music: "failed", why: failed(`restoring the volume to ${earlier} after duck failed: ${errorText(error)}`) };
+          }
+        },
+      );
     },
   };
 

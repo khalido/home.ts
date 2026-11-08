@@ -18,7 +18,7 @@ home cast announce --to <name> (--say "<text>" | --file <path>) [--volume 0-100]
 home cast volume <name> <0-100>
 home cast mute <name> on|off
 home cast stop <name>         # end the running app; the device returns to its idle screen
-home spotify pause | play [link] | next | volume <0-100>  # the Soloist speaker at SOLOIST_WS; volume held to SOLOIST_MAX_VOLUME
+home spotify pause | play [link] | next | volume <0-100>  # the Soloist speaker at SOLOIST_WS; volume held to SOLOIST_MAX_VOLUME; prints what Soloist then reported
 ```
 
 ## Output

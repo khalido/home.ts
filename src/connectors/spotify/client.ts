@@ -50,7 +50,9 @@ const Entity: z.ZodType<Entity> = z.lazy(() =>
 const Position = z.looseObject({ position_ms: z.number().optional(), timestamp_ms: z.number().optional(), speed: z.number().optional() });
 const Options = z.looseObject({ shuffle: z.boolean().optional(), repeat: z.string().optional() });
 
-/** Soloist's frames by type, those this library reads. `queue_changed` and the rest are skipped. */
+const QueueEntry = z.looseObject({ uid: z.string().optional(), source: z.string().optional(), item: Entity.optional() });
+
+/** Soloist's frames by type, those this library reads. Anything else is skipped. */
 export const Frame = z.discriminatedUnion("type", [
   z.looseObject({ type: z.literal("auth_state"), logged_in: z.boolean().optional(), is_active: z.boolean().optional(), device_name: z.string().optional() }),
   z.looseObject({ type: z.literal("playback_state"), status: z.string().optional(), item: Entity.optional(), context: Entity.optional(), position: Position.optional(), volume: z.number().optional(), is_active: z.boolean().optional(), options: Options.optional() }),
@@ -61,6 +63,7 @@ export const Frame = z.discriminatedUnion("type", [
   z.looseObject({ type: z.literal("context_changed"), context: Entity.optional() }),
   z.looseObject({ type: z.literal("options_changed"), options: Options.optional() }),
   z.looseObject({ type: z.literal("position_sync"), position: Position.optional() }),
+  z.looseObject({ type: z.literal("queue_changed"), previous: z.array(QueueEntry).optional(), upcoming: z.array(QueueEntry).optional() }),
   z.looseObject({ type: z.literal("command_result"), command: z.string().optional() }),
   z.looseObject({ type: z.literal("error"), message: z.string().optional() }),
 ]);
@@ -94,6 +97,8 @@ export type SpotifyState = {
   shuffle?: boolean;
   /** off, context or track. */
   repeat?: string;
+  /** What plays next, next first: Soloist's `queue_changed` (at most 10) or its answer to `get_queue`. Queued tracks, then the context's. */
+  upNext?: Track[];
   asOf: string;
 };
 
@@ -126,6 +131,7 @@ export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
   switch (f.type) {
     case "auth_state": {
       const next = { ...s, ...dropUndefined({ loggedIn: f.logged_in, active: f.is_active, deviceName: f.device_name || undefined }), asOf };
+      // signed out: nothing plays, nothing is queued
       return f.logged_in === false ? { loggedIn: false, ...dropUndefined({ deviceName: next.deviceName, active: next.active }), asOf } : next;
     }
     case "playback_state": {
@@ -163,6 +169,8 @@ export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
       return f.options ? { ...s, ...toOptions(f.options), asOf } : s;
     case "position_sync":
       return f.position ? { ...s, position: toAnchor(f.position), asOf } : s;
+    case "queue_changed":
+      return f.upcoming ? { ...s, upNext: f.upcoming.map((e) => toTrack(e.item)).filter((t): t is Track => !!t), asOf } : s;
     default:
       return s; // command_result and error answer a command; they change no state
   }
