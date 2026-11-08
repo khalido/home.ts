@@ -13,14 +13,14 @@ Reads an IQ Gateway (Envoy) on the LAN: production, consumption and grid flow. `
 - The token's days left ride in the snapshot; under 30 the status says to run `home enphase login`. A 401 marks Enphase unavailable and stops polling.
 - `home enphase login` mints the token (below) and writes `~/.config/home/enphase-token.json` (0600, directory 0700), printing only the days left. `home status` shows solar now, consumption and the token's days left.
 
-**Live, KO's gateway, 2026-10-13 (D8.3.5528, owner token, 364 days left).** `/info` answers without a token; everything else answers 401 without one. With the token, one GET each:
+**Live, KO's gateway, 2026-10-13 (D8.3.5528, owner token).** `/info` answers without a token; everything else answers 401 without one. With the token, one GET each:
 
 - `/ivp/meters`: `production` and `net-consumption` **enabled**, `meteringStatus normal`; `storage`, `backfeed`, `load`, `evse`, `pv3p` disabled. So both CTs are fitted.
-- `/production.json?details=1`: `production` holds `inverters` (9 active, `wNow`, `whLifetime`, no daily fields) and `eim production` (20 fields); `consumption` holds `eim total-consumption` and `eim net-consumption`; `storage` holds an inactive `acb`. A reading at dusk: production 200 W, consumption 4,991 W, net 4,791 W imported.
-- **Anomaly**: on every `eim` reading, `whToday`, `whLastSevenDays` and `whLifetime` are the same number (production 21,007,108 Wh). The daily counters are broken on this firmware. `toState` drops them and sets `anomaly`; `enphase()` counts today from the lifetime counter from its first reading of the day and marks where that count starts (`todaySince`).
-- `/api/v1/production`: all zeros except `wattHoursLifetime` (19,483,258 Wh). Not used.
+- `/production.json?details=1`: `production` holds `inverters` (`activeCount`, `wNow`, `whLifetime`, no daily fields) and `eim production` (20 fields); `consumption` holds `eim total-consumption` and `eim net-consumption`; `storage` holds an inactive `acb`. At dusk production was near zero and net consumption matched consumption less production.
+- **Anomaly**: on every `eim` reading, `whToday`, `whLastSevenDays` and `whLifetime` are the same number. The daily counters are broken on this firmware. `toState` drops them and sets `anomaly`; `enphase()` counts today from the lifetime counter from its first reading of the day and marks where that count starts (`todaySince`).
+- `/api/v1/production`: all zeros except `wattHoursLifetime`. Not used.
 - `/ivp/meters/readings`: 8 entries with `eid`, `timestamp`, `actEnergyDlvd`, `actEnergyRcvd`, `instantaneousDemand` and more. Not used yet.
-- The lifetime totals disagree: production meter 21.0 MWh, inverters 7.9 MWh, `/api/v1` 19.5 MWh. The meter is used; why the inverter total is lower is unconfirmed (a reset or replacement is a guess).
+- The lifetime totals disagree across the production meter, the inverters (far lower) and `/api/v1`. The meter is used; why the inverter total is lower is unconfirmed (a reset or replacement is a guess).
 
 ## TLS: why the Bun path skips verification
 

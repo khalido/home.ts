@@ -25,7 +25,7 @@ Amber Electric's live wholesale-linked prices, read through Amber's public API. 
 
 ## What the API said (KO's account, 2026-10-13)
 
-- `GET /v1/sites`: one active site, network Ausgrid, `intervalLength: 5`, channels `general` and `feedIn`.
+- `GET /v1/sites`: one active site, its network named, `intervalLength: 5`, channels `general` and `feedIn`.
 - `GET …/prices/current?next=1&previous=1`: for each channel an `ActualInterval`, a `CurrentInterval` (with `estimate`) and a `ForecastInterval` (with `advancedPrice`). Fields: `perKwh` and `spotPerKwh` (c/kWh incl. GST), `renewables` (%), `descriptor`, `spikeStatus`, `startTime`, `endTime`, `nemTime`, `tariffInformation`.
 - **Rate limit** from the response headers: `ratelimit-policy: 50;w=300`, so 50 calls per 5 minutes. A 60 s poll uses 5.
 - **Feed-in sign**: the feed-in `perKwh` was −35.3 with spot at +33.1 and descriptor `high`, so a negative feed-in price means you are paid. Amber's spec does not say this; it is inferred from the live reply. A positive feed-in price would mean exporting costs you.

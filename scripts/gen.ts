@@ -7,7 +7,7 @@ const HEADER = `# Names the \`home\` CLI, the live tests and the bench read. Dum
 # from each connector's manifest (src/connectors/*/index.ts); edit those, not this file.`;
 
 /** Outside any connector: which config `home` reads. */
-const HOME_CONFIG: EnvVar = { name: "HOME_CONFIG", example: "", optional: true, what: "a home config (JSONC), e.g. ~/My Drive/jaldi/home/home.jsonc; else the names above" };
+const HOME_CONFIG: EnvVar = { name: "HOME_CONFIG", example: "", optional: true, what: "a home config (JSONC), e.g. ~/home/home.jsonc; else the names above" };
 
 /** `NAME=example  # what`, the comments in one column; an optional name says so. */
 const line = (e: EnvVar) => {

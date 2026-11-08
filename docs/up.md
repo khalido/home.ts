@@ -6,7 +6,7 @@ Proposed 2026-10-14 from two Sonnet research passes over [Up's API](https://deve
 
 ## What KO wants from it
 
-Surface the household's spending to the kids through the home bot, so "utilities" and "groceries" are real numbers from real purchases. Let an agent or the CLI pull the latest transactions (JSON or CSV), see Up's categories, find what still needs a category, and set one so Up's auto-categorisation improves. The library stays deterministic; an agent (or Jev) decides what to tag, the library applies it.
+Surface the household's spending to the family through the home bot, so "utilities" and "groceries" are real numbers from real purchases. Let an agent or the CLI pull the latest transactions (JSON or CSV), see Up's categories, find what still needs a category, and set one so Up's auto-categorisation improves. The library stays deterministic; an agent (or Jev) decides what to tag, the library applies it.
 
 ## What the three repos taught
 
@@ -67,7 +67,7 @@ What the library carries so a consumer needs nothing else:
 
 When to set one up: only when the bot should say "a purchase just happened" within seconds. For a daily or on-demand summary, the 15-minute poll is enough, and the bot needs no public URL. (Hue already pushes over its event stream; Amber's v1 API has no webhooks.)
 
-## The message to the kids
+## The message to the family
 
 Only numbers the API returned, through `spendByCategory`, with Up's own category names and the excluded transfers stated. The shape, with invented figures: "October so far: $2,140 on the house. Groceries $620, utilities $410 (power $230, water $90), eating out $180. Up from $1,980 last month. 3 purchases still need a category." No budgets, no "you saved", no judgement; the bot adds those if KO wants them.
 
@@ -81,4 +81,4 @@ Yes. Three endpoints, about 30 lines, reversible (a category resets to null, a t
 
 ## Before building
 
-One live `GET /categories` and one `GET /transactions?page[size]=5` with the token (field names and category ids only, nothing kept) to confirm the ids and the transfer and round-up shapes. KO names the env variable; it is not in `.zshrc`, `.zprofile` or `.zshenv`.
+One live `GET /categories` and one `GET /transactions?page[size]=5` with the token (field names and category ids only, nothing kept) to confirm the ids and the transfer and round-up shapes.
