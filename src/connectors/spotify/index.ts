@@ -479,7 +479,9 @@ export function spotify(
       };
       const stop = () => (end("stopped"), s.close());
       signal.addEventListener("abort", stop, { once: true });
+      // An ended socket's late events belong to no session: they must not touch the next socket's state.
       s.onopen = () => {
+        if (ended) return;
         open = true;
         down = undefined;
         note = undefined; // a new socket: what failed on the last one is history
@@ -493,7 +495,7 @@ export function spotify(
           if (!whole) ((whole = true), publish()); // signed in, no playback_state: connected with what there is
         });
       };
-      s.onmessage = (ev) => handle(ev.data);
+      s.onmessage = (ev) => void (ended || handle(ev.data));
       s.onerror = () => {}; // onclose follows and says it
       s.onclose = () => end("Soloist closed the socket");
     });

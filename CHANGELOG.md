@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+
+- **spotify:** a frame or open event from a socket that had already ended (dropped, or closed after 10 s of silence) no longer changes the state or the next socket's status.
+
 ## [0.1.0] - 2026-11-08
 
 First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber prices, Up Bank spending and the weather from the cloud. Each connector's README says what has run against a real device.

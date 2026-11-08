@@ -493,6 +493,26 @@ describe("the integration", () => {
     await h.stop();
   });
 
+  test("an ended socket's late open and frames change nothing", async () => {
+    const h = setup();
+    const old = await h.online({ status: "playing", item: TRACK, volume: 40 });
+    old.close();
+    await tick();
+    old.push({ type: "volume_changed", volume: 90 });
+    old.open();
+    expect(h.last()).toMatchObject({
+      status: "disconnected",
+      detail: "Soloist closed the socket",
+      state: { volume: 40 },
+    });
+    await h.advance(1000);
+    h.sockets[1]!.open();
+    old.push({ type: "auth_state", logged_in: true });
+    await h.advance(10_000); // the new socket heard nothing of its own
+    expect(h.last().detail).toBe("Soloist said nothing in 10 s");
+    await h.stop();
+  });
+
   test("a socket that opens and says nothing is closed after 10 s", async () => {
     const h = setup();
     h.sockets[0]!.open();
