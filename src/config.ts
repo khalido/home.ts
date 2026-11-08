@@ -10,6 +10,7 @@ import { type AddressCache, addressBook, type Connector, discover, type Finder, 
 import { envName, filePath } from "./home.ts";
 import { bunPinnedFetch, hue, configSchema as hueDevice } from "./connectors/hue/index.ts";
 import { printers, configSchema as printersDevice } from "./connectors/printers/index.ts";
+import { spotify, configSchema as spotifyDevice } from "./connectors/spotify/index.ts";
 import { up, configSchema as upDevice } from "./connectors/up/index.ts";
 import { manifestOf } from "./manifests.ts";
 import { bom, google, openMeteo, weather, type WeatherSource } from "./connectors/weather/index.ts";
@@ -45,6 +46,7 @@ export const Device = z.discriminatedUnion("connector", [
   upDevice.extend(placed),
   castDevice.extend({ id: placed.id, room: placed.room }), // its name is required: the Google Home name
   printersDevice.extend({ id: placed.id, room: placed.room }), // likewise: the printer's own name
+  spotifyDevice.extend(placed),
 ]);
 export type Device = z.infer<typeof Device>;
 
@@ -199,6 +201,7 @@ export type HomeIntegration =
   | ReturnType<typeof up>
   | ReturnType<typeof cast>
   | ReturnType<typeof printers>
+  | ReturnType<typeof spotify>
   | ReturnType<typeof weather>;
 
 /** The token in a JSON token file (`home enphase login` writes `{ token, expiresAt }`); a file that is not JSON says so by name. */
@@ -261,6 +264,8 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
         return amber({ key: env(d.key), siteId: d.siteId, fetch: net, clock });
       case "up":
         return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone, clock });
+      case "spotify":
+        return spotify({ url: d.url, maxVolume: d.maxVolume, clock });
     }
   }
   function castAll(): ReturnType<typeof cast> {

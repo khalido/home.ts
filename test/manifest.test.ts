@@ -17,7 +17,7 @@ const AT = "2026-10-14T00:00:00Z";
 
 describe("manifests", () => {
   test("one per connector, each env name once", () => {
-    expect(MANIFESTS.map((m) => m.name)).toEqual(["hue", "daikin", "enphase", "amber", "up", "weather", "cast", "printers"]);
+    expect(MANIFESTS.map((m) => m.name)).toEqual(["hue", "daikin", "enphase", "amber", "up", "weather", "cast", "printers", "spotify"]);
     const names = MANIFESTS.flatMap((m) => m.env.map((e) => e.name));
     expect(new Set(names).size).toBe(names.length);
   });

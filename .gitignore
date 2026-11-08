@@ -18,3 +18,6 @@ private/
 /home.svg
 *.pem
 *enphase-token*.json
+
+# Work in progress copied in from other repos; may carry their paths and users.
+drafts/

@@ -1,7 +1,7 @@
 # The `home` command
 
 ```sh
-home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, weather
+home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, printers, spotify, up, weather
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
 home lights off               # one write to the whole-home group
 home room <name> on|off|<1-100>
@@ -18,6 +18,7 @@ home cast announce --to <name> (--say "<text>" | --file <path>) [--volume 0-100]
 home cast volume <name> <0-100>
 home cast mute <name> on|off
 home cast stop <name>         # end the running app; the device returns to its idle screen
+home spotify pause | play [link] | next | volume <0-100>  # the Soloist speaker at SOLOIST_WS; volume held to SOLOIST_MAX_VOLUME
 ```
 
 ## Output

@@ -410,6 +410,42 @@
               "id"
             ],
             "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connector": {
+                "type": "string",
+                "const": "spotify"
+              },
+              "url": {
+                "description": "Soloist's WebSocket, as its --ws flag opens it; ws://127.0.0.1:9091 when left out. It has no auth: keep it on loopback",
+                "type": "string",
+                "format": "uri"
+              },
+              "maxVolume": {
+                "description": "the loudest a write may set (0–100), and where a first play that starts above it is lowered to (Soloist issue #23)",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "id": {
+                "type": "string"
+              },
+              "room": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^room-.*"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector",
+              "id"
+            ],
+            "additionalProperties": {}
           }
         ]
       }

@@ -14,6 +14,7 @@ import { kw, type Manifest } from "../manifest.ts";
 import { MANIFESTS, manifestOf } from "../manifests.ts";
 import { castNow } from "./cast.ts";
 import { printersNow } from "./printers.ts";
+import { spotifyFromEnv } from "./spotify.ts";
 import { addresses, CliError, configPathOf, env, fail, fromConfig, homeTimeZone, type Options, printJson, readConfig, TOKEN_FILE } from "./context.ts";
 import { enphaseFromEnv } from "./enphase.ts";
 import { hueFromEnv } from "./hue.ts";
@@ -49,6 +50,7 @@ const FROM_ENV: Record<string, { needs?: () => string[]; build: () => Integratio
   weather: { build: () => weather({ ...place(), sources: weatherSources(), timeZone: homeTimeZone() }) },
   cast: { build: castNow },
   printers: { build: printersNow },
+  spotify: { build: spotifyFromEnv },
 };
 
 /** The rows for these manifests from the shell: not set up, failed to build, or run until each has answered. */

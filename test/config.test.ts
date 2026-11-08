@@ -49,7 +49,7 @@ describe("schema", () => {
 
   test("an unknown connector is refused, naming the field", () => {
     const bad = { ...example, devices: [{ id: "tv", connector: "sonos", host: "192.0.2.9" }] };
-    expect(checkPlan(bad).problems).toEqual(["devices[0] (tv).connector: Invalid discriminator value. Expected 'hue' | 'daikin' | 'enphase' | 'amber' | 'up' | 'cast' | 'printers'"]);
+    expect(checkPlan(bad).problems).toEqual(["devices[0] (tv).connector: Invalid discriminator value. Expected 'hue' | 'daikin' | 'enphase' | 'amber' | 'up' | 'cast' | 'printers' | 'spotify'"]);
   });
 
   test("a pasted secret is refused: keys are env names", () => {
@@ -188,5 +188,16 @@ describe("cast entries", () => {
     expect(() => loadHome(castConfig, { env })).toThrow(
       "devices[0] (kitchen): Cast needs castConnect (tlsConnect from @khalido/home/cast/tls); devices[0] (kitchen): Cast needs finders.cast (its mDNS discovery)",
     );
+  });
+});
+
+describe("spotify entry", () => {
+  test("a Soloist speaker: url and maxVolume optional, maxVolume 0–100, one per home", () => {
+    const one = { devices: [{ id: "speaker", connector: "spotify", name: "Kitchen speaker", maxVolume: 60 }] };
+    expect(checkHome(one, env)).toMatchObject({ problems: [], setup: [{ name: "spotify", from: "speaker", settings: { maxVolume: 60 }, secrets: {} }] });
+    expect(loadHome(one, { env }).map((i) => i.name)).toEqual(["spotify"]);
+    expect(checkHome({ devices: [{ id: "s", connector: "spotify", maxVolume: 140 }] }, env).problems[0]).toStartWith("devices[0] (s).maxVolume:");
+    const two = { devices: [{ id: "a", connector: "spotify" }, { id: "b", connector: "spotify", url: "ws://127.0.0.1:9092" }] };
+    expect(checkHome(two, env).problems).toEqual(["devices[1] (b): a second spotify device (first: a); one per connector for now"]);
   });
 });

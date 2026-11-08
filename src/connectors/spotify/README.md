@@ -1,0 +1,54 @@
+# Spotify (Soloist)
+
+**Docs:** [Spotify Soloist](https://developer.spotify.com/documentation/soloist): start with [basic integration](https://developer.spotify.com/documentation/soloist/howtos/basic-integration), then the [WebSocket API reference](https://developer.spotify.com/documentation/soloist/reference/websocket-api) this connector speaks.
+
+What a [Spotify Soloist](https://developer.spotify.com/documentation/soloist) speaker is playing, and control over it, over Soloist's local WebSocket. `iot_class`: **local_push** (one socket, Soloist pushes every change). Built and tested against a fake socket only: no real Soloist has answered it yet.
+
+Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7 and x86_64, Apple Silicon, Windows x86_64). The machine running it shows up as a speaker in every Spotify app on the network; this connector is how a program on the same machine sees and steers it. It does not search Spotify or read anyone's library: Soloist plays URIs, and reports only its own session.
+
+## Built
+
+- `spotify({ url?, maxVolume?, connect?, clock? })` holds one WebSocket to `url` (`ws://127.0.0.1:9091` by default, the port chota-bot's unit opens; Soloist itself has no default, and its docs' example is 9090, so start it with `--ws 127.0.0.1:9091` or pass `url`). `connect` is a socket factory, the runtime's `WebSocket` global by default (Bun, Node 22+), so the connector is runtime-neutral.
+- On connect Soloist sends `auth_state` and, when signed in, `playback_state`; then events. Each frame is checked by a zod schema with every field optional and folded into `SpotifyState`: `loggedIn`, `deviceName`, `active`, `status`, `track` (`uri`, `type`, `name`, `artists`, `album`, the `default` cover, `durationMs`), `context`, `position` (Soloist's anchor: `ms`, `atMs`, `speed`), `volume`, `shuffle`, `repeat`. An empty item `uri` is nothing loaded: no `track`. `queue_changed` and unknown frame types are skipped.
+- `positionMs(state, now)` moves the anchor on by the time since, at its speed, while playing. It is not held to the track's length or rounded.
+- Odd readings pass through and are named in `anomaly`: a status outside `idle`/`playing`/`paused`/`buffering`, a volume outside 0–100, an unknown repeat, a negative speed, a position past the track's end. A frame of a known type the schema rejects is an `anomaly` too, and leaves the state as it was.
+- Status: `connecting` until `auth_state`; `connected` after it; `disconnected` when nothing answers or the socket drops, with the reason in `detail` and the last state kept. Signed out (`logged_in: false`) is `connected` with `loggedIn: false` and a `detail` saying Soloist is running but not signed in (a bad key never signs in and keeps running, [issue #18](https://github.com/spotify/soloist/issues/18)); writes are refused without being sent. A socket that opens and says nothing in 10 s is closed. A drop reconnects with backoff, 1 s doubling to 60 s, back to 1 s after a socket that opened.
+- `refresh()` sends `get_state` (`get_auth_state` without a session) through the write lane, done when the frame it asks for arrives; a refused query is an `anomaly`. While Soloist is unreachable it reconnects now rather than waiting out the backoff.
+- Writes, on the integration: `play(linkOrUri?)`, `pause`, `resume`, `next`, `prev`, `seek(ms)`, `setVolume(0–100)`, `queue(track)`, `setShuffle(on)`. A link is an `open.spotify.com` URL or a `spotify:` URI (`toSpotifyUri`); `spotify.link` short links need a redirect, so they are refused. Each resolves on Soloist's `command_result` (accepted, not applied: the state follows as events), rejects on its `error`, after 3 s without an answer, or at once when not connected. They go through one write lane (`src/lane.ts`), 100 ms apart (a guess: Soloist publishes no limit and is on loopback). Slots: `volume`, `seek` and `shuffle` merge to the last; `play`, `pause` and `resume` share one, so the last wins; every `next`, `prev` and `queue` is its own, so two skips are two. Soloist's `error` names no command, so queries go through the lane too: its one-at-a-time is what makes an `error` the one in flight's. A failed write the integration made itself (the cap, `interrupt`'s pause or resume) stays in `detail` until a write works or the socket reconnects.
+- `maxVolume` is a write policy: `setVolume` holds a request to it (and rounds to a whole percent), resolving to the volume sent. Within 10 s of an idle → playing change, a reported volume above it is lowered to it once, through the same volume slot, and `anomaly` says "started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)" until the speaker next goes idle. The reading stays what Soloist reported until it reports the new one. Not on resuming from pause, not on connecting mid-song, and a person turning it up again inside the window keeps it. [Issue #23](https://github.com/spotify/soloist/issues/23): `--initial-volume` is ignored on PipeWire and the first play starts at 100%, so expect a loud first moment.
+- `interrupt(fn)`: if playing (or buffering), pause, wait up to 2 s for the pause to show, run `fn`, then resume, even if `fn` throws. Not playing or not connected: just `fn`. A failed pause still runs `fn` and leaves the music alone; a failed pause or resume is in `detail`. With Cast's `announce`, it makes "pause the music, say this, carry on" one call: `speaker.interrupt(() => cast.announce("Kitchen", clip))`. Cast's own `announce` restores what a Cast device was playing; this is for music playing through Soloist's own output. Run one at a time: a second `interrupt` while one runs sees the music paused, skips its pause, and the first one's resume can land during the second's `fn`.
+- CLI: `home spotify` (status) and the writes below need `SOLOIST_WS`; without it `home` lists the speaker as not set up, and the writes `home spotify pause`, `play [link]`, `next`, `volume <0-100>` (held to `SOLOIST_MAX_VOLUME` when set). From a config: `{ "connector": "spotify", "url"?: "…", "maxVolume"?: 60, "name"?: "…" }`, one per home.
+
+## Protocol
+
+JSON text frames on a plain WebSocket, no path, no subprotocol, no auth, TLS or origin check: bind it to loopback. Every server frame has a `type`; every client frame is `{ "type": "command", "command": "…", …fields }`.
+
+- Server: `auth_state` (`logged_in`, `is_active`, `device_name`), `playback_state` (`status`, `item`, `context`, `position`, `volume`, `is_active`, `options`, `available_actions`), `track_changed`, `playback_changed`, `volume_changed`, `device_changed`, `context_changed`, `options_changed` (`shuffle`, `repeat`: off, context, track), `position_sync` (`position_ms`, `timestamp_ms` as Soloist's epoch ms, `speed`), `queue_changed`, `command_result` (`command` only) and `error` (`message` only).
+- Commands: queries `get_auth_state`, `get_state`, `get_queue` (answered by the frame they name, no `command_result`); controls `play` (`uri`?), `pause`, `skip_next`, `skip_prev`, `seek` (`position_ms`), `set_volume` (`volume`, 0–100), `set_shuffle` (`enabled`), `set_repeat_context` and `set_repeat_track` (`enabled`), `add_to_queue` (`uri`, tracks only), `activate`, `deactivate`. Controls need a session; without one Soloist answers `error` "command requires authentication".
+
+Not built: repeat (two commands in order), the queue, `activate`/`deactivate`, `available_actions`. An `item` can be an ad (`entity_type: "ad"`); it shows as a `track` today, and whether seek or skip work during one isn't stated (`available_actions` would say).
+
+From the docs (read 2026-11-08):
+- On connect Soloist sends `auth_state`, and `playback_state` only if signed in. A later first sign-in (someone picks the speaker) is promised only an `auth_state`, so the connector sends `get_state` when `logged_in` turns true after false.
+- If `--ws` can't bind, Soloist starts without the WebSocket and only logs a warning: the connector stays `disconnected` while the daemon looks healthy.
+- `--ws ADDR:0` picks a free port and writes `ws.addr` and `ws.port` to the data dir; this connector takes a fixed `url` and doesn't read them.
+- No origin check means any web page in a browser on the same machine can open the socket and send commands.
+
+## Unverified
+
+This connector against a real Soloist: so far only `soloist ctl` has talked to one. In particular: seek on playback a phone started; Family-plan members picking the speaker; whether `play` with no `uri` and nothing loaded errors; whether `volume` is always a whole number; the order of `auth_state` and `playback_state` on connect; the 100% first play and its lowering on a real speaker; a USB speaker going into standby and dropping off while Soloist plays.
+
+## Live findings
+
+- **2026-11-08, a Raspberry Pi 5 (Pi OS Lite Trixie arm64), via `soloist ctl`, not this connector** (from chota-bot's session): `soloist 1.3.10.51 build 1793988108 (20261106)` as a systemd user unit with `-w 127.0.0.1:9091`. It logs the days left on the build (88), the WebSocket listening, then "waiting for login". Each build expires 90 days after it was built and exits with code 10; chota-bot's units refresh it weekly.
+  - Before anyone picks the speaker, `ctl status` says not logged in: `logged_in: false` is the normal waiting state, not only a bad key. After a phone picked it: logged in, active device.
+  - Playback a phone started is controllable from the Pi: volume 80 then 100, pause, and `play` with no `uri` resumed at the same position.
+  - Soloist and avahi-daemon both bind UDP 5353 (`ss -ulpn`) and the phone found the speaker with avahi running: [issue #1](https://github.com/spotify/soloist/issues/1) didn't bite.
+  - Under PipeWire 1.4 the stream is a node called "Spotify". The USB speaker there has no hardware volume, so the PipeWire sink is left at 100% and Soloist's `set_volume` is the music's volume: `maxVolume` caps that and nothing else.
+  - Soloist's logs, as a user unit: `journalctl _SYSTEMD_USER_UNIT=soloist.service`.
+
+## Sources
+
+- [Soloist documentation](https://developer.spotify.com/documentation/soloist), the [WebSocket API reference](https://developer.spotify.com/documentation/soloist/reference/websocket-api), [`soloist ctl`](https://developer.spotify.com/documentation/soloist/reference/soloist-ctl) and the [command line](https://developer.spotify.com/documentation/soloist/reference/command-line) (read 2026-11-08). Soloist is Spotify's binary, downloaded from Spotify, never redistributed here.
+- [Soloist's issues](https://github.com/spotify/soloist/issues): #1, #5 (a stall mid-track with no error: this would still say `playing`), #15, #18, #23, #24.
+- chota-bot's first client (KO's, 2026-11-08), ported here. Home Assistant has no Soloist integration; its `spotify` one is the cloud Web API, not used.

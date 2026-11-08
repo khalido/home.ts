@@ -38,11 +38,11 @@ health(home.snapshot(), Date.now());   // per integration: ok, stale or down, wi
 
 ## Writes
 
-Writes hang off the integration: `home.integration("daikin")?.client.write(setMode("cool"))`, `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands.
+Writes hang off the integration: `home.integration("daikin")?.client.write(setMode("cool"))`, `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`, `home.integration("spotify")?.play(link)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands.
 
 ## Text for people and agents
 
-Each connector's manifest turns its part into lines: `manifest.lines(part)`, the first line its summary (`import { manifest } from "@khalido/home/amber"`). The text helpers say the same in one line: `weatherText`, `blockText`, `acText`, `enphaseText`, `amberText`, `castText`, `printerText`, `upText`.
+Each connector's manifest turns its part into lines: `manifest.lines(part)`, the first line its summary (`import { manifest } from "@khalido/home/amber"`). The text helpers say the same in one line: `weatherText`, `blockText`, `acText`, `enphaseText`, `amberText`, `castText`, `printerText`, `spotifyText`, `upText`.
 
 ## Energy
 

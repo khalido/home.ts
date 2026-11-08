@@ -12,6 +12,7 @@ import { enphaseVerbs } from "./enphase.ts";
 import { hueVerbs } from "./hue.ts";
 import { locate } from "./locate.ts";
 import { probe } from "./probe.ts";
+import { SPOTIFY_USAGE, spotifyVerbs } from "./spotify.ts";
 import { status } from "./status.ts";
 import { UP_OPTIONS, UP_USAGE, upVerbs } from "./up.ts";
 
@@ -28,6 +29,7 @@ const VERBS: Record<string, { verbs: Verbs; usage: string; options?: [string, st
   enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
   cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
   up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
+  spotify: { verbs: spotifyVerbs, usage: SPOTIFY_USAGE },
 };
 
 const cli = cac("home");

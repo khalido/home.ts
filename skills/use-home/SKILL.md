@@ -46,6 +46,7 @@ Weather: `blocks` holds morning, afternoon and evening for today and tomorrow in
 - Hue: press the bridge's button, then `home pair` within 30 s; it prints the env lines. Set `HUE_CA_FILE` to Signify's root CA (`src/connectors/hue/README.md`).
 - Enphase: `home enphase login` once a year writes the owner token to `~/.config/home/enphase-token.json` (0600).
 - Amber, Up, Google Weather: a token from each service's website.
+- Spotify (Soloist): no key in `home`; Soloist's own API key is the daemon's. Set `SOLOIST_WS` to the address its `--ws` opens. Signed out is normal until someone picks the speaker in the Spotify app.
 
 Copying a working `.env` (and the CA file) to another machine works: the keys are not tied to the machine.
 
