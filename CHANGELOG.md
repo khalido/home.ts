@@ -4,6 +4,14 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-09
+
+Fixes from chota-bot's first live reads, on a Raspberry Pi and a Mac. No breaking changes.
+
+### Added
+
+- **`discover`:** a `stopOn` option, for an error no later pass could get past.
+
 ### Changed
 
 - **cast:** `tlsConnect` gives up after 3 s, down from 10 s, so one offline device holds up a one-shot read for less. A device whose cached address fails and that discovery can't find no longer gets a second try before it shows as disconnected. `home cast` with one device down: 13.3 s to 2.3 s (Bun 1.4.4, macOS, 2026-11-09).
@@ -13,7 +21,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 - **spotify:** `maxVolume`'s first-play window now opens on a start through `buffering` too: idle → buffering → playing escaped it.
 - **weather:** the text's chance of rain for today is the highest of the hours still to come, once that's lower than the day's figure and from the same source, and it says "the rest of the day". `forecast.today.rainChance` stays as the source gave it.
 - **`home discover`:** without `avahi-browse` or `dns-sd` it fails at once, naming the package, instead of after both passes.
-- **spotify:** a frame or open event from a socket that had already ended (dropped, or closed after 10 s of silence) no longer changes the state or the next socket's status.
+- **spotify:** a frame or open event from a socket that had already ended (dropped, or closed after 10 s with no message) no longer changes the state or the next socket's status.
 - **cast:** `@khalido/home/cast/serve`'s types no longer name `NodeJS.Dict`, so they compile without `@types/node`.
 - **Docs:** corrected the config parser, the printers exception to one device per connector, Daikin's `home status` address, and the weather user agent. `skills/draw-home` no longer points at private paths.
 
@@ -34,5 +42,6 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/khalido/home.ts/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/khalido/home.ts/releases/tag/v0.1.0
