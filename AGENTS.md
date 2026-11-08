@@ -1,6 +1,6 @@
-# @khalido/home
+# home.ts
 
-KO's small, opinionated TypeScript library for his home: Hue, Daikin, Enphase, Google Cast, AirPrint printers, a Spotify Soloist speaker, Amber prices, Up Bank spending and the weather. Used by jaldi's sidecar and chota-bot (both Bun), plus a `home` CLI. MIT; local git today, going public on GitHub.
+`@khalido/home` on npm. KO's small, opinionated TypeScript library for home automation, starting with his home: Hue, Daikin, Enphase, Google Cast, AirPrint printers, a Spotify Soloist speaker, Amber prices, Up Bank spending and the weather. Used by jaldi's sidecar and chota-bot (both Bun), plus a `home` CLI. MIT; local git today, going public on GitHub.
 
 **Read [docs/handover.md](docs/handover.md) first**: where the last session left off and what to do next. Keep it current as you work; rewrite it clean before you stop, never append. Then `README.md`, then the README in the connector folder you are changing.
 

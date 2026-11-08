@@ -1,6 +1,6 @@
-# @khalido/home
+# home.ts
 
-My house as a TypeScript import: Philips Hue, a Daikin AC, Enphase solar, Google Cast speakers and screens, AirPrint printers and a Spotify Soloist speaker on the local network, plus Amber Electric's live prices, Up Bank spending and the weather. One small library and a `home` command. No server, no cloud of its own.
+Small, typed home automation for TypeScript, starting with the devices in my house: Philips Hue, a Daikin AC, Enphase solar, Google Cast speakers and screens, AirPrint printers and a Spotify Soloist speaker on the local network, plus Amber Electric's live prices, Up Bank spending and the weather. One small library, published as `@khalido/home`, and a `home` command. No server, no cloud of its own.
 
 - Read every device into one typed snapshot, kept current by event stream or on a timer.
 - Turn lights on, set the AC, change speaker volume. Writes are spaced and merged, so a burst never floods a device.

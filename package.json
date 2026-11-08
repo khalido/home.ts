@@ -1,7 +1,7 @@
 {
   "name": "@khalido/home",
   "version": "0.1.0",
-  "description": "Small, typed home control for TypeScript: Hue, Daikin, Enphase, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber prices, Up Bank spending and the weather from the cloud.",
+  "description": "home.ts: small, typed home automation for TypeScript: Hue, Daikin, Enphase, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber prices, Up Bank spending and the weather from the cloud.",
   "license": "MIT",
   "author": "Khalid Omar",
   "repository": {

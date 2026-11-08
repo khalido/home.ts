@@ -1,6 +1,6 @@
-# @khalido/home
+# home.ts
 
-> A small TypeScript library and `home` command for one home: Philips Hue, a Daikin AC, Enphase solar, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber Electric prices, Up Bank spending and the weather from the cloud. Runs on Bun 1.4+ and Node 24+; the CLI needs Bun. MIT.
+> Small, typed home automation for TypeScript, published on npm as `@khalido/home`, with a `home` command. It starts with one home's devices: Philips Hue, a Daikin AC, Enphase solar, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber Electric prices, Up Bank spending and the weather from the cloud. Runs on Bun 1.4+ and Node 24+; the CLI needs Bun. MIT.
 
 The library never reads the environment or a file: callers pass addresses, keys and a `fetch`. `createHome` runs integrations and keeps one typed snapshot; `loadHome` builds them from a home config that names env vars, never secrets. Every field a device reports is optional, and odd readings pass through in `anomaly` rather than being corrected. Writes go through a per-device lane: spaced, bursts merged.
 
