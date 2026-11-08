@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a release of @khalido/home - pick the 0.x bump from what a consumer would notice, roll Unreleased into a dated CHANGELOG section, fact-check it, tag, publish to npm with bun, and tell the consumers. Human-in-the-loop; nothing tags or publishes without KO's yes.
+description: Cut a release of @khalido/home - pick the 0.x bump from what a consumer would notice, roll Unreleased into a dated CHANGELOG section, fact-check it, tag, create the GitHub release that stages it on npm, and tell the consumers. Human-in-the-loop; nothing tags or goes live without KO's yes.
 ---
 
 # /release
@@ -17,7 +17,7 @@ Cut a release of **@khalido/home** on npm (`khalido/home.ts` on GitHub). jaldi a
 - **`CHANGELOG.md` is the canonical record**, in [Keep a Changelog](https://keepachangelog.com/) form: `## [Unreleased]` rolls into `## [X.Y.Z] - YYYY-MM-DD` with `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`. "Fixed" means it was wrong; "Changed" means it worked and now differs. The GitHub release notes are that section, verbatim. The first release is one `Added` section.
 - **Full commit bodies in, never raw diffs.** The body has the why.
 - **A fresh subagent fact-checks every claim** against the code before it lands: an editorial pass can invert meaning or name an export that doesn't exist.
-- **Manual publish with `bun publish`** until trusted publishing from Actions is set up (`docs/publishing.md`). `bun publish` gives no provenance and needs KO's 2FA.
+- **A GitHub release stages the version on npm; KO approves it with 2FA.** `.github/workflows/publish.yml` runs `npm stage publish` over trusted publishing: no stored token, provenance included, and the publisher is stage-only, so nothing goes live without KO (`docs/publishing.md`).
 
 ## Steps
 
@@ -67,7 +67,7 @@ Fix what it flags before step 7.
 
 ```bash
 bun run check && bun test
-bun publish --dry-run                        # runs prepublishOnly; lists files, version, access, tag
+npm stage publish --dry-run                  # runs prepublishOnly; lists files, version, access, tag
 ```
 
 The pack list must not hold `docs/handover.md`, `docs/publishing.md`, `private/`, `drafts/` or `.env`. Grep the packed files for IPs, MACs and KO's device names (AGENTS.md: never in the repo).
@@ -82,13 +82,14 @@ The version and the one-line reason, the changelog section, the fact-check resul
 git add CHANGELOG.md package.json && git commit -m "Release vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main --follow-tags           # main only: never --all, never pre-squash
-bun publish                                  # KO answers the 2FA; --auth-type legacy for a terminal prompt
 gh release create vX.Y.Z --repo khalido/home.ts --title "vX.Y.Z" --verify-tag --notes-file - <<'NOTES'
 <the changelog section, without its heading>
 NOTES
 ```
 
-`bun publish` needs KO at the keyboard for the 2FA: if this session can't prompt him, stop after the push and hand him the two commands. Then check it landed: `npm view @khalido/home version`.
+The release starts `publish.yml`, which checks the tag against `package.json`, runs `prepublishOnly` and stages the version. Once it passes, KO approves it, since that needs his 2FA: Staged Packages on npmjs.com, or `npm stage list @khalido/home` then `npm stage approve <id>`. Then check it landed: `npm view @khalido/home version`, and a clean `bun add @khalido/home --no-cache` (the tarball can lag the version record by minutes).
+
+If the run fails on auth, fix the publisher and `gh run rerun <id>`. If it fails on the code, fix it and release a new patch version, because a rerun builds the same tag.
 
 ### 9. After
 
@@ -96,8 +97,6 @@ NOTES
 - Refresh `docs/project-map.html` with the `project-map` skill, if the repo has one.
 - Rewrite `docs/handover.md`: the version out, what's next.
 
-## First release only
+## The first release
 
-- No tag yet, so the range is everything on `main`; the history before the squash stays local in `pre-squash` and is never pushed.
-- The repo goes public before `bun publish`, or the npm page's links and `llms.txt`'s 404: Settings → Danger Zone → Change visibility.
-- `check.yml` runs on GitHub for the first time on that push.
+Done with 0.1.0, by hand with `bun publish`. A new trusted publisher must complete its first publish within 2 days or it expires; delete and recreate it if so.

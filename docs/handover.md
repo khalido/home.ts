@@ -1,12 +1,12 @@
 # Handover
 
-2026-11-08. Read `AGENTS.md` first, then this.
+2026-11-09. Read `AGENTS.md` first, then this.
 
 ## Where things stand
 
-- **0.1.0 is ready to publish.** `bun run check` clean, 451 tests (Bun 1.4.4, 2026-11-08). A clean clone passed check, test (bare env, `TZ=UTC`) and build on macOS (Oct); the Ubuntu runner is untested until the first push. `bun publish --dry-run` runs `prepublishOnly` (check, test, build) and packs: access public, tag latest. KO is logged in (`bunx npm login`, the `khalido` account owns the scope). Repacked 8 Nov: installed with no devDependencies, every entry point checked earlier (Node 24.20, 26.11, Bun, 28 Oct) and the spotify one now on Node 26.11.1 and Bun 1.4.4. `docs/handover.md` and `docs/publishing.md` are not in it; `llms.txt` is.
-- **GitHub:** `khalido/home.ts`, **private**, nothing since 28 Oct pushed, so GitHub still shows the old README with its mermaid map; the local README dropped it. KO pushes, flips it public, publishes; until it is public the npm page's links and `llms.txt`'s 404.
-- **New since `origin/main`** (`CHANGELOG.md`, `docs/using.md`): `health`, `onChange`, `home.integration(name)`, `settle`; writes on the integration; `dayBlocks` with `uvIndex`; Amber `forecast` and `bestWindow`; `@khalido/home/node`; the `spotify` connector.
+- **0.1.0 is on npm** (2026-11-09, `bun publish` from the tag). A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
+- **`main` is past the tag** with what goes in 0.1.1: the spotify late-socket fix (in `CHANGELOG.md`), the shared test clocks, and `publish.yml`.
+- **Releases now stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). Not yet run once.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. No write has reached a device except `setPower(true)` on the Daikin at KO's request.
 
 ## spotify (Soloist)
@@ -34,28 +34,26 @@ On Bun on a Raspberry Pi 5 (Pi OS Lite Trixie arm64, Wi-Fi), one long-lived `loa
 
 On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so the address cache matters more. `cast/serve.d.ts` needs `@types/node`. Check Vite's SSR build keeps `@khalido/home` external.
 
-## Publishing (KO)
-
-1. `git push`, then flip `khalido/home.ts` public. `check.yml` runs for the first time.
-2. fx: add `AI_GATEWAY_API_KEY` and allow Actions to create PRs, or disable `fx.yml`.
-3. `bun publish` (logged in already; `--auth-type legacy` for a terminal OTP prompt). No provenance; trusted publishing from Actions later (`docs/publishing.md`).
-4. Tell chota-bot the version is out.
-
 ## Waiting on KO
 
 - Hue pairing (`home pair`, `.env`, `HUE_CA_FILE`, then `home hue`).
 - Enphase: why the gateway refuses connections (`home discover`), then a read on Node with `NODE_TLS`.
 - First writes, each with KO's say-so: Up categorise, Daikin presets, a Hue burst, spotify on the Pi.
+- The trusted publisher on npmjs.com: `khalido`, `home.ts`, `publish.yml`, both boxes unticked. It expires unless a release goes through within 2 days of creating it, so create it when 0.1.1 is ready, and approve the staged version within the 2 days.
+- `fx.yml`: add `AI_GATEWAY_API_KEY` and allow Actions to create PRs, or disable it. The repo is public now, so a new issue starts it and it has no key.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged: `git worktree remove`, `git branch -D`; keep `pre-squash`.
 
 ## Next, in order
 
+0. **0.1.1**, after chota-bot's live tests of Cast and spotify on the Pi (the list is in chota-bot's handover; results come back here). Include Gemini's doc fixes: `docs/config.md:31` says the CLI uses `Bun.JSONC.parse` (it's `jsonc-parser`) and `:27` omits printers; Daikin's README claims a UDP fallback `home status` lacks; the weather README's user agent; `docs/google.md:64` describes a fixed bug; `skills/draw-home` names KO-local paths and the private `sfl-mes`.
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.
 4. **Weather**: BOM warnings; Google's hourly as a second source; compare with chota's weather tool first.
 5. **Leftovers**: TS 5.6 and older fail on `Uint8Array<…>` in `printers/codec.d.ts` with `skipLibCheck: false`; `cast/serve.d.ts` names `NodeJS.Dict`; `exports.test.ts` imports `src`, not `dist`; `FROM_ENV` and `loadHome` build integrations two ways; `withSpotify` and `withCast` in the CLI are near-copies (two, under the rule of three).
 6. **A docs site** later: GitHub Pages from an Actions build (not a `gh-pages` branch or a committed folder), serving `llms.txt`.
+
+After live tests: spotify's socket flags as one `phase` union with a pure `next()` (chota-bot's idea; its `whatsapp-conn.ts` is a small example); `repairedFor` never clears, so a track stalls-and-repairs once per run; a Cast `play(target, url)` for streams. For a 0.2.0: writes in one shape across connectors, Up's client exposed, Cast's volume 0–1 against spotify's 0–100.
 
 ## To see the current state
 

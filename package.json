@@ -98,7 +98,7 @@
     }
   },
   "bin": {
-    "home": "./src/cli/main.ts"
+    "home": "src/cli/main.ts"
   },
   "files": [
     "CHANGELOG.md",

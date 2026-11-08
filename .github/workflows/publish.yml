@@ -1,0 +1,32 @@
+# A published GitHub release stages that version on npm, with provenance and no stored token (trusted publishing).
+# It goes live only when KO approves it with 2FA: npm stage approve <id>, or Staged Packages on npmjs.com.
+
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the OIDC token npm trusts
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2 # prepublishOnly runs the checks, tests and build with Bun
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "26" # ships npm 11.20; npm stage needs 11.15 or later
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # never cache in a release build
+      - run: bun install --frozen-lockfile
+      - name: The tag is the package's version
+        run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+      - run: npm stage publish # Bun can't do OIDC or provenance
