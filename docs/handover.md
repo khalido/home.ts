@@ -4,7 +4,7 @@
 
 ## Where things stand
 
-- **0.1.0 is ready to publish, with the spotify connector in it.** `bun run check` clean, 443 tests (Bun 1.4.4, 2026-11-08). A clean clone passes check, test (bare env, `TZ=UTC`) and build on macOS; the Ubuntu runner is untested until the first push. `bun publish --dry-run` runs `prepublishOnly` (check, test, build) and packs. The packed tarball, installed with no devDependencies, loaded every entry point on Node 24.20, Node 26.11 and Bun (2026-10-28, before spotify: repack and recheck before publishing). `docs/handover.md` and `docs/publishing.md` are not in it.
+- **0.1.0 is ready to publish, with the spotify connector in it.** `bun run check` clean, 451 tests (Bun 1.4.4, 2026-11-08). A clean clone passes check, test (bare env, `TZ=UTC`) and build on macOS; the Ubuntu runner is untested until the first push. `bun publish --dry-run` runs `prepublishOnly` (check, test, build) and packs. The packed tarball, installed with no devDependencies, loaded every entry point on Node 24.20, Node 26.11 and Bun (2026-10-28, before spotify: repack and recheck before publishing). `docs/handover.md` and `docs/publishing.md` are not in it.
 - **GitHub:** `khalido/home.ts`, **private**, nothing since 28 Oct pushed. KO pushes, flips it public and publishes; until it is public the npm page's links 404.
 - **New for consumers since `origin/main`** (`CHANGELOG.md`, `docs/using.md`): `health`, `onChange`, `home.integration(name)`, `settle`; writes on the integration (Hue and Daikin `client`, Cast actions, spotify's writes); `dayBlocks` with `uvIndex`; Amber `forecast` and `bestWindow`; `@khalido/home/node` (`NODE_TLS`); the `spotify` connector.
 - **Live, read-only, 2026-10-28:** Amber's forecast and `bestWindow`; weather with blocks and UV. The Enphase gateway refused connections all day. No write has reached a real device except `setPower(true)` on the Daikin at KO's request.
@@ -18,7 +18,8 @@
 - `home` lists spotify as not set up unless `SOLOIST_WS` is set; the verbs need it too, and the library defaults to `ws://127.0.0.1:9091`.
 - **Built 8 Nov for chota (its group 1 of 3):** writes resolve with `{ state, confirmed }` once Soloist reports the change; `duck(fn, { to })` and `interrupt(fn)` return `{ value, music, why? }` and leave a phone's change alone; `state.upNext`; error codes `offline`, `waiting`, `refused`, `timeout`, `invalid`. Reviewed by Gemini and a Sonnet pass; their real bugs fixed.
 - **Group 2, built 8 Nov, agreed with chota-bot:** `setRepeat`, `speakerState(part)`, `spotifyChanges(before, after)` (own `duck`/`interrupt` events marked `own`), signed out worded as waiting.
-- **Left for spotify:** stall detection and repair (Soloist issue #5), not in 0.1.0; repair would be opt-in. Then the live run on the Pi.
+- **Group 3, built 8 Nov:** stall watch (issue #5): every 20 s while playing, `frozen` or `overrun` into `state.stalled`, `anomaly` and `stalled`/`recovered` events; `repairStalls: true` tries once per track. Never seen live.
+- **Left for spotify:** the clean-up pass (split `index.ts`, a test helper, the README rewritten shorter, `llms.txt`), then the live run on the Pi. Spotify search lives in chota-bot (KO, 8 Nov), not here; the research is in `docs/ideas.md`.
 - `drafts/soloist/` (git-ignored) holds chota's agent tools and systemd units for reference; delete it once chota switches.
 
 ## chota-bot as a consumer

@@ -4,9 +4,9 @@ import { ConnectorError, errorText } from "../../connector.ts";
 import type { Integration, Part, Status } from "../../home.ts";
 import { writeLane } from "../../lane.ts";
 import type { Manifest } from "../../manifest.ts";
-import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, positionMs, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri, type Track } from "./client.ts";
+import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, positionMs, type SocketFactory, type SocketLike, type SpotifyState, type Stall, toSpotifyUri, type Track } from "./client.ts";
 
-export { positionMs, type PositionAnchor, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri, type Track } from "./client.ts";
+export { positionMs, type PositionAnchor, type SocketFactory, type SocketLike, type SpotifyState, type Stall, toSpotifyUri, type Track } from "./client.ts";
 
 /** Soloist has no default port (`--ws ADDR:PORT` opens it); this library assumes this one, the port in chota-bot's unit. */
 export const DEFAULT_URL = "ws://127.0.0.1:9091";
@@ -16,6 +16,7 @@ export const configSchema = z.looseObject({
   connector: z.literal("spotify"),
   url: z.url({ protocol: /^wss?$/ }).optional().describe(`Soloist's WebSocket, as its --ws flag opens it; ${DEFAULT_URL} when left out. It has no auth: keep it on loopback`),
   maxVolume: z.number().int().min(0).max(100).optional().describe("the loudest a write may set (0–100), and where a first play that starts above it is lowered to (Soloist issue #23)"),
+  repairStalls: z.boolean().optional().describe("when playback stalls while Soloist says playing (Soloist issue #5), try once per track to restart it: a seek, then pause and play, or a skip when it is stuck past the track's end. Off unless set"),
 });
 
 export type SpotifyConfig = {
@@ -23,6 +24,10 @@ export type SpotifyConfig = {
   url?: string;
   /** Volume ceiling 0–100 for writes, and for a first play that starts louder (issue #23). */
   maxVolume?: number;
+  /** Try once per track to restart playback that stalled (issue #5): a write the library makes unasked, so off unless set. */
+  repairStalls?: boolean;
+  /** How often to look for a stall while playing, in ms; `STALL_CHECK_MS` by default, 0 to never look. */
+  stallCheckMs?: number;
   /** Opens the socket; the runtime's `WebSocket` by default. Tests pass a fake. */
   connect?: SocketFactory;
   clock?: Clock;
@@ -90,6 +95,12 @@ const CAP_WINDOW_MS = 10_000;
 const CONFIRM_MS = 2000;
 /** Between two commands. Soloist publishes no limit; it is on loopback; a stated guess. */
 const WRITE_GAP_MS = 100;
+/** While playing, a stall check this often: one `get_state`. Soloist issue #5 reports stalls 71–150 s into a track; a stated guess. */
+const STALL_CHECK_MS = 20_000;
+/** Still playing the same track this far past its length: stuck ("never moved on", issue #5). */
+const OVERRUN_MS = 15_000;
+/** After a repair's seek, how long before looking whether the position moves again. */
+const REPAIR_WAIT_MS = 5000;
 const MIN_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60_000;
 
@@ -114,6 +125,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   const cap = config.maxVolume;
   const connect: SocketFactory = config.connect ?? ((u) => new WebSocket(u) as unknown as SocketLike);
   const lane = writeLane({ gapMs: WRITE_GAP_MS, clock });
+  const checkMs = config.stallCheckMs ?? STALL_CHECK_MS;
 
   let state: SpotifyState = { asOf: asOf(clock) };
   let socket: SocketLike | undefined;
@@ -144,7 +156,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     // Connecting is reported never: before the first report createHome's placeholder says it, and a reconnect stays
     // disconnected until Soloist has answered, so two reports in a row never hide a change behind a half-done connect.
     if (status === "connecting") return;
-    const anomaly = [capNote, oddities(state), frameNote].filter(Boolean).join("; ") || undefined;
+    const anomaly = [capNote, stallText(state.stalled), oddities(state), frameNote].filter(Boolean).join("; ") || undefined;
     frameNote = undefined;
     reported = true;
     report?.({ status, detail, anomaly, state });
@@ -268,6 +280,8 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       if (f.status === "idle") capNote = undefined;
       statusKnown = true;
     }
+    stallOver();
+    if (state.status !== "playing") seen = undefined; // a pause between two checks must not read as frozen
     applyCap();
     for (const w of [...waiters]) w();
     publish();
@@ -300,6 +314,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
         signedIn = false;
         pending?.finish(offline());
         for (const w of [...waiters]) w(); // a write waiting to confirm stops waiting
+        seen = undefined;
         resolve({ why: was ? why : `nothing answered at ${url}`, opened: was });
       };
       const stop = () => (end("stopped"), s.close());
@@ -335,9 +350,10 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   const failed = (why: string) => ((note = why), publish(), why);
   let asides: Promise<unknown> = Promise.resolve();
   /** `state.aside` set or cleared, so `spotifyChanges` can mark what happens meanwhile as the library's own. */
-  const marked = (kind?: "duck" | "interrupt") => {
+  const marked = (kind?: "duck" | "interrupt" | "repair") => {
     const { aside: _, ...rest } = state;
     state = kind ? { ...rest, aside: kind } : rest;
+    stallOver(); // a repair's skip changed the track while it ran
     publish();
   };
   /**
@@ -462,6 +478,80 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     },
   };
 
+  /** The stall set or cleared, through `state` so a snapshot and `spotifyChanges` see it. */
+  const stallAs = (stall?: Stall) => {
+    const { stalled: _, ...rest } = state;
+    state = stall ? { ...rest, stalled: stall } : rest;
+    publish();
+  };
+  /** A stall ends when its track changes or stops being played; not during the repair's own pause or skip. */
+  function stallOver() {
+    const st = state.stalled;
+    if (!st || state.aside === "repair" || (state.track?.uri === st.track && (state.status === "playing" || state.status === "buffering"))) return;
+    const { stalled: _, ...rest } = state;
+    state = rest;
+  }
+  let seen: { track: string; ms: number; atMs: number } | undefined; // the last check's reported position
+  let repairedFor: string | undefined; // at most one repair per track
+  /** Ask Soloist where it is, waiting for the answer (or the query's timeout). */
+  const fresh = () => write("query-get_state", { command: "get_state", answers: "playback_state" }).then(() => undefined, () => undefined);
+  const where = () => (state.track && state.position?.ms !== undefined && state.position.atMs !== undefined ? { track: state.track.uri, ms: state.position.ms, atMs: state.position.atMs } : undefined);
+  /** Two fresh reports of one track, at least `gap` apart by Soloist's own clock, less than a second apart in position. */
+  const frozen = (a: typeof seen, b: typeof seen, gap = checkMs / 2) => !!a && !!b && a.track === b.track && b.atMs - a.atMs >= gap && Math.abs(b.ms - a.ms) < 1000;
+  const playing = () => open && state.status === "playing" && !state.aside;
+
+  /** One look while playing: a fresh position, then frozen, overrun, recovered or fine (Soloist issue #5). */
+  const checkStall = async () => {
+    if (!playing()) return void (seen = undefined);
+    await fresh();
+    if (!playing()) return void (seen = undefined);
+    const now = where();
+    const track = state.track;
+    if (!track) return void (seen = undefined);
+    // Repeat-track loops one track, so running past its length is normal there.
+    const over = state.repeat !== "track" && track.durationMs !== undefined && (positionMs(state, clock.now()) ?? 0) > track.durationMs + OVERRUN_MS;
+    const stuck = frozen(seen, now);
+    if (now && seen && now.track === seen.track && !stuck && !over && state.stalled?.track === now.track) stallAs(); // it moves again: recovered
+    else if ((stuck || over) && !state.stalled) {
+      stallAs({ track: track.uri, ms: now?.ms ?? 0, how: over ? "overrun" : "frozen" });
+      if (config.repairStalls && repairedFor !== track.uri) await repair(track.uri, over);
+    }
+    seen = where();
+  };
+
+  /** Once per track: a skip when stuck past the end; otherwise a seek to where it stuck, then pause and play if it still doesn't move. */
+  const repair = (track: string, over: boolean) => {
+    repairedFor = track;
+    const tried = (what: string) => state.stalled && stallAs({ ...state.stalled, tried: what });
+    // Still ours to fix: playing this track, stalled, and no duck, interrupt or person in between.
+    const ours = () => open && state.status === "playing" && state.track?.uri === track && state.stalled?.track === track && (!state.aside || state.aside === "repair");
+    const run = async () => {
+      if (!ours()) return;
+      marked("repair");
+      try {
+        if (over) return void (tried("a skip"), await actions.next());
+        await actions.seek(state.stalled!.ms);
+        tried("a seek");
+        const at = where(); // where the seek left it
+        await clock.sleep(REPAIR_WAIT_MS);
+        if (!ours()) return;
+        await fresh();
+        if (!ours() || !frozen(at, where(), REPAIR_WAIT_MS / 2)) return;
+        await actions.pause();
+        await actions.resume();
+        tried("a seek, then pause and play");
+      } catch (error) {
+        tried(`a repair that failed: ${errorText(error)}`);
+      } finally {
+        if (state.aside === "repair") marked();
+      }
+    };
+    // In line with duck and interrupt: one aside at a time, so a repair never runs inside an announcement.
+    const p = asides.then(run, run);
+    asides = p.catch(() => {});
+    return p;
+  };
+
   return {
     ...actions,
     name: "spotify",
@@ -473,6 +563,13 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     },
     async run(signal, update) {
       report = update;
+      if (checkMs > 0)
+        void (async () => {
+          while (!signal.aborted) {
+            await clock.sleep(checkMs, signal);
+            if (!signal.aborted) await checkStall().catch((error) => ((frameNote = `stall check failed: ${errorText(error)}`), publish()));
+          }
+        })();
       let backoff = MIN_BACKOFF_MS;
       while (!signal.aborted) {
         const { why, opened } = await session(signal);
@@ -488,6 +585,14 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   };
 }
 
+/** A stall in a few words: `playback stalled at 1:39 (Soloist issue #5); tried a seek`. */
+function stallText(s: Stall | undefined): string | undefined {
+  if (!s) return undefined;
+  const at = `${Math.floor(s.ms / 60_000)}:${String(Math.floor((s.ms % 60_000) / 1000)).padStart(2, "0")}`;
+  const what = s.how === "overrun" ? `playback stuck past the end of the track (Soloist issue #5)` : `playback stalled at ${at} (Soloist issue #5)`;
+  return s.tried ? `${what}; tried ${s.tried}` : what;
+}
+
 /** The speaker in one word, to switch on. `offline`: not reached (or no part); `waiting`: running, nobody has picked it. A status Soloist sends beyond its four passes through. */
 export type SpeakerState = "offline" | "connecting" | "waiting" | "idle" | "playing" | "paused" | "buffering" | (string & {});
 
@@ -500,11 +605,12 @@ export function speakerState(part: Part<SpotifyState> | undefined): SpeakerState
 
 /**
  * A change worth telling someone about, from two reports of the speaker. `own`, on playback events only: it happened while
- * this library's `duck` or `interrupt` ran (its own pause and resume, or a person's change in that time), so a consumer
- * needn't react to it. `offline`, `online`, `waiting` and `picked` are never `own`.
+ * this library's `duck`, `interrupt` or stall repair ran (its own writes, or a person's change in that time), so a consumer
+ * needn't react to it. `offline`, `online`, `waiting`, `picked`, `stalled` and `recovered` are never `own`.
  */
 export type SpotifyEvent = { own?: true } & (
-  | { type: "offline" | "online" | "waiting" | "picked" | "started" | "resumed" | "paused" | "stopped" }
+  | { type: "offline" | "online" | "waiting" | "picked" | "started" | "resumed" | "paused" | "stopped" | "recovered" }
+  | { type: "stalled"; stall: Stall }
   | { type: "track"; track: Track }
 );
 
@@ -513,7 +619,7 @@ const PLAYING = new Set(["playing", "buffering"]);
 /**
  * The events between two reports, for `onChange`'s `before` and `after`: `offline` and `online`; `waiting` (signed out) and
  * `picked` (someone picked the speaker); `started` (from idle), `resumed` (from paused), `paused`, `stopped` (to idle), then
- * `track` for a new track, so "started" and the track come as a pair. Buffering counts as playing. No `before`, or one
+ * `track` for a new track, so "started" and the track come as a pair, then `stalled` and `recovered` (Soloist issue #5). Buffering counts as playing. No `before`, or one
  * with no state (createHome's placeholder before the first report, as at a restart): nothing, since nothing was seen to change. No volume or queue events: read the state.
  */
 export function spotifyChanges(before: Part<SpotifyState> | undefined, after: Part<SpotifyState> | undefined): SpotifyEvent[] {
@@ -538,6 +644,8 @@ export function spotifyChanges(before: Part<SpotifyState> | undefined, after: Pa
   if (to === "paused" && from !== "paused") add({ type: "paused" });
   if (to === "idle" && from !== undefined && from !== "idle") add({ type: "stopped" });
   if (a?.track && a.track.uri !== b?.track?.uri) add({ type: "track", track: a.track });
+  if (a?.stalled && !b?.stalled) events.push({ type: "stalled", stall: a.stalled });
+  if (b?.stalled && !a?.stalled && a?.status === "playing" && a.track?.uri === b.stalled.track) events.push({ type: "recovered" });
   return events;
 }
 

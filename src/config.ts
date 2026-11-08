@@ -265,7 +265,7 @@ export function loadHome(input: unknown, options: LoadOptions): HomeIntegration[
       case "up":
         return up({ token: env(d.key), account: d.account, household: d.household, fetch: net, timeZone: config!.location?.timezone, clock });
       case "spotify":
-        return spotify({ url: d.url, maxVolume: d.maxVolume, clock });
+        return spotify({ url: d.url, maxVolume: d.maxVolume, repairStalls: d.repairStalls, clock });
     }
   }
   function castAll(): ReturnType<typeof cast> {

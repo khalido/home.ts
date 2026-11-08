@@ -429,6 +429,10 @@
                 "minimum": 0,
                 "maximum": 100
               },
+              "repairStalls": {
+                "description": "when playback stalls while Soloist says playing (Soloist issue #5), try once per track to restart it: a seek, then pause and play, or a skip when it is stuck past the track's end. Off unless set",
+                "type": "boolean"
+              },
               "id": {
                 "type": "string"
               },

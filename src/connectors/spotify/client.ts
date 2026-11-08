@@ -70,6 +70,9 @@ export const Frame = z.discriminatedUnion("type", [
 export type Frame = z.infer<typeof Frame>;
 export const FRAME_TYPES: ReadonlySet<string> = new Set(Frame.options.map((o) => o.shape.type.value));
 
+/** A stall the library noticed: see `SpotifyState.stalled`. */
+export type Stall = { track: string; ms: number; how: "frozen" | "overrun"; tried?: string };
+
 /** What is loaded: a track or an episode. */
 export type Track = { uri: string; type?: string; name?: string; artists: string[]; album?: string; cover?: string; durationMs?: number };
 
@@ -99,8 +102,14 @@ export type SpotifyState = {
   repeat?: string;
   /** What plays next, next first: Soloist's `queue_changed` (at most 10) or its answer to `get_queue`. Queued tracks, then the context's. */
   upNext?: Track[];
-  /** Set by this library while its own `duck` or `interrupt` runs, so changes then can be told from a person's. Not Soloist's. */
-  aside?: "duck" | "interrupt";
+  /** Set by this library while its own `duck`, `interrupt` or stall repair runs, so changes then can be told from a person's. Not Soloist's. */
+  aside?: "duck" | "interrupt" | "repair";
+  /**
+   * Set by this library when playback stalls while Soloist still says playing (Soloist issue #5): `frozen` (its reported
+   * position stopped moving) or `overrun` (still on a track well past its end). `ms` the track position where it stuck, `tried` the repair.
+   * Cleared when the track moves again, changes or stops. Not Soloist's.
+   */
+  stalled?: Stall;
   asOf: string;
 };
 

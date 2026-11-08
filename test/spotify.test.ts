@@ -49,11 +49,11 @@ const TRACK = entity("spotify:track:abc123", "Song A", {
   playback: { duration_ms: 200_000 },
 });
 
-function setup(config: { maxVolume?: number; url?: string } = {}) {
+function setup(config: { maxVolume?: number; url?: string; repairStalls?: boolean; stallCheckMs?: number } = {}) {
   const { clock, advance } = manualClock();
   const sockets: FakeSocket[] = [];
   const parts: Part<SpotifyState>[] = [];
-  const s = spotify({ ...config, clock, connect: (url) => (sockets.push(new FakeSocket(url)), sockets.at(-1)!) });
+  const s = spotify({ stallCheckMs: 0, ...config, clock, connect: (url) => (sockets.push(new FakeSocket(url)), sockets.at(-1)!) });
   const abort = new AbortController();
   const running = s.run(abort.signal, (p) => parts.push(p));
   const last = () => parts.at(-1)!;
@@ -937,6 +937,164 @@ describe("spotifyChanges", () => {
     expect(h.last().state?.aside).toBeUndefined();
     sock.push({ type: "playback_changed", status: "paused" });
     expect(spotifyChanges(h.parts.at(-2), h.last())).toEqual([{ type: "paused" }]);
+    await h.stop();
+  });
+});
+
+describe("stalls (Soloist issue #5)", () => {
+  /** Answer the get_state a stall check sends with this position, Soloist's clock at `atMs`. */
+  async function answer(h: Awaited<ReturnType<typeof setup>>, sock: FakeSocket, ms: number, atMs: number) {
+    await tick();
+    expect(sock.sent.at(-1)).toMatchObject({ command: "get_state" });
+    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40, position: { position_ms: ms, timestamp_ms: atMs, speed: 1 } });
+    await tick();
+  }
+  const playingAt = (ms: number) => ({ status: "playing", item: TRACK, position: { position_ms: ms, timestamp_ms: 0, speed: 1 } });
+
+  test("a position that stops moving is a stall: anomaly and a stalled event, no write without repairStalls", async () => {
+    const h = setup({ stallCheckMs: 20_000 });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    await h.advance(20_000);
+    const before = h.last();
+    await answer(h, sock, 99_100, 40_000);
+    expect(h.last().state?.stalled).toEqual({ track: "spotify:track:abc123", ms: 99_100, how: "frozen" });
+    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5)");
+    expect(spotifyChanges(before, h.last())).toContainEqual({ type: "stalled", stall: { track: "spotify:track:abc123", ms: 99_100, how: "frozen" } });
+    expect(sock.commands()).toEqual(["get_state", "get_state"]);
+    const stalled = h.last();
+    await h.advance(20_000);
+    await answer(h, sock, 120_000, 60_000); // it moves again
+    expect(h.last().state?.stalled).toBeUndefined();
+    expect(spotifyChanges(stalled, h.last())).toEqual([{ type: "recovered" }]);
+    await h.stop();
+  });
+
+  test("moving normally is no stall; paused or idle is not looked at", async () => {
+    const h = setup({ stallCheckMs: 20_000 });
+    const sock = await h.online(playingAt(10_000));
+    await h.advance(19_900);
+    await answer(h, sock, 30_000, 20_000);
+    await h.advance(20_000);
+    await answer(h, sock, 50_000, 40_000);
+    expect(h.last().state?.stalled).toBeUndefined();
+    sock.push({ type: "playback_changed", status: "paused" });
+    sock.sent.length = 0;
+    await h.advance(20_000);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("repairStalls: a seek to where it stuck, and when that moves it, nothing more", async () => {
+    const h = setup({ stallCheckMs: 20_000, repairStalls: true });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    await h.advance(20_000);
+    await answer(h, sock, 99_000, 40_000);
+    await h.advance(100);
+    expect(sock.ack()).toEqual({ type: "command", command: "seek", position_ms: 99_000 });
+    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    await tick();
+    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5); tried a seek");
+    expect(h.last().state?.aside).toBe("repair");
+    await h.advance(5000);
+    await answer(h, sock, 104_000, 45_300);
+    expect(sock.commands()).toEqual(["get_state", "get_state", "seek", "get_state"]);
+    expect(h.last().state?.aside).toBeUndefined();
+    await h.stop();
+  });
+
+  test("repairStalls: still frozen after the seek, a pause and play; once per track", async () => {
+    const h = setup({ stallCheckMs: 20_000, repairStalls: true });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    await h.advance(20_000);
+    await answer(h, sock, 99_000, 40_000);
+    await h.advance(100);
+    sock.ack();
+    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    await tick();
+    await h.advance(5000);
+    await answer(h, sock, 99_000, 45_300);
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ command: "pause" });
+    sock.push({ type: "playback_changed", status: "paused" });
+    await h.advance(100);
+    expect(sock.ack()).toMatchObject({ command: "play" });
+    sock.push({ type: "playback_changed", status: "playing" });
+    await tick();
+    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5); tried a seek, then pause and play");
+    expect(h.last().state?.stalled?.track).toBe("spotify:track:abc123"); // still on: the next check that sees it move clears it
+    sock.sent.length = 0;
+    await h.advance(20_000);
+    await answer(h, sock, 99_000, 65_000);
+    await h.advance(20_000);
+    await answer(h, sock, 99_000, 85_000);
+    expect(sock.commands()).toEqual(["get_state", "get_state"]); // no second repair on this track
+    await h.stop();
+  });
+
+  test("repair: a person pausing during its wait ends it; an interrupt waits for it", async () => {
+    const h = setup({ stallCheckMs: 20_000, repairStalls: true });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    await h.advance(20_000);
+    await answer(h, sock, 99_000, 40_000);
+    await h.advance(100);
+    sock.ack(); // the seek
+    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    await tick();
+    const announced: string[] = [];
+    const done = h.s.interrupt(() => announced.push("said"));
+    await tick();
+    expect(sock.commands()).toEqual(["get_state", "get_state", "seek"]); // the interrupt waits its turn
+    sock.push({ type: "playback_changed", status: "paused" }); // someone paused from a phone
+    await h.advance(5000);
+    expect(await done).toMatchObject({ value: 1, music: "untouched", why: "it was not playing" });
+    expect(sock.commands()).toEqual(["get_state", "get_state", "seek"]); // no pause and play from the repair
+    expect(h.last().state?.aside).toBeUndefined();
+    await h.stop();
+  });
+
+  test("a pause between two checks is not a stall", async () => {
+    const h = setup({ stallCheckMs: 20_000 });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    sock.push({ type: "playback_changed", status: "paused" });
+    sock.push({ type: "playback_changed", status: "playing" });
+    await h.advance(20_000);
+    await answer(h, sock, 99_300, 40_000);
+    expect(h.last().state?.stalled).toBeUndefined();
+    await h.stop();
+  });
+
+  test("repeat-track running past the track's length is not an overrun", async () => {
+    const h = setup({ stallCheckMs: 20_000 });
+    const sock = await h.online({ ...playingAt(196_000), options: { shuffle: false, repeat: "track" } });
+    await h.advance(19_900);
+    await answer(h, sock, 196_000, 0);
+    expect(h.last().state?.stalled).toBeUndefined();
+    await h.stop();
+  });
+
+  test("stuck past the end of the track is a stall; repair skips it", async () => {
+    const h = setup({ stallCheckMs: 20_000, repairStalls: true });
+    const sock = await h.online(playingAt(196_000));
+    await h.advance(19_900);
+    await answer(h, sock, 196_000, 0); // the same old anchor: by now 216 s into a 200 s track
+    await h.advance(100);
+    const stalled = h.last();
+    expect(stalled.state?.stalled).toMatchObject({ how: "overrun" });
+    expect(stalled.anomaly).toBe("playback stuck past the end of the track (Soloist issue #5); tried a skip");
+    expect(sock.ack()).toMatchObject({ command: "skip_next" });
+    sock.push({ type: "track_changed", item: entity("spotify:track:next", "Next") });
+    await tick();
+    expect(h.last().state?.stalled).toBeUndefined();
     await h.stop();
   });
 });
