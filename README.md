@@ -54,7 +54,7 @@ The library never reads your environment or a file: you pass addresses, keys and
 | [enphase](src/connectors/enphase/README.md) | solar production and consumption from the IQ Gateway | none |
 | [cast](src/connectors/cast/README.md) | every Cast device and speaker group | volume, mute, stop, announcements |
 | [printers](src/connectors/printers/README.md) | AirPrint printers over IPP: state, toner, paper | none |
-| [spotify](src/connectors/spotify/README.md) | a Spotify Soloist speaker: what is playing, volume, shuffle, over its local WebSocket | play a link, pause, resume, skip, seek, volume (capped), queue, shuffle, each confirmed by what the speaker reports; turn down or pause around an announcement |
+| [spotify](src/connectors/spotify/README.md) | a Spotify Soloist speaker: what is playing, volume, shuffle, over its local WebSocket | play a link, pause, resume, skip, seek, volume (capped), queue, shuffle, repeat, each confirmed by what the speaker reports; turn down or pause around an announcement |
 | [amber](src/connectors/amber/README.md) | live import and feed-in prices | none |
 | [up](src/connectors/up/README.md) | household spending by category, what still needs one | a category or tag on a transaction |
 | [weather](src/connectors/weather/README.md) | now, forecast by the hour and by part of the day, rain soon, the sun, from BOM, Open-Meteo and Google | none |

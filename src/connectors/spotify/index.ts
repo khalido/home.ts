@@ -4,7 +4,7 @@ import { ConnectorError, errorText } from "../../connector.ts";
 import type { Integration, Part, Status } from "../../home.ts";
 import { writeLane } from "../../lane.ts";
 import type { Manifest } from "../../manifest.ts";
-import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, positionMs, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri } from "./client.ts";
+import { commandFrame, fold, Frame, FRAME_TYPES, OPEN, oddities, positionMs, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri, type Track } from "./client.ts";
 
 export { positionMs, type PositionAnchor, type SocketFactory, type SocketLike, type SpotifyState, toSpotifyUri, type Track } from "./client.ts";
 
@@ -27,6 +27,9 @@ export type SpotifyConfig = {
   connect?: SocketFactory;
   clock?: Clock;
 };
+
+/** Soloist's repeat modes. */
+export type Repeat = "off" | "context" | "track";
 
 /** What a write left: the state once Soloist reported the change (`confirmed`), or the state as it stood when `CONFIRM_MS` ran out without it. */
 export type Applied = { state: SpotifyState; confirmed: boolean };
@@ -59,6 +62,8 @@ export type SpotifyActions = {
   /** Add a track to the queue (Soloist queues tracks only); confirmed when it shows in `upNext`. */
   queue(track: string): Promise<Applied>;
   setShuffle(on: boolean): Promise<Applied>;
+  /** Repeat off, the context (playlist, album) or the track: two commands, in the order Soloist's docs give, as one write. */
+  setRepeat(mode: Repeat): Promise<Applied>;
   /**
    * Pause if playing, run `fn`, then resume, unless someone changed it meanwhile (resumed, stopped or skipped it from a
    * phone): then it is theirs and stays. The resume runs even if `fn` throws. Not playing or not connected: just `fn`.
@@ -88,7 +93,14 @@ const WRITE_GAP_MS = 100;
 const MIN_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60_000;
 
-const NOT_SIGNED_IN = "Soloist is running with no Spotify session: nobody has picked it in the Spotify app yet, or its API key is bad (a bad key never signs in, Soloist issue #18)";
+/** Signed out is Soloist's normal state until someone picks the speaker (seen live 2026-11-08); a bad key looks the same (issue #18). */
+const WAITING = "waiting for someone to pick it in the Spotify app; if nobody can, check Soloist's API key (Soloist issue #18)";
+
+const REPEAT_ORDER: Record<Repeat, [[string, boolean], [string, boolean]]> = {
+  off: [["set_repeat_track", false], ["set_repeat_context", false]],
+  context: [["set_repeat_track", false], ["set_repeat_context", true]],
+  track: [["set_repeat_context", false], ["set_repeat_track", true]],
+};
 
 /**
  * A Spotify Soloist speaker as one integration: one WebSocket to Soloist, its `auth_state` and `playback_state` on connect,
@@ -128,8 +140,10 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     let detail: string | undefined;
     if (!open) (status = reported || down ? "disconnected" : "connecting"), (detail = down);
     else if (!heard || (state.loggedIn === true && !whole)) status = "connecting";
-    else (status = "connected"), (detail = state.loggedIn === false ? NOT_SIGNED_IN : note);
-    if (status === "connecting" && !reported) return;
+    else (status = "connected"), (detail = state.loggedIn === false ? WAITING : note);
+    // Connecting is reported never: before the first report createHome's placeholder says it, and a reconnect stays
+    // disconnected until Soloist has answered, so two reports in a row never hide a change behind a half-done connect.
+    if (status === "connecting") return;
     const anomaly = [capNote, oddities(state), frameNote].filter(Boolean).join("; ") || undefined;
     frameNote = undefined;
     reported = true;
@@ -147,7 +161,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     new Promise<void>((resolve, reject) => {
       const s = socket;
       if (!s || !open || s.readyState !== OPEN) return reject(offline());
-      if (state.loggedIn === false && !answers) return reject(new ConnectorError(NOT_SIGNED_IN, { code: "waiting" }));
+      if (state.loggedIn === false && !answers) return reject(new ConnectorError(WAITING, { code: "waiting" }));
       const stop = new AbortController();
       const p = {
         command: name,
@@ -168,11 +182,12 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
     });
 
   /** A command, and for a write how to tell it took: `took(now, before, at)`, `before` the state and `at` the time it was sent. */
-  type Body = { command: string; fields?: Record<string, unknown>; answers?: string; took?: (now: SpotifyState, before: SpotifyState, at: number) => boolean };
+  type Body = { command: string; fields?: Record<string, unknown>; answers?: string; then?: { command: string; fields: Record<string, unknown> }; took?: (now: SpotifyState, before: SpotifyState, at: number) => boolean };
   const send = async (body: Body) => {
     const before = state;
     const at = clock.now();
     await command(body.command, body.fields, body.answers);
+    if (body.then) await command(body.then.command, body.then.fields); // repeat's second half, still this write's turn
     return { before, at };
   };
   let once = 0; // skips and queued tracks never merge: two nexts are two skips
@@ -319,12 +334,26 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   /** A write the integration made itself that failed: in `detail`, and the reason returned. */
   const failed = (why: string) => ((note = why), publish(), why);
   let asides: Promise<unknown> = Promise.resolve();
+  /** `state.aside` set or cleared, so `spotifyChanges` can mark what happens meanwhile as the library's own. */
+  const marked = (kind?: "duck" | "interrupt") => {
+    const { aside: _, ...rest } = state;
+    state = kind ? { ...rest, aside: kind } : rest;
+    publish();
+  };
   /**
    * Run `fn` between `enter` and `leave`, one aside at a time. `enter` returns why it changed nothing (then `fn` just runs);
    * `leave` puts things back, or says why not, and runs even if `fn` throws.
    */
-  const aside = <T>(fn: () => Promise<T> | T, enter: () => Promise<string | undefined>, leave: () => Promise<Left>) => {
+  const aside = <T>(kind: "duck" | "interrupt", fn: () => Promise<T> | T, enter: () => Promise<string | undefined>, leave: () => Promise<Left>) => {
     const run = async (): Promise<Aside<T>> => {
+      if (open) marked(kind);
+      try {
+        return await within();
+      } finally {
+        if (state.aside) marked();
+      }
+    };
+    const within = async (): Promise<Aside<T>> => {
       const skipped = await enter();
       if (skipped) return { value: await fn(), music: "untouched", why: skipped };
       let value: T;
@@ -369,10 +398,17 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       return change(`once-${++once}`, { command: "add_to_queue", fields: { uri }, took: (s) => !!s.upNext?.some((t) => t.uri === uri) });
     },
     setShuffle: (on) => change("shuffle", { command: "set_shuffle", fields: { enabled: on }, took: (s) => s.shuffle === on }),
+    async setRepeat(mode) {
+      // developer.spotify.com/documentation/soloist/reference/websocket-api: clear the other mode first, then set this one.
+      if (!Object.hasOwn(REPEAT_ORDER, mode)) throw invalid(`repeat is off, context or track, not ${mode}`);
+      const [first, second] = REPEAT_ORDER[mode];
+      return change("repeat", { command: first[0], fields: { enabled: first[1] }, then: { command: second[0], fields: { enabled: second[1] } }, took: (s) => s.repeat === mode });
+    },
     interrupt(fn) {
       let track: string | undefined;
       let shown = false; // the pause showed
       return aside(
+        "interrupt",
         fn,
         async () => {
           const no = notPlaying();
@@ -400,6 +436,7 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
       let earlier = 0;
       let shown = false; // the lowered volume showed
       return aside(
+        "duck",
         fn,
         async () => {
           const no = notPlaying();
@@ -451,10 +488,63 @@ export function spotify(config: SpotifyConfig = {}): Integration<SpotifyState, "
   };
 }
 
-/** The speaker in a few words: `Kitchen speaker: playing "Song" by Band · 35%`, or `…: not signed in`. */
+/** The speaker in one word, to switch on. `offline`: not reached (or no part); `waiting`: running, nobody has picked it. A status Soloist sends beyond its four passes through. */
+export type SpeakerState = "offline" | "connecting" | "waiting" | "idle" | "playing" | "paused" | "buffering" | (string & {});
+
+export function speakerState(part: Part<SpotifyState> | undefined): SpeakerState {
+  if (!part || part.status === "disconnected" || part.status === "unavailable") return "offline";
+  if (part.status === "connecting") return "connecting";
+  if (part.state?.loggedIn === false) return "waiting";
+  return part.state?.status ?? "idle"; // signed in, nothing reported yet: nothing is playing
+}
+
+/**
+ * A change worth telling someone about, from two reports of the speaker. `own`, on playback events only: it happened while
+ * this library's `duck` or `interrupt` ran (its own pause and resume, or a person's change in that time), so a consumer
+ * needn't react to it. `offline`, `online`, `waiting` and `picked` are never `own`.
+ */
+export type SpotifyEvent = { own?: true } & (
+  | { type: "offline" | "online" | "waiting" | "picked" | "started" | "resumed" | "paused" | "stopped" }
+  | { type: "track"; track: Track }
+);
+
+const PLAYING = new Set(["playing", "buffering"]);
+
+/**
+ * The events between two reports, for `onChange`'s `before` and `after`: `offline` and `online`; `waiting` (signed out) and
+ * `picked` (someone picked the speaker); `started` (from idle), `resumed` (from paused), `paused`, `stopped` (to idle), then
+ * `track` for a new track, so "started" and the track come as a pair. Buffering counts as playing. No `before`, or one
+ * with no state (createHome's placeholder before the first report, as at a restart): nothing, since nothing was seen to change. No volume or queue events: read the state.
+ */
+export function spotifyChanges(before: Part<SpotifyState> | undefined, after: Part<SpotifyState> | undefined): SpotifyEvent[] {
+  if (!before?.state) return []; // createHome's first `before` is a bare connecting part: a boot is no change
+  const own = before.state?.aside || after?.state?.aside ? { own: true as const } : {}; // playback events only: a drop or a sign-out is never the library's
+  const down = (p: Part<SpotifyState> | undefined) => ["offline", "connecting"].includes(speakerState(p)); // a reconnect passes through connecting
+  const was = down(before);
+  if (speakerState(after) === "offline") return was ? [] : [{ type: "offline" }];
+  if (after?.status === "connecting") return [];
+  const events: SpotifyEvent[] = [];
+  const add = (e: SpotifyEvent) => events.push({ ...e, ...own });
+  if (was) events.push({ type: "online" });
+  const b = before.state;
+  const a = after?.state;
+  if (b?.loggedIn !== false && a?.loggedIn === false) events.push({ type: "waiting" });
+  if (b?.loggedIn === false && a?.loggedIn === true) events.push({ type: "picked" });
+  const from = b?.status;
+  const to = a?.status;
+  const playingNow = to !== undefined && PLAYING.has(to);
+  const playingThen = from !== undefined && PLAYING.has(from);
+  if (playingNow && !playingThen) add({ type: from === "paused" ? "resumed" : "started" });
+  if (to === "paused" && from !== "paused") add({ type: "paused" });
+  if (to === "idle" && from !== undefined && from !== "idle") add({ type: "stopped" });
+  if (a?.track && a.track.uri !== b?.track?.uri) add({ type: "track", track: a.track });
+  return events;
+}
+
+/** The speaker in a few words: `Kitchen speaker: playing "Song" by Band · 35%`, or `…: waiting for someone to pick it`. */
 export function spotifyText(s: SpotifyState): string {
   const who = s.deviceName ?? "Soloist";
-  if (s.loggedIn === false) return `${who}: not signed in`;
+  if (s.loggedIn === false) return `${who}: waiting for someone to pick it`;
   const t = s.track;
   const what = t ? `${t.name ? ` "${t.name}"` : ` ${t.uri}`}${t.artists.length ? ` by ${t.artists.join(", ")}` : ""}` : "";
   const parts = [`${s.status ?? "status unknown"}${what}`, s.volume === undefined ? "" : `${s.volume}%`, s.shuffle ? "shuffle" : ""];

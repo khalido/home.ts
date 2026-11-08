@@ -38,7 +38,7 @@ health(home.snapshot(), Date.now());   // per integration: ok, stale or down, wi
 
 ## Writes
 
-Writes hang off the integration: `home.integration("daikin")?.client.write(setMode("cool"))`, `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`, `home.integration("spotify")?.play(link)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands. Spotify's writes resolve with `{ state, confirmed }`, the state once Soloist reported the change, and `duck(fn, { to })` and `interrupt(fn)` turn the music down or pause it around an announcement, returning what happened to it (`music`: `untouched`, `restored`, `kept` or `failed`).
+Writes hang off the integration: `home.integration("daikin")?.client.write(setMode("cool"))`, `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`, `home.integration("spotify")?.play(link)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands. Spotify's writes resolve with `{ state, confirmed }`, the state once Soloist reported the change, and `duck(fn, { to })` and `interrupt(fn)` turn the music down or pause it around an announcement, returning what happened to it (`music`: `untouched`, `restored`, `kept` or `failed`). `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.
 
 ## Text for people and agents
 

@@ -99,6 +99,8 @@ export type SpotifyState = {
   repeat?: string;
   /** What plays next, next first: Soloist's `queue_changed` (at most 10) or its answer to `get_queue`. Queued tracks, then the context's. */
   upNext?: Track[];
+  /** Set by this library while its own `duck` or `interrupt` runs, so changes then can be told from a person's. Not Soloist's. */
+  aside?: "duck" | "interrupt";
   asOf: string;
 };
 

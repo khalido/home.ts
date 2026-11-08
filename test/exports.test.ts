@@ -13,7 +13,7 @@ const PUBLIC: Record<string, string[]> = {
   "./weather/ftp": ["ftpFetch"],
   "./cast": ["cast", "castDevices", "castText", "configSchema", "manifest", "resolvedFrom"],
   "./printers": ["POLL_MS", "configSchema", "manifest", "printerList", "printerText", "printers"],
-  "./spotify": ["DEFAULT_URL", "configSchema", "manifest", "positionMs", "spotify", "spotifyText", "toSpotifyUri"],
+  "./spotify": ["DEFAULT_URL", "configSchema", "manifest", "positionMs", "speakerState", "spotify", "spotifyChanges", "spotifyText", "toSpotifyUri"],
   "./cast/tls": ["tlsConnect"],
   "./cast/serve": ["SERVE_MS", "lanAddress", "serveClip"],
   "./finders": ["FINDERS", "fileCache"],
