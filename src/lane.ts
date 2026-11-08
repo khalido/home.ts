@@ -14,7 +14,12 @@ export type LaneOptions = {
 };
 
 type Waiter = { resolve(value: unknown): void; reject(error: unknown): void };
-type Pending = { slot: string; body: unknown; write: (body: unknown) => Promise<unknown>; waiters: Waiter[] };
+type Pending = {
+  slot: string;
+  body: unknown;
+  write: (body: unknown) => Promise<unknown>;
+  waiters: Waiter[];
+};
 
 const MINUTE = 60_000;
 
@@ -24,7 +29,10 @@ const MINUTE = 60_000;
  * defaults to the newer body alone.
  */
 export function writeLane(options: LaneOptions) {
-  if (options.perMinute !== undefined && !(options.perMinute >= 1)) throw new RangeError(`writeLane: perMinute must be at least 1, got ${options.perMinute}`);
+  if (options.perMinute !== undefined && !(options.perMinute >= 1))
+    throw new RangeError(
+      `writeLane: perMinute must be at least 1, got ${options.perMinute}`,
+    );
   const clock = options.clock ?? realClock;
   const queue: Pending[] = []; // in order of each slot's first waiting write
   const sent = new Map<string, number[]>(); // send times per slot, the last minute's
@@ -32,11 +40,15 @@ export function writeLane(options: LaneOptions) {
   let running = false;
   let wake = new AbortController();
 
-  const recent = (slot: string) => (sent.get(slot) ?? []).filter((t) => t > clock.now() - MINUTE);
+  const recent = (slot: string) =>
+    (sent.get(slot) ?? []).filter((t) => t > clock.now() - MINUTE);
 
   function readyAt(slot: string): number {
     const times = recent(slot);
-    const capped = options.perMinute !== undefined && times.length >= options.perMinute ? times[times.length - options.perMinute]! + MINUTE : -Infinity;
+    const capped =
+      options.perMinute !== undefined && times.length >= options.perMinute
+        ? times[times.length - options.perMinute]! + MINUTE
+        : -Infinity;
     return Math.max(lastAt + options.gapMs, capped);
   }
 
@@ -47,7 +59,10 @@ export function writeLane(options: LaneOptions) {
       const next = queue.find((p) => readyAt(p.slot) <= now);
       if (!next) {
         wake = new AbortController();
-        await clock.sleep(Math.min(...queue.map((p) => readyAt(p.slot))) - now, wake.signal);
+        await clock.sleep(
+          Math.min(...queue.map((p) => readyAt(p.slot))) - now,
+          wake.signal,
+        );
         continue;
       }
       queue.splice(queue.indexOf(next), 1);
@@ -64,7 +79,12 @@ export function writeLane(options: LaneOptions) {
   }
 
   return {
-    send<B, T>(slot: string, body: B, write: (body: B) => Promise<T>, merge: (older: B, newer: B) => B = (_, newer) => newer): Promise<T> {
+    send<B, T>(
+      slot: string,
+      body: B,
+      write: (body: B) => Promise<T>,
+      merge: (older: B, newer: B) => B = (_, newer) => newer,
+    ): Promise<T> {
       return new Promise<T>((resolve, reject) => {
         const waiter = { resolve, reject } as Waiter;
         const waiting = queue.find((p) => p.slot === slot);
@@ -74,8 +94,14 @@ export function writeLane(options: LaneOptions) {
           waiting.waiters.push(waiter);
           return;
         }
-        queue.push({ slot, body, write: write as Pending["write"], waiters: [waiter] });
-        if (running) wake.abort(); // a sleeping lane looks again: this slot may be ready sooner
+        queue.push({
+          slot,
+          body,
+          write: write as Pending["write"],
+          waiters: [waiter],
+        });
+        if (running)
+          wake.abort(); // a sleeping lane looks again: this slot may be ready sooner
         else void run();
       });
     },

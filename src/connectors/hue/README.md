@@ -39,12 +39,12 @@ Two write lanes per client (`src/lane.ts`). `grouped_light` and `scene` writes g
 
 What this folder learned from, and on what terms. No code was copied.
 
-| Source | Licence | Used for |
-|---|---|---|
-| [Signify's Hue API docs](https://developers.meethue.com/develop/hue-api-v2/) | Developer terms, login-gated | the API itself |
-| [openhue/openhue-api](https://github.com/openhue/openhue-api) | Apache-2.0 | resource and event-stream shapes |
-| [Home Assistant `hue` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/hue) | Apache-2.0 | how HA wires aiohue into entities |
-| [home-assistant-libs/aiohue](https://github.com/home-assistant-libs/aiohue) | Apache-2.0 | reconnect behaviour |
-| [jash90/lumen-desktop](https://github.com/jash90/lumen-desktop) | MIT | the public copy of Signify's root CA |
-| [jdmg94/Hue-Sync](https://github.com/jdmg94/Hue-Sync) | Apache-2.0 | resource types, cross-checked |
-| [vchlum/smart-home](https://github.com/vchlum/smart-home) | MIT | a compact CLIP v2 event loop |
+| Source                                                                                                           | Licence                      | Used for                             |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------ |
+| [Signify's Hue API docs](https://developers.meethue.com/develop/hue-api-v2/)                                     | Developer terms, login-gated | the API itself                       |
+| [openhue/openhue-api](https://github.com/openhue/openhue-api)                                                    | Apache-2.0                   | resource and event-stream shapes     |
+| [Home Assistant `hue` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/hue) | Apache-2.0                   | how HA wires aiohue into entities    |
+| [home-assistant-libs/aiohue](https://github.com/home-assistant-libs/aiohue)                                      | Apache-2.0                   | reconnect behaviour                  |
+| [jash90/lumen-desktop](https://github.com/jash90/lumen-desktop)                                                  | MIT                          | the public copy of Signify's root CA |
+| [jdmg94/Hue-Sync](https://github.com/jdmg94/Hue-Sync)                                                            | Apache-2.0                   | resource types, cross-checked        |
+| [vchlum/smart-home](https://github.com/vchlum/smart-home)                                                        | MIT                          | a compact CLIP v2 event loop         |

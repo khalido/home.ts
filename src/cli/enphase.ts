@@ -1,6 +1,11 @@
 // `home enphase login`: mint the owner token once a year and keep it owner-only.
 import { readFileSync } from "node:fs";
-import { bunGatewayFetch, enphase, mintToken, tokenExpiry } from "../connectors/enphase/index.ts";
+import {
+  bunGatewayFetch,
+  enphase,
+  mintToken,
+  tokenExpiry,
+} from "../connectors/enphase/index.ts";
 import { daysLeft } from "../connectors/enphase/client.ts";
 import { writePrivate } from "../finders.ts";
 import { env, fail, homeTimeZone, TOKEN_FILE, type Verbs } from "./context.ts";
@@ -24,8 +29,14 @@ export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
 
 /** Enphase as an integration from IQ_GATEWAY_HOST and the token file, for `home status`. */
 export function enphaseFromEnv() {
-  const t = enphaseToken() ?? fail("no Enphase token", "auth", "home enphase login");
-  return enphase({ host: env.IQ_GATEWAY_HOST!, token: t.token, fetch: bunGatewayFetch(), timeZone: homeTimeZone() });
+  const t =
+    enphaseToken() ?? fail("no Enphase token", "auth", "home enphase login");
+  return enphase({
+    host: env.IQ_GATEWAY_HOST!,
+    token: t.token,
+    fetch: bunGatewayFetch(),
+    timeZone: homeTimeZone(),
+  });
 }
 
 export const enphaseVerbs: Verbs = {
@@ -38,7 +49,14 @@ export const enphaseVerbs: Verbs = {
       serial: need("IQ_GATEWAY_SERIAL_NUMBER"),
       fetch,
     });
-    writePrivate(TOKEN_FILE, JSON.stringify({ token, expiresAt: expiresAt.toISOString(), mintedAt: new Date().toISOString() }));
+    writePrivate(
+      TOKEN_FILE,
+      JSON.stringify({
+        token,
+        expiresAt: expiresAt.toISOString(),
+        mintedAt: new Date().toISOString(),
+      }),
+    );
     console.log(`${daysLeft(expiresAt, new Date())} days left`);
   },
 };

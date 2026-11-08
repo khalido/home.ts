@@ -29,13 +29,13 @@ The contract (in `docs/cli.md`): stdout is data, stderr everything else. `--json
 
 What a status means:
 
-| Status | Meaning | What to do |
-|---|---|---|
-| `connected` | read and current | use it |
-| `connecting` | still starting (a 15 s cap in the CLI) | wait, or run again |
+| Status         | Meaning                                                                            | What to do                                        |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `connected`    | read and current                                                                   | use it                                            |
+| `connecting`   | still starting (a 15 s cap in the CLI)                                             | wait, or run again                                |
 | `disconnected` | the device or service did not answer; the last good state is kept, with its `asOf` | say so; check the device is on and at its address |
-| `unavailable` | stopped for good: a key rejected, a setting wrong | the `detail` names it; fix the key or setting |
-| `not set up` | env names or a file missing (`needs` lists them) | set them, or say what is needed |
+| `unavailable`  | stopped for good: a key rejected, a setting wrong                                  | the `detail` names it; fix the key or setting     |
+| `not set up`   | env names or a file missing (`needs` lists them)                                   | set them, or say what is needed                   |
 
 Weather: `blocks` holds morning, afternoon and evening for today and tomorrow in the home's time zone; `rainSoon` says when rain starts in the next two hours (needs the Google key). Energy: `now` in `home --json` is the one owner of solar, use, grid flow and cost per hour; never recompute it.
 
@@ -74,9 +74,9 @@ If discovery finds nothing: the machine must be on the same network and subnet a
 ```ts
 import { createHome, loadHome } from "@khalido/home";
 const home = createHome(loadHome(config, options));
-await home.start(signal);               // runs until signal aborts
-home.part("weather")?.state?.blocks;    // typed by name; never touches a device
-await home.refresh("daikin");           // read now; resolves when it has reported
+await home.start(signal); // runs until signal aborts
+home.part("weather")?.state?.blocks; // typed by name; never touches a device
+await home.refresh("daikin"); // read now; resolves when it has reported
 ```
 
 `docs/using.md` covers wiring it into an app (Bun and Node). Automations ("if X then Y") belong in the app, not the library: the library gives the facts (`sunNow`, `rainSoon`, `dayBlocks`, `energyNow`) and the writes.

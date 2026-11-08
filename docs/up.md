@@ -11,7 +11,7 @@ Surface the household's spending to the family through the home bot, so "utiliti
 ## What the three repos taught
 
 - **up-bank-mcp** is a thin wrapper: 20 tools, raw API JSON back, no shaping, no transfer exclusion, writes report success without reading the result. No licence; read for the endpoint list only.
-- **up-finance-skills** has the useful idea: a transaction is *spend* only after excluding transfers between own accounts, covers, forwards, round-ups and interest, and every report carries a validation block (date range, raw and filtered counts, categories reconciling to the total). It matches those movements by description text, which is fragile; the API gives `transferAccount` for own-account transfers and `roundUp` on the purchase, but names no field for cover and forward (**unconfirmed** beyond description matching).
+- **up-finance-skills** has the useful idea: a transaction is _spend_ only after excluding transfers between own accounts, covers, forwards, round-ups and interest, and every report carries a validation block (date range, raw and filtered counts, categories reconciling to the total). It matches those movements by description text, which is fragile; the API gives `transferAccount` for own-account transfers and `roundUp` on the purchase, but names no field for cover and forward (**unconfirmed** beyond description matching).
 - **up-mcp**: thin, MIT, 2025.
 
 ## The API facts that shape it
@@ -43,15 +43,15 @@ Surface the household's spending to the family through the home bot, so "utiliti
 
 **CLI**, `home up …`:
 
-| Verb | Prints | |
-|---|---|---|
-| `home up` | the window, spend, top five categories, uncategorised count | read |
-| `home up transactions [--since] [--until] [--category] [--tag] [--status] [--json\|--csv]` | trimmed rows | read |
-| `home up categories` | the tree with ids | read |
-| `home up uncategorised` | categorisable transactions with no category | read |
-| `home up spend [--by category\|merchant]` | the helper's output | read |
-| `home up categorise <id> <category\|none>` | the transaction before and after | **write** |
-| `home up tag <id> <tag> [--remove]` | the transaction before and after | **write** |
+| Verb                                                                                       | Prints                                                      |           |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | --------- |
+| `home up`                                                                                  | the window, spend, top five categories, uncategorised count | read      |
+| `home up transactions [--since] [--until] [--category] [--tag] [--status] [--json\|--csv]` | trimmed rows                                                | read      |
+| `home up categories`                                                                       | the tree with ids                                           | read      |
+| `home up uncategorised`                                                                    | categorisable transactions with no category                 | read      |
+| `home up spend [--by category\|merchant]`                                                  | the helper's output                                         | read      |
+| `home up categorise <id> <category\|none>`                                                 | the transaction before and after                            | **write** |
+| `home up tag <id> <tag> [--remove]`                                                        | the transaction before and after                            | **write** |
 
 No bulk "fix all" verb. Writes exist so an agent with its own judgement can act one transaction at a time.
 

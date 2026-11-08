@@ -2,7 +2,12 @@
 // the socket is a 4-byte big-endian length, then the encoded message. Only string payloads (JSON) are used.
 
 /** One message on a Cast socket. `payload` is the JSON text; a binary payload (unused by any namespace here) comes as undefined. */
-export type CastMessage = { source: string; destination: string; namespace: string; payload?: string };
+export type CastMessage = {
+  source: string;
+  destination: string;
+  namespace: string;
+  payload?: string;
+};
 
 /** The namespaces a state reader uses. */
 export const NS = {
@@ -29,7 +34,16 @@ const field = (number: number, value: string): number[] => {
 
 /** A message as framed on the socket: version 0, string payload. */
 export function encode(m: CastMessage): Uint8Array {
-  const body = [0x08, 0, ...field(2, m.source), ...field(3, m.destination), ...field(4, m.namespace), 0x28, 0, ...field(6, m.payload ?? "")];
+  const body = [
+    0x08,
+    0,
+    ...field(2, m.source),
+    ...field(3, m.destination),
+    ...field(4, m.namespace),
+    0x28,
+    0,
+    ...field(6, m.payload ?? ""),
+  ];
   const out = new Uint8Array(4 + body.length);
   new DataView(out.buffer).setUint32(0, body.length);
   out.set(body, 4);
@@ -62,7 +76,12 @@ export function decode(bytes: Uint8Array): CastMessage {
     } else if (wire === 1 || wire === 5) i += wire === 1 ? 8 : 4;
     else throw new Error(`cast: unknown wire type ${wire}`);
   }
-  return { source: strings[2] ?? "", destination: strings[3] ?? "", namespace: strings[4] ?? "", payload: strings[6] };
+  return {
+    source: strings[2] ?? "",
+    destination: strings[3] ?? "",
+    namespace: strings[4] ?? "",
+    payload: strings[6],
+  };
 }
 
 /** Splits a byte stream into messages: `push` each chunk as it arrives, get back every message it completed. */
@@ -76,7 +95,10 @@ export function framer() {
     let at = 0;
     while (joined.length - at >= 4) {
       const length = new DataView(joined.buffer, at).getUint32(0);
-      if (length > MAX_MESSAGE) throw new Error(`cast: a ${length}-byte message, over the protocol's ${MAX_MESSAGE}`);
+      if (length > MAX_MESSAGE)
+        throw new Error(
+          `cast: a ${length}-byte message, over the protocol's ${MAX_MESSAGE}`,
+        );
       if (joined.length - at < 4 + length) break;
       out.push(decode(joined.subarray(at + 4, at + 4 + length)));
       at += 4 + length;
@@ -96,4 +118,9 @@ export type CastChannel = {
 };
 
 /** How to open one: `tlsConnect` from `@khalido/home/cast/tls` in Bun and Node. */
-export type CastConnect = (to: { host: string; port: number; signal?: AbortSignal; timeoutMs?: number }) => Promise<CastChannel>;
+export type CastConnect = (to: {
+  host: string;
+  port: number;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}) => Promise<CastChannel>;

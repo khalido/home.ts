@@ -38,6 +38,7 @@ Source for every step: Enphase's technical brief [Accessing IQ Gateway local API
    - `POST https://entrez.enphaseenergy.com/tokens` with JSON `{ session_id, serial_num, username }`, returning the token.
 
    A system owner's token is valid for **one year**; an installer's, or a self-installer's, for 12 hours. Unconfirmed which KO's account is; the token's expiry will say.
+
 2. **Cache it** in `~/.config/home/enphase-token.json`, owner-only (0600), written by the CLI only. The library never stores it; callers pass it in. The password is read from `ENPHASE_PASSWORD` for those two calls and never written.
 3. **Read locally**: HTTPS to the gateway with `Authorization: Bearer <token>` and `Accept: application/json`. The brief uses `curl -k`; see TLS above.
 
@@ -53,11 +54,11 @@ Its coordinator polls the gateway every 60 s, rechecks the firmware every 4 h, c
 
 ## Sources
 
-| Source | Licence | Used for |
-|---|---|---|
-| Enphase [Envoy-S manual](https://portal.segen.co.uk/reseller/docs/Envoy-S-MAN-EN-INTL.pdf) (141-00035 Rev 02, a reseller's copy) | Enphase document | LEDs, AP mode, Wi-Fi change |
-| Enphase [TEB-00060-2.0](https://enphase.com/download/iq-gateway-local-apis-or-ui-access-using-token) | Enphase document, © Enphase | token flow, local endpoints |
-| [Enphase developer v4](https://developer-v4.enphase.com/) | Enphase API terms | the cloud alternative |
-| [Home Assistant `enphase_envoy` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/enphase_envoy) | Apache-2.0 | how HA reads a local gateway |
-| [pyenphase/pyenphase](https://github.com/pyenphase/pyenphase) | MIT | endpoints for software 8, the meter rules, and the test fixtures (copied with attribution) |
-| The author's earlier Python dashboard (not public) | the author's | ran against this gateway: the env names, `/production.json` with `/ivp/meters`, trusting a meter only when enabled and active |
+| Source                                                                                                                               | Licence                     | Used for                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Enphase [Envoy-S manual](https://portal.segen.co.uk/reseller/docs/Envoy-S-MAN-EN-INTL.pdf) (141-00035 Rev 02, a reseller's copy)     | Enphase document            | LEDs, AP mode, Wi-Fi change                                                                                                   |
+| Enphase [TEB-00060-2.0](https://enphase.com/download/iq-gateway-local-apis-or-ui-access-using-token)                                 | Enphase document, © Enphase | token flow, local endpoints                                                                                                   |
+| [Enphase developer v4](https://developer-v4.enphase.com/)                                                                            | Enphase API terms           | the cloud alternative                                                                                                         |
+| [Home Assistant `enphase_envoy` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/enphase_envoy) | Apache-2.0                  | how HA reads a local gateway                                                                                                  |
+| [pyenphase/pyenphase](https://github.com/pyenphase/pyenphase)                                                                        | MIT                         | endpoints for software 8, the meter rules, and the test fixtures (copied with attribution)                                    |
+| The author's earlier Python dashboard (not public)                                                                                   | the author's                | ran against this gateway: the env names, `/production.json` with `/ivp/meters`, trusting a meter only when enabled and active |

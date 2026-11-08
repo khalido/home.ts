@@ -1,6 +1,11 @@
 import { localDay, localHour, localTime } from "../../clock.ts";
 import { field } from "../../manifest.ts";
-import { CONDITIONS, type Condition, type ForecastHour, type WeatherHourly } from "./source.ts";
+import {
+  CONDITIONS,
+  type Condition,
+  type ForecastHour,
+  type WeatherHourly,
+} from "./source.ts";
 
 /** One part of a day: its name and the local hours it covers, `from` up to `to` (0–24, within one day). */
 export type BlockDef = { name: string; from: number; to: number };
@@ -33,16 +38,30 @@ export type DayBlock = {
   uvIndex?: number; // the highest hour's
   condition?: Condition;
 };
-export type DayBlocks = { source: string; today: DayBlock[]; tomorrow: DayBlock[] };
+export type DayBlocks = {
+  source: string;
+  today: DayBlock[];
+  tomorrow: DayBlock[];
+};
 
 const HOUR_MS = 3_600_000;
 
-function summarise(block: BlockDef, date: string, hours: (ForecastHour & { t: number; hour: number })[]): DayBlock {
-  const values = (k: "tempC" | "rainChance" | "windKmh" | "gustKmh" | "rainMm" | "uvIndex") => hours.map((h) => h[k]).filter((v) => v !== undefined);
-  const max = (k: Parameters<typeof values>[0]) => (values(k).length ? Math.max(...values(k)) : undefined);
+function summarise(
+  block: BlockDef,
+  date: string,
+  hours: (ForecastHour & { t: number; hour: number })[],
+): DayBlock {
+  const values = (
+    k: "tempC" | "rainChance" | "windKmh" | "gustKmh" | "rainMm" | "uvIndex",
+  ) => hours.map((h) => h[k]).filter((v) => v !== undefined);
+  const max = (k: Parameters<typeof values>[0]) =>
+    values(k).length ? Math.max(...values(k)) : undefined;
   const temps = values("tempC");
   const mm = values("rainMm");
-  const worst = hours.map((h) => h.condition).filter((c) => c !== undefined).sort((a, b) => CONDITIONS.indexOf(b) - CONDITIONS.indexOf(a))[0];
+  const worst = hours
+    .map((h) => h.condition)
+    .filter((c) => c !== undefined)
+    .sort((a, b) => CONDITIONS.indexOf(b) - CONDITIONS.indexOf(a))[0];
   return {
     name: block.name,
     date,
@@ -53,7 +72,10 @@ function summarise(block: BlockDef, date: string, hours: (ForecastHour & { t: nu
     minC: temps.length ? Math.min(...temps) : undefined,
     maxC: temps.length ? Math.max(...temps) : undefined,
     rainChance: max("rainChance"),
-    rainMm: mm.length === hours.length ? Number(mm.reduce((s, v) => s + v, 0).toFixed(2)) : undefined, // toFixed drops float noise only
+    rainMm:
+      mm.length === hours.length
+        ? Number(mm.reduce((s, v) => s + v, 0).toFixed(2))
+        : undefined, // toFixed drops float noise only
     windKmh: max("windKmh"),
     gustKmh: max("gustKmh"),
     uvIndex: max("uvIndex"),
@@ -67,29 +89,50 @@ function summarise(block: BlockDef, date: string, hours: (ForecastHour & { t: nu
  * `dayBlocks(state.hourly, now, timeZone)`. An hour counts while it has not ended; a part with no hours left is left out.
  * Throws on a block outside 0–24 or ending before it starts.
  */
-export function dayBlocks(hourly: WeatherHourly | undefined, at: number, timeZone?: string, blocks: readonly BlockDef[] = BLOCKS): DayBlocks | undefined {
+export function dayBlocks(
+  hourly: WeatherHourly | undefined,
+  at: number,
+  timeZone?: string,
+  blocks: readonly BlockDef[] = BLOCKS,
+): DayBlocks | undefined {
   checkBlocks(blocks);
   if (!hourly) return undefined;
   const hours = hourly.hours
     .map((h) => ({ ...h, t: Date.parse(h.at) }))
     .filter((h) => h.t + HOUR_MS > at)
-    .map((h) => ({ ...h, date: localDay(h.t, timeZone), hour: localHour(h.t, timeZone) }));
+    .map((h) => ({
+      ...h,
+      date: localDay(h.t, timeZone),
+      hour: localHour(h.t, timeZone),
+    }));
   const cut = (date: string) =>
     blocks.flatMap((b) => {
-      const inside = hours.filter((h) => h.date === date && h.hour >= b.from && h.hour < b.to);
+      const inside = hours.filter(
+        (h) => h.date === date && h.hour >= b.from && h.hour < b.to,
+      );
       return inside.length ? [summarise(b, date, inside)] : [];
     });
   const today = localDay(at, timeZone);
   const [y, m, d] = today.split("-").map(Number);
-  const tomorrow = new Date(Date.UTC(y!, m! - 1, d! + 1)).toISOString().slice(0, 10); // by the calendar: a day is 23 or 25 hours twice a year
+  const tomorrow = new Date(Date.UTC(y!, m! - 1, d! + 1))
+    .toISOString()
+    .slice(0, 10); // by the calendar: a day is 23 or 25 hours twice a year
   return { source: hourly.source, today: cut(today), tomorrow: cut(tomorrow) };
 }
 
 /** Throw on blocks a day cannot hold: whole hours within 0–24, each ending after it starts. */
 export function checkBlocks(blocks: readonly BlockDef[]): void {
   for (const b of blocks)
-    if (!(Number.isInteger(b.from) && Number.isInteger(b.to) && b.from >= 0 && b.to <= 24 && b.from < b.to))
-      throw new RangeError(`day block ${b.name}: hours ${b.from}–${b.to}, want whole hours, 0 ≤ from < to ≤ 24`);
+    if (!(
+      Number.isInteger(b.from) &&
+      Number.isInteger(b.to) &&
+      b.from >= 0 &&
+      b.to <= 24 &&
+      b.from < b.to
+    ))
+      throw new RangeError(
+        `day block ${b.name}: hours ${b.from}–${b.to}, want whole hours, 0 ≤ from < to ≤ 24`,
+      );
 }
 
 /** The UV index from which a block's text names it: 3, where sun protection starts to be advised (WHO's "moderate"). A display rule. */
@@ -100,10 +143,31 @@ export const UV_SHOWN = 3;
  * under way or short; UV shows from `UV_SHOWN`.
  */
 export function blockText(b: DayBlock, timeZone?: string): string {
-  const name = b.late ? `${b.name} from ${localTime(Date.parse(b.from), timeZone)}` : b.name;
-  const temp = b.minC === undefined || b.maxC === undefined ? "" : b.minC === b.maxC ? `${b.minC} °C` : `${b.minC}–${b.maxC} °C`;
-  const rain = [field(b.rainChance, (v) => `rain ${v}%`), b.rainMm ? `${b.rainChance === undefined ? "rain " : ""}${b.rainMm} mm` : ""].filter(Boolean).join(" ");
-  const wind = field(b.windKmh, (v) => `wind ${v} km/h${b.gustKmh === undefined ? "" : ` gusting ${b.gustKmh}`}`);
-  const uv = b.uvIndex !== undefined && b.uvIndex >= UV_SHOWN ? `UV ${b.uvIndex}` : "";
-  return [`${name} ${temp}`.trim(), b.condition ?? "", rain, wind, uv].filter(Boolean).join(", ");
+  const name = b.late
+    ? `${b.name} from ${localTime(Date.parse(b.from), timeZone)}`
+    : b.name;
+  const temp =
+    b.minC === undefined || b.maxC === undefined
+      ? ""
+      : b.minC === b.maxC
+        ? `${b.minC} °C`
+        : `${b.minC}–${b.maxC} °C`;
+  const rain = [
+    field(b.rainChance, (v) => `rain ${v}%`),
+    b.rainMm
+      ? `${b.rainChance === undefined ? "rain " : ""}${b.rainMm} mm`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const wind = field(
+    b.windKmh,
+    (v) =>
+      `wind ${v} km/h${b.gustKmh === undefined ? "" : ` gusting ${b.gustKmh}`}`,
+  );
+  const uv =
+    b.uvIndex !== undefined && b.uvIndex >= UV_SHOWN ? `UV ${b.uvIndex}` : "";
+  return [`${name} ${temp}`.trim(), b.condition ?? "", rain, wind, uv]
+    .filter(Boolean)
+    .join(", ");
 }

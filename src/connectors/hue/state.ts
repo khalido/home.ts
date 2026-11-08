@@ -1,11 +1,19 @@
 import type { HueEvent, Resource } from "./schemas.ts";
 
 /** Every resource on the bridge by id, from the last full read plus every event since. `asOf` is local time it was last known fresh. */
-export type HueSnapshot = { resources: Record<string, Resource>; asOf: string; lastEventId?: string; lastError?: HueEvent };
+export type HueSnapshot = {
+  resources: Record<string, Resource>;
+  asOf: string;
+  lastEventId?: string;
+  lastError?: HueEvent;
+};
 
 /** A snapshot from one full `get()`. */
 export function snapshotFrom(resources: Resource[], asOf: string): HueSnapshot {
-  return { resources: Object.fromEntries(resources.map((r) => [r.id, r])), asOf };
+  return {
+    resources: Object.fromEntries(resources.map((r) => [r.id, r])),
+    asOf,
+  };
 }
 
 /** Apply one event batch. Pure: returns a new snapshot. Updates carry only changed fields, so they merge; unknown types are ignored. */
@@ -16,25 +24,39 @@ export function reduce(snapshot: HueSnapshot, event: HueEvent): HueSnapshot {
   for (const item of event.data) {
     const prev = resources[item.id];
     if (event.type === "delete") delete resources[item.id];
-    else resources[item.id] = (event.type === "update" && prev ? merge(prev, item) : item) as Resource;
+    else
+      resources[item.id] = (
+        event.type === "update" && prev ? merge(prev, item) : item
+      ) as Resource;
   }
   return { ...snapshot, resources };
 }
 
 type Plain = Record<string, unknown>;
-const isPlain = (v: unknown): v is Plain => typeof v === "object" && v !== null && !Array.isArray(v);
+const isPlain = (v: unknown): v is Plain =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 function merge(a: Plain, b: Plain): Plain {
   const out = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = isPlain(v) && isPlain(a[k]) ? merge(a[k], v) : v;
+  for (const [k, v] of Object.entries(b))
+    out[k] = isPlain(v) && isPlain(a[k]) ? merge(a[k], v) : v;
   return out;
 }
 
-const ofType = (s: HueSnapshot, type: string) => Object.values(s.resources).filter((r) => r.type === type);
+const ofType = (s: HueSnapshot, type: string) =>
+  Object.values(s.resources).filter((r) => r.type === type);
 const groupedLightOf = (s: HueSnapshot, r: Resource) =>
-  r.services?.map((x) => s.resources[x.rid]).find((x) => x?.type === "grouped_light");
+  r.services
+    ?.map((x) => s.resources[x.rid])
+    .find((x) => x?.type === "grouped_light");
 
 /** A light as a row shows it. `reachable` is undefined when the bridge has no connectivity record for it. */
-export type LightView = { id: string; name?: string; on?: boolean; brightness?: number; reachable?: boolean };
+export type LightView = {
+  id: string;
+  name?: string;
+  on?: boolean;
+  brightness?: number;
+  reachable?: boolean;
+};
 
 /** Every light, with on, brightness and reachability. */
 export function lights(s: HueSnapshot): LightView[] {
@@ -52,7 +74,15 @@ export function lights(s: HueSnapshot): LightView[] {
 }
 
 /** A room or zone as a row shows it, with its grouped light's state. */
-export type GroupView = { id: string; type: "room" | "zone"; name?: string; groupedLightId?: string; on?: boolean; brightness?: number; lightIds: string[] };
+export type GroupView = {
+  id: string;
+  type: "room" | "zone";
+  name?: string;
+  groupedLightId?: string;
+  on?: boolean;
+  brightness?: number;
+  lightIds: string[];
+};
 
 /** Rooms and zones. A room's children are devices; a zone's are lights. */
 export function groups(s: HueSnapshot): GroupView[] {
@@ -67,7 +97,9 @@ export function groups(s: HueSnapshot): GroupView[] {
       groupedLightId: grouped?.id,
       on: grouped?.on?.on,
       brightness: grouped?.dimming?.brightness,
-      lightIds: all.filter((l) => kids.has(l.id) || kids.has(l.owner?.rid ?? "")).map((l) => l.id),
+      lightIds: all
+        .filter((l) => kids.has(l.id) || kids.has(l.owner?.rid ?? ""))
+        .map((l) => l.id),
     };
   });
 }
@@ -82,6 +114,11 @@ export function homeGroupedLightId(s: HueSnapshot): string | undefined {
 export function scenes(s: HueSnapshot) {
   return ofType(s, "scene").map((sc) => {
     const active = (sc.status as { active?: string } | undefined)?.active;
-    return { id: sc.id, name: sc.metadata?.name, groupId: sc.group?.rid, active: active !== undefined && active !== "inactive" };
+    return {
+      id: sc.id,
+      name: sc.metadata?.name,
+      groupId: sc.group?.rid,
+      active: active !== undefined && active !== "inactive",
+    };
   });
 }

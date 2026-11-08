@@ -9,8 +9,14 @@ const BASE = "https://api.up.com.au/api/v1";
 /** A failed Up call. `status` 401 means the token is wrong or revoked; 429 the rate limit (unpublished: read `X-RateLimit-Remaining`). */
 export class UpError extends ConnectorError {}
 
-const Money = z.looseObject({ currencyCode: z.string().optional(), value: z.string().optional(), valueInBaseUnits: z.number().optional() });
-const Ref = z.looseObject({ data: z.looseObject({ id: z.string() }).nullable().optional() });
+const Money = z.looseObject({
+  currencyCode: z.string().optional(),
+  value: z.string().optional(),
+  valueInBaseUnits: z.number().optional(),
+});
+const Ref = z.looseObject({
+  data: z.looseObject({ id: z.string() }).nullable().optional(),
+});
 
 const TransactionResource = z.looseObject({
   id: z.string(),
@@ -21,16 +27,31 @@ const TransactionResource = z.looseObject({
       description: z.string().optional(),
       message: z.string().nullable().optional(),
       isCategorizable: z.boolean().optional(),
-      holdInfo: z.looseObject({ amount: Money.optional() }).nullable().optional(),
-      roundUp: z.looseObject({ amount: Money.optional() }).nullable().optional(),
-      cashback: z.looseObject({ amount: Money.optional() }).nullable().optional(),
+      holdInfo: z
+        .looseObject({ amount: Money.optional() })
+        .nullable()
+        .optional(),
+      roundUp: z
+        .looseObject({ amount: Money.optional() })
+        .nullable()
+        .optional(),
+      cashback: z
+        .looseObject({ amount: Money.optional() })
+        .nullable()
+        .optional(),
       amount: Money.optional(),
       foreignAmount: Money.nullable().optional(),
       settledAt: z.string().nullable().optional(),
       createdAt: z.string().optional(),
       transactionType: z.string().nullable().optional(),
-      note: z.looseObject({ text: z.string().optional() }).nullable().optional(),
-      performingCustomer: z.looseObject({ displayName: z.string().optional() }).nullable().optional(),
+      note: z
+        .looseObject({ text: z.string().optional() })
+        .nullable()
+        .optional(),
+      performingCustomer: z
+        .looseObject({ displayName: z.string().optional() })
+        .nullable()
+        .optional(),
       deepLinkURL: z.string().optional(),
     })
     .optional(),
@@ -40,12 +61,20 @@ const TransactionResource = z.looseObject({
       transferAccount: Ref.optional(),
       category: Ref.optional(),
       parentCategory: Ref.optional(),
-      tags: z.looseObject({ data: z.array(z.looseObject({ id: z.string() })).optional() }).optional(),
+      tags: z
+        .looseObject({
+          data: z.array(z.looseObject({ id: z.string() })).optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
 
-const Page = <T extends z.ZodType>(item: T) => z.looseObject({ data: z.array(item), links: z.looseObject({ next: z.string().nullable().optional() }).optional() });
+const Page = <T extends z.ZodType>(item: T) =>
+  z.looseObject({
+    data: z.array(item),
+    links: z.looseObject({ next: z.string().nullable().optional() }).optional(),
+  });
 const One = <T extends z.ZodType>(item: T) => z.looseObject({ data: item });
 
 const CategoryResource = z.looseObject({
@@ -56,13 +85,23 @@ const CategoryResource = z.looseObject({
 const AccountResource = z.looseObject({
   id: z.string(),
   attributes: z
-    .looseObject({ displayName: z.string().optional(), accountType: z.string().optional(), ownershipType: z.string().optional(), balance: Money.optional() })
+    .looseObject({
+      displayName: z.string().optional(),
+      accountType: z.string().optional(),
+      ownershipType: z.string().optional(),
+      balance: Money.optional(),
+    })
     .optional(),
 });
 const WebhookResource = z.looseObject({
   id: z.string(),
   attributes: z
-    .looseObject({ url: z.string().optional(), description: z.string().nullable().optional(), secretKey: z.string().optional(), createdAt: z.string().optional() })
+    .looseObject({
+      url: z.string().optional(),
+      description: z.string().nullable().optional(),
+      secretKey: z.string().optional(),
+      createdAt: z.string().optional(),
+    })
     .optional(),
 });
 const LogResource = z.looseObject({
@@ -71,7 +110,10 @@ const LogResource = z.looseObject({
     .looseObject({
       deliveryStatus: z.string().optional(),
       createdAt: z.string().optional(),
-      response: z.looseObject({ statusCode: z.number().optional() }).nullable().optional(),
+      response: z
+        .looseObject({ statusCode: z.number().optional() })
+        .nullable()
+        .optional(),
     })
     .optional(),
 });
@@ -105,15 +147,34 @@ export type Transaction = {
 };
 
 export type Category = { id: string; name?: string; parentId?: string };
-export type Account = { id: string; displayName?: string; accountType?: string; ownershipType?: string; balanceCents?: number };
-export type Webhook = { id: string; url?: string; description?: string; createdAt?: string; secretKey?: string };
-export type WebhookLog = { id: string; deliveryStatus?: string; createdAt?: string; statusCode?: number };
+export type Account = {
+  id: string;
+  displayName?: string;
+  accountType?: string;
+  ownershipType?: string;
+  balanceCents?: number;
+};
+export type Webhook = {
+  id: string;
+  url?: string;
+  description?: string;
+  createdAt?: string;
+  secretKey?: string;
+};
+export type WebhookLog = {
+  id: string;
+  deliveryStatus?: string;
+  createdAt?: string;
+  statusCode?: number;
+};
 
 const id = (r?: z.infer<typeof Ref>) => r?.data?.id ?? undefined;
 const nul = <T>(v: T | null | undefined) => v ?? undefined;
 
 /** Up's transaction resource to the library's shape. */
-export function toTransaction(r: z.infer<typeof TransactionResource>): Transaction {
+export function toTransaction(
+  r: z.infer<typeof TransactionResource>,
+): Transaction {
   const a = r.attributes ?? {};
   const rel = r.relationships ?? {};
   return {
@@ -157,103 +218,291 @@ export type TransactionQuery = {
 
 /** The Up client: the token comes in, nothing is stored. Reads are GETs; the writes are the three Up allows, each re-reading what Up now holds. */
 export function upClient(options: { token: string; fetch: typeof fetch }) {
-  const headers = { authorization: `Bearer ${options.token}`, accept: "application/json" };
-  const url = (path: string) => (path.startsWith("https://") ? path : `${BASE}${path}`);
-  const get = <T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal) => getJson(options.fetch, url(path), { init: { headers }, signal, schema, error: UpError });
+  const headers = {
+    authorization: `Bearer ${options.token}`,
+    accept: "application/json",
+  };
+  const url = (path: string) =>
+    path.startsWith("https://") ? path : `${BASE}${path}`;
+  const get = <T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal) =>
+    getJson(options.fetch, url(path), {
+      init: { headers },
+      signal,
+      schema,
+      error: UpError,
+    });
   /** A write: JSON in, the status checked, the body (if any) returned. Up answers 204 to category and tag writes. */
-  async function send(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<unknown> {
-    const init = { method, headers: { ...headers, ...(body === undefined ? {} : { "content-type": "application/json" }) }, body: body === undefined ? undefined : JSON.stringify(body) };
+  async function send(
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    const init = {
+      method,
+      headers: {
+        ...headers,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    };
     const res = await fetchTimeout(options.fetch, url(path), init, { signal });
-    if (!res.ok) throw new UpError(`HTTP ${res.status} on ${method} ${new URL(url(path)).pathname}`, { status: res.status });
+    if (!res.ok)
+      throw new UpError(
+        `HTTP ${res.status} on ${method} ${new URL(url(path)).pathname}`,
+        { status: res.status },
+      );
     return res.status === 204 ? undefined : res.json();
   }
   /** Follow `links.next` until `limit` items or `pageCap` pages; `truncated` says more were there. */
-  async function pages<T extends z.ZodType>(path: string, item: T, limit: number, pageCap: number, signal?: AbortSignal) {
+  async function pages<T extends z.ZodType>(
+    path: string,
+    item: T,
+    limit: number,
+    pageCap: number,
+    signal?: AbortSignal,
+  ) {
     const out: z.infer<T>[] = [];
     let next: string | undefined = path;
     let n = 0;
     while (next && out.length < limit && n < pageCap) {
-      const page: { data: z.infer<T>[]; links?: { next?: string | null } } = await get(next, Page(item), signal);
+      const page: { data: z.infer<T>[]; links?: { next?: string | null } } =
+        await get(next, Page(item), signal);
       out.push(...page.data);
       next = page.links?.next ?? undefined;
       n++;
     }
-    return { items: out.slice(0, limit), truncated: next !== undefined || out.length > limit };
+    return {
+      items: out.slice(0, limit),
+      truncated: next !== undefined || out.length > limit,
+    };
   }
-  const transaction = async (txId: string, signal?: AbortSignal) => toTransaction((await get(`/transactions/${encodeURIComponent(txId)}`, One(TransactionResource), signal)).data);
-  const tagBody = (labels: string[]) => ({ data: labels.map((l) => ({ type: "tags", id: l })) });
+  const transaction = async (txId: string, signal?: AbortSignal) =>
+    toTransaction(
+      (
+        await get(
+          `/transactions/${encodeURIComponent(txId)}`,
+          One(TransactionResource),
+          signal,
+        )
+      ).data,
+    );
+  const tagBody = (labels: string[]) => ({
+    data: labels.map((l) => ({ type: "tags", id: l })),
+  });
 
   return {
     /** 200 when the token is good. */
     async ping(signal?: AbortSignal): Promise<void> {
       await get("/util/ping", z.unknown(), signal);
     },
-    async accounts(filter: { accountType?: string; ownershipType?: string } = {}, signal?: AbortSignal): Promise<Account[]> {
+    async accounts(
+      filter: { accountType?: string; ownershipType?: string } = {},
+      signal?: AbortSignal,
+    ): Promise<Account[]> {
       const q = new URLSearchParams({ "page[size]": "100" });
       if (filter.accountType) q.set("filter[accountType]", filter.accountType);
-      if (filter.ownershipType) q.set("filter[ownershipType]", filter.ownershipType);
-      const { items } = await pages(`/accounts?${q}`, AccountResource, 1000, 10, signal);
-      return items.map((r) => ({ id: r.id, displayName: r.attributes?.displayName, accountType: r.attributes?.accountType, ownershipType: r.attributes?.ownershipType, balanceCents: r.attributes?.balance?.valueInBaseUnits }));
+      if (filter.ownershipType)
+        q.set("filter[ownershipType]", filter.ownershipType);
+      const { items } = await pages(
+        `/accounts?${q}`,
+        AccountResource,
+        1000,
+        10,
+        signal,
+      );
+      return items.map((r) => ({
+        id: r.id,
+        displayName: r.attributes?.displayName,
+        accountType: r.attributes?.accountType,
+        ownershipType: r.attributes?.ownershipType,
+        balanceCents: r.attributes?.balance?.valueInBaseUnits,
+      }));
     },
     /** Transactions newest first, following cursors. A cut-off result says so in `truncated`, so it never looks complete. */
-    async transactions(query: TransactionQuery = {}, signal?: AbortSignal): Promise<{ transactions: Transaction[]; truncated: boolean }> {
+    async transactions(
+      query: TransactionQuery = {},
+      signal?: AbortSignal,
+    ): Promise<{ transactions: Transaction[]; truncated: boolean }> {
       const limit = query.limit ?? 1000;
-      const q = new URLSearchParams({ "page[size]": String(Math.min(100, limit)) });
-      for (const [k, v] of [["since", query.since], ["until", query.until], ["status", query.status], ["category", query.category], ["tag", query.tag]] as const) if (v) q.set(`filter[${k}]`, v);
-      const base = query.accountId ? `/accounts/${encodeURIComponent(query.accountId)}/transactions` : "/transactions";
-      const { items, truncated } = await pages(`${base}?${q}`, TransactionResource, limit, query.pageCap ?? 20, signal);
+      const q = new URLSearchParams({
+        "page[size]": String(Math.min(100, limit)),
+      });
+      for (const [k, v] of [
+        ["since", query.since],
+        ["until", query.until],
+        ["status", query.status],
+        ["category", query.category],
+        ["tag", query.tag],
+      ] as const)
+        if (v) q.set(`filter[${k}]`, v);
+      const base = query.accountId
+        ? `/accounts/${encodeURIComponent(query.accountId)}/transactions`
+        : "/transactions";
+      const { items, truncated } = await pages(
+        `${base}?${q}`,
+        TransactionResource,
+        limit,
+        query.pageCap ?? 20,
+        signal,
+      );
       return { transactions: items.map(toTransaction), truncated };
     },
     transaction,
     async categories(signal?: AbortSignal): Promise<Category[]> {
-      const { data } = await get("/categories", z.looseObject({ data: z.array(CategoryResource) }), signal);
-      return data.map((c) => ({ id: c.id, name: c.attributes?.name, parentId: id(c.relationships?.parent) }));
+      const { data } = await get(
+        "/categories",
+        z.looseObject({ data: z.array(CategoryResource) }),
+        signal,
+      );
+      return data.map((c) => ({
+        id: c.id,
+        name: c.attributes?.name,
+        parentId: id(c.relationships?.parent),
+      }));
     },
     async tags(signal?: AbortSignal): Promise<string[]> {
-      return (await pages("/tags?page[size]=100", z.looseObject({ id: z.string() }), 1000, 10, signal)).items.map((t) => t.id);
+      return (
+        await pages(
+          "/tags?page[size]=100",
+          z.looseObject({ id: z.string() }),
+          1000,
+          10,
+          signal,
+        )
+      ).items.map((t) => t.id);
     },
 
     // Writes. The integration never calls these; `home up categorise|tag` and a consumer's own code do.
 
     /** Set a child category, or `null` to clear it. Returns the transaction as Up now holds it. */
-    async setCategory(txId: string, categoryId: string | null, signal?: AbortSignal): Promise<Transaction> {
-      await send("PATCH", `/transactions/${encodeURIComponent(txId)}/relationships/category`, { data: categoryId === null ? null : { type: "categories", id: categoryId } }, signal);
+    async setCategory(
+      txId: string,
+      categoryId: string | null,
+      signal?: AbortSignal,
+    ): Promise<Transaction> {
+      await send(
+        "PATCH",
+        `/transactions/${encodeURIComponent(txId)}/relationships/category`,
+        {
+          data:
+            categoryId === null ? null : { type: "categories", id: categoryId },
+        },
+        signal,
+      );
       return transaction(txId, signal);
     },
     /** Add tags by label (at most 6 per transaction; a duplicate is ignored). Returns the transaction as Up now holds it. */
-    async addTags(txId: string, labels: string[], signal?: AbortSignal): Promise<Transaction> {
-      await send("POST", `/transactions/${encodeURIComponent(txId)}/relationships/tags`, tagBody(labels), signal);
+    async addTags(
+      txId: string,
+      labels: string[],
+      signal?: AbortSignal,
+    ): Promise<Transaction> {
+      await send(
+        "POST",
+        `/transactions/${encodeURIComponent(txId)}/relationships/tags`,
+        tagBody(labels),
+        signal,
+      );
       return transaction(txId, signal);
     },
     /** Remove tags by label (an absent one is ignored). Returns the transaction as Up now holds it. */
-    async removeTags(txId: string, labels: string[], signal?: AbortSignal): Promise<Transaction> {
-      await send("DELETE", `/transactions/${encodeURIComponent(txId)}/relationships/tags`, tagBody(labels), signal);
+    async removeTags(
+      txId: string,
+      labels: string[],
+      signal?: AbortSignal,
+    ): Promise<Transaction> {
+      await send(
+        "DELETE",
+        `/transactions/${encodeURIComponent(txId)}/relationships/tags`,
+        tagBody(labels),
+        signal,
+      );
       return transaction(txId, signal);
     },
 
     // Webhooks: reads, then writes behind the same gate.
 
     async webhooks(signal?: AbortSignal): Promise<Webhook[]> {
-      return (await pages("/webhooks?page[size]=100", WebhookResource, 1000, 10, signal)).items.map(toWebhook);
+      return (
+        await pages(
+          "/webhooks?page[size]=100",
+          WebhookResource,
+          1000,
+          10,
+          signal,
+        )
+      ).items.map(toWebhook);
     },
     async webhook(webhookId: string, signal?: AbortSignal): Promise<Webhook> {
-      return toWebhook((await get(`/webhooks/${encodeURIComponent(webhookId)}`, One(WebhookResource), signal)).data);
+      return toWebhook(
+        (
+          await get(
+            `/webhooks/${encodeURIComponent(webhookId)}`,
+            One(WebhookResource),
+            signal,
+          )
+        ).data,
+      );
     },
-    async webhookLogs(webhookId: string, signal?: AbortSignal): Promise<WebhookLog[]> {
-      const { items } = await pages(`/webhooks/${encodeURIComponent(webhookId)}/logs?page[size]=30`, LogResource, 30, 1, signal);
-      return items.map((l) => ({ id: l.id, deliveryStatus: l.attributes?.deliveryStatus, createdAt: l.attributes?.createdAt, statusCode: nul(l.attributes?.response)?.statusCode }));
+    async webhookLogs(
+      webhookId: string,
+      signal?: AbortSignal,
+    ): Promise<WebhookLog[]> {
+      const { items } = await pages(
+        `/webhooks/${encodeURIComponent(webhookId)}/logs?page[size]=30`,
+        LogResource,
+        30,
+        1,
+        signal,
+      );
+      return items.map((l) => ({
+        id: l.id,
+        deliveryStatus: l.attributes?.deliveryStatus,
+        createdAt: l.attributes?.createdAt,
+        statusCode: nul(l.attributes?.response)?.statusCode,
+      }));
     },
     /** Create a webhook. Its `secretKey` comes back this once: the caller keeps it; this client never stores or logs it. */
-    async createWebhook(hookUrl: string, description?: string, signal?: AbortSignal): Promise<Webhook> {
-      const body = await send("POST", "/webhooks", { data: { attributes: { url: hookUrl, ...(description ? { description } : {}) } } }, signal);
+    async createWebhook(
+      hookUrl: string,
+      description?: string,
+      signal?: AbortSignal,
+    ): Promise<Webhook> {
+      const body = await send(
+        "POST",
+        "/webhooks",
+        {
+          data: {
+            attributes: {
+              url: hookUrl,
+              ...(description ? { description } : {}),
+            },
+          },
+        },
+        signal,
+      );
       return toWebhook(One(WebhookResource).parse(body).data);
     },
-    async deleteWebhook(webhookId: string, signal?: AbortSignal): Promise<void> {
-      await send("DELETE", `/webhooks/${encodeURIComponent(webhookId)}`, undefined, signal);
+    async deleteWebhook(
+      webhookId: string,
+      signal?: AbortSignal,
+    ): Promise<void> {
+      await send(
+        "DELETE",
+        `/webhooks/${encodeURIComponent(webhookId)}`,
+        undefined,
+        signal,
+      );
     },
     /** Ask Up to send a PING event to the webhook. */
     async pingWebhook(webhookId: string, signal?: AbortSignal): Promise<void> {
-      await send("POST", `/webhooks/${encodeURIComponent(webhookId)}/ping`, undefined, signal);
+      await send(
+        "POST",
+        `/webhooks/${encodeURIComponent(webhookId)}/ping`,
+        undefined,
+        signal,
+      );
     },
   };
 }

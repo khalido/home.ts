@@ -32,41 +32,85 @@ export const TAG = {
 /** The operation ids this package sends. Identify-Printer (0x003C) and Print-Job (0x0002) are the writes that come later. */
 export const OPERATION = { getPrinterAttributes: 0x000b } as const;
 
-const STRING_TAGS: ReadonlySet<number> = new Set([TAG.textWithoutLanguage, TAG.nameWithoutLanguage, TAG.keyword, TAG.uri, TAG.uriScheme, TAG.charset, TAG.naturalLanguage, TAG.mimeMediaType]);
+const STRING_TAGS: ReadonlySet<number> = new Set([
+  TAG.textWithoutLanguage,
+  TAG.nameWithoutLanguage,
+  TAG.keyword,
+  TAG.uri,
+  TAG.uriScheme,
+  TAG.charset,
+  TAG.naturalLanguage,
+  TAG.mimeMediaType,
+]);
 
 export type IppRange = { lower: number; upper: number };
-export type IppResolution = { x: number; y: number; units: "dpi" | "dpcm" | number };
+export type IppResolution = {
+  x: number;
+  y: number;
+  units: "dpi" | "dpcm" | number;
+};
 /** A value whose tag this decoder does not read (a language-tagged string, a collection, an out-of-band marker), or whose length is wrong for its tag: the bytes, unchanged. */
 export type IppUnknown = { tag: number; bytes: Uint8Array };
 /**
  * One decoded value. Integers and enums are numbers; every string tag is a string; a dateTime is an ISO 8601 string with
  * its offset; an octetString is bytes. A collection decodes to one `IppUnknown` with no bytes, its members skipped.
  */
-export type IppValue = number | boolean | string | Uint8Array | IppRange | IppResolution | IppUnknown;
+export type IppValue =
+  | number
+  | boolean
+  | string
+  | Uint8Array
+  | IppRange
+  | IppResolution
+  | IppUnknown;
 
 export type IppAttribute = { name: string; tag: number; values: IppValue[] };
 export type IppGroup = { tag: number; attributes: IppAttribute[] };
 /** A request or a response: `code` is the operation id of a request or the status code of a response. */
-export type IppMessage = { version: [number, number]; code: number; requestId: number; groups: IppGroup[]; data?: Uint8Array };
+export type IppMessage = {
+  version: [number, number];
+  code: number;
+  requestId: number;
+  groups: IppGroup[];
+  data?: Uint8Array;
+};
 
 const utf8 = new TextEncoder();
 const text = new TextDecoder();
 
 const u16 = (n: number) => [(n >> 8) & 255, n & 255];
-const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const u32 = (n: number) => [
+  (n >>> 24) & 255,
+  (n >>> 16) & 255,
+  (n >>> 8) & 255,
+  n & 255,
+];
 
 function encodeValue(tag: number, value: IppValue): number[] {
   if (STRING_TAGS.has(tag)) return [...utf8.encode(String(value))];
   if (tag === TAG.integer || tag === TAG.enum) return u32(Number(value));
   if (tag === TAG.boolean) return [value ? 1 : 0];
-  if (tag === TAG.rangeOfInteger) return [...u32((value as IppRange).lower), ...u32((value as IppRange).upper)];
+  if (tag === TAG.rangeOfInteger)
+    return [
+      ...u32((value as IppRange).lower),
+      ...u32((value as IppRange).upper),
+    ];
   if (tag === TAG.resolution) {
     const r = value as IppResolution;
-    return [...u32(r.x), ...u32(r.y), r.units === "dpi" ? 3 : r.units === "dpcm" ? 4 : Number(r.units)];
+    return [
+      ...u32(r.x),
+      ...u32(r.y),
+      r.units === "dpi" ? 3 : r.units === "dpcm" ? 4 : Number(r.units),
+    ];
   }
   if (tag === TAG.dateTime) {
-    const m = String(value).match(/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d)([+-])(\d\d):(\d\d)$/);
-    if (!m) throw new Error(`ipp: a dateTime is YYYY-MM-DDTHH:MM:SS.d+HH:MM, got ${String(value)}`);
+    const m = String(value).match(
+      /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d)([+-])(\d\d):(\d\d)$/,
+    );
+    if (!m)
+      throw new Error(
+        `ipp: a dateTime is YYYY-MM-DDTHH:MM:SS.d+HH:MM, got ${String(value)}`,
+      );
     const n = m.slice(1).map((x, i) => (i === 7 ? x.charCodeAt(0) : Number(x)));
     return [...u16(n[0]!), ...n.slice(1)];
   }
@@ -84,7 +128,13 @@ export function encodeMessage(m: IppMessage): Uint8Array<ArrayBuffer> {
       a.values.forEach((v, i) => {
         const name = i === 0 ? utf8.encode(a.name) : new Uint8Array();
         const value = encodeValue(a.tag, v);
-        out.push(a.tag, ...u16(name.length), ...name, ...u16(value.length), ...value);
+        out.push(
+          a.tag,
+          ...u16(name.length),
+          ...name,
+          ...u16(value.length),
+          ...value,
+        );
       });
   }
   out.push(TAG.end);
@@ -92,7 +142,11 @@ export function encodeMessage(m: IppMessage): Uint8Array<ArrayBuffer> {
 }
 
 /** The Get-Printer-Attributes request: IPP 2.0, utf-8, English, the printer's `ipp://` URI, and the attributes wanted. */
-export function getPrinterAttributesRequest(printerUri: string, requested: string[], requestId = 1): Uint8Array<ArrayBuffer> {
+export function getPrinterAttributesRequest(
+  printerUri: string,
+  requested: string[],
+  requestId = 1,
+): Uint8Array<ArrayBuffer> {
   return encodeMessage({
     version: [2, 0],
     code: OPERATION.getPrinterAttributes,
@@ -102,7 +156,11 @@ export function getPrinterAttributesRequest(printerUri: string, requested: strin
         tag: TAG.operation,
         attributes: [
           { name: "attributes-charset", tag: TAG.charset, values: ["utf-8"] },
-          { name: "attributes-natural-language", tag: TAG.naturalLanguage, values: ["en"] },
+          {
+            name: "attributes-natural-language",
+            tag: TAG.naturalLanguage,
+            values: ["en"],
+          },
           { name: "printer-uri", tag: TAG.uri, values: [printerUri] },
           { name: "requested-attributes", tag: TAG.keyword, values: requested },
         ],
@@ -120,18 +178,28 @@ function decodeValue(tag: number, bytes: Uint8Array): IppValue {
   const unknown = { tag, bytes };
   if (STRING_TAGS.has(tag)) return text.decode(bytes);
   if (tag === TAG.octetString) return bytes;
-  if (tag === TAG.integer || tag === TAG.enum) return bytes.length === 4 ? view.getInt32(0) : unknown;
+  if (tag === TAG.integer || tag === TAG.enum)
+    return bytes.length === 4 ? view.getInt32(0) : unknown;
   if (tag === TAG.boolean) return bytes.length === 1 ? bytes[0] !== 0 : unknown;
-  if (tag === TAG.rangeOfInteger) return bytes.length === 8 ? { lower: view.getInt32(0), upper: view.getInt32(4) } : unknown;
+  if (tag === TAG.rangeOfInteger)
+    return bytes.length === 8
+      ? { lower: view.getInt32(0), upper: view.getInt32(4) }
+      : unknown;
   if (tag === TAG.resolution) {
     if (bytes.length !== 9) return unknown;
     const units = bytes[8]!;
-    return { x: view.getInt32(0), y: view.getInt32(4), units: units === 3 ? "dpi" : units === 4 ? "dpcm" : units };
+    return {
+      x: view.getInt32(0),
+      y: view.getInt32(4),
+      units: units === 3 ? "dpi" : units === 4 ? "dpcm" : units,
+    };
   }
   if (tag === TAG.dateTime) {
     if (bytes.length !== 11) return unknown;
     const p = (n: number) => String(n).padStart(2, "0");
-    const [mo, d, h, mi, s, ds, dir, uh, um] = [2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => bytes[i]!);
+    const [mo, d, h, mi, s, ds, dir, uh, um] = [2, 3, 4, 5, 6, 7, 8, 9, 10].map(
+      (i) => bytes[i]!,
+    );
     return `${view.getUint16(0)}-${p(mo!)}-${p(d!)}T${p(h!)}:${p(mi!)}:${p(s!)}.${ds}${String.fromCharCode(dir!)}${p(uh!)}:${p(um!)}`;
   }
   return unknown;
@@ -145,7 +213,8 @@ export function decodeMessage(bytes: Uint8Array): IppMessage {
   if (bytes.length < 9) fail("a message is at least 9 bytes");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
   let i = 8;
-  const need = (n: number) => i + n <= bytes.length || fail("the message is cut short");
+  const need = (n: number) =>
+    i + n <= bytes.length || fail("the message is cut short");
   /** One attribute element at `i`: tag, name, value bytes. */
   const element = () => {
     need(3);
@@ -181,7 +250,7 @@ export function decodeMessage(bytes: Uint8Array): IppMessage {
     const e = element();
     let value: IppValue;
     if (e.tag === TAG.begCollection) {
-      for (let depth = 1; depth > 0; ) {
+      for (let depth = 1; depth > 0;) {
         const inner = element();
         if (inner.tag === TAG.begCollection) depth++;
         else if (inner.tag === TAG.endCollection) depth--;
@@ -195,15 +264,29 @@ export function decodeMessage(bytes: Uint8Array): IppMessage {
     } else {
       last = group!.attributes.find((a) => a.name === e.name);
       if (last) last.values.push(value);
-      else group!.attributes.push((last = { name: e.name, tag: e.tag, values: [value] }));
+      else
+        group!.attributes.push(
+          (last = { name: e.name, tag: e.tag, values: [value] }),
+        );
     }
   }
-  return { version: [bytes[0]!, bytes[1]!], code: view.getUint16(2), requestId: view.getUint32(4), groups, ...(i < bytes.length ? { data: bytes.slice(i) } : {}) };
+  return {
+    version: [bytes[0]!, bytes[1]!],
+    code: view.getUint16(2),
+    requestId: view.getUint32(4),
+    groups,
+    ...(i < bytes.length ? { data: bytes.slice(i) } : {}),
+  };
 }
 
 /** Every attribute of the groups with this tag (default: the printer's), by name, repeats merged. */
-export function attributesOf(m: IppMessage, groupTag: number = TAG.printer): Record<string, IppValue[]> {
+export function attributesOf(
+  m: IppMessage,
+  groupTag: number = TAG.printer,
+): Record<string, IppValue[]> {
   const out: Record<string, IppValue[]> = {};
-  for (const g of m.groups) if (g.tag === groupTag) for (const a of g.attributes) (out[a.name] ??= []).push(...a.values);
+  for (const g of m.groups)
+    if (g.tag === groupTag)
+      for (const a of g.attributes) (out[a.name] ??= []).push(...a.values);
   return out;
 }

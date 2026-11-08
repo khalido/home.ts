@@ -86,7 +86,7 @@ KO's decisions on this package, newest block last. They override every other doc
 # 2026-10-14
 
 - **Connectors live in `src/connectors/<name>/`**, core files at `src/`. Public import paths (`@khalido/home/hue`) are unchanged through `exports`. Done before the count grew.
-- **Two words, two meanings.** A *connector* is the folder, its factory and the `connector:` field in the config. An *integration* is the running object a factory returns (`Integration` in `home.ts`).
+- **Two words, two meanings.** A _connector_ is the folder, its factory and the `connector:` field in the config. An _integration_ is the running object a factory returns (`Integration` in `home.ts`).
 - **A shared layer for what was byte-identical, nothing more**: one `ConnectorError`, one `TIMEOUT_MS`, `fetchTimeout` merging the run's signal (so a shutdown cancels a read in flight), `getJson` for the JSON connectors, `asOf(clock)`. The weather error is not a device error: Hue keeps its error-envelope parsing and BOM its text fetch on top of `fetchTimeout`, while the JSON weather sources use `getJson`. The poll loop and the relocator block stay per connector until this layer has settled.
 - **Docs layout.** `AGENTS.md` is the main file; `CLAUDE.md` only imports it. The README is for a visitor: what, a map, the connectors, install, links. A connector's README is the one file for working in that folder (no per-folder AGENTS.md: six stubs is scaffold). `docs/` holds design, decisions, investigations and the handover. `docs/handover.md` is read first and rewritten clean, never appended.
 - **`home discover` says when it is waiting**: a progress line on stderr before each later pass.

@@ -13,16 +13,32 @@ export const DEFAULT_POLL_MINUTES = 15;
 const SLOT_OFFSET_MS = 5 * 60_000;
 
 /** The next read slot after `at`: every `pollMinutes` from 5 minutes past the hour when `pollMinutes` divides 60 (else from the epoch, plus 5 minutes). */
-export function nextPoll(at: number, pollMinutes = DEFAULT_POLL_MINUTES): number {
+export function nextPoll(
+  at: number,
+  pollMinutes = DEFAULT_POLL_MINUTES,
+): number {
   const step = pollMinutes * 60_000;
-  return Math.floor((at - SLOT_OFFSET_MS) / step) * step + step + SLOT_OFFSET_MS;
+  return (
+    Math.floor((at - SLOT_OFFSET_MS) / step) * step + step + SLOT_OFFSET_MS
+  );
 }
 
 /** What a source is asked to read: where, at what instant (epoch ms), the polling interval to schedule by, and `force` to read everything now. */
-export type ReadRequest = { place: Place; at: number; pollMinutes: number; force?: boolean; signal?: AbortSignal };
+export type ReadRequest = {
+  place: Place;
+  at: number;
+  pollMinutes: number;
+  force?: boolean;
+  signal?: AbortSignal;
+};
 
 /** Every slice says who made it, whether it is a model rather than an instrument, the time it is for, and when it was fetched. */
-export type SliceMeta = { source: string; modelled: boolean; at: string; fetchedAt: string };
+export type SliceMeta = {
+  source: string;
+  modelled: boolean;
+  at: string;
+  fetchedAt: string;
+};
 
 /** Outside now. Speeds in km/h, direction where the wind comes from. */
 export type WeatherNow = SliceMeta & {
@@ -51,21 +67,47 @@ export type ForecastDay = {
   code?: string; // the source's own icon or condition code (BOM 1–19, WMO for Open-Meteo, a type name for Google)
 };
 
-export type WeatherForecast = SliceMeta & { issuedAt?: string; today?: ForecastDay; tomorrow?: ForecastDay };
+export type WeatherForecast = SliceMeta & {
+  issuedAt?: string;
+  today?: ForecastDay;
+  tomorrow?: ForecastDay;
+};
 
 /** Cloud, UV and sunlight on the ground. `radiationWm2` is shortwave (global horizontal) irradiance. */
-export type SkyHour = { at: string; cloudPct?: number; uvIndex?: number; radiationWm2?: number };
+export type SkyHour = {
+  at: string;
+  cloudPct?: number;
+  uvIndex?: number;
+  radiationWm2?: number;
+};
 export type WeatherSky = SliceMeta & Omit<SkyHour, "at"> & { hours: SkyHour[] };
 
 /** One stretch of the minute-by-minute rain forecast. `from` and `to` are UTC ISO; `type` is the source's own (`NONE`, `RAIN`, ...). */
-export type RainSegment = { from: string; to: string; type?: string; chance?: number; mm?: number; intensity?: string };
+export type RainSegment = {
+  from: string;
+  to: string;
+  type?: string;
+  chance?: number;
+  mm?: number;
+  intensity?: string;
+};
 /** Rain minute by minute, up to `RAIN_HORIZON_MINUTES` ahead. `at` is when the forecast starts. Ask `rainSoon` what it means. */
 export type WeatherRain = SliceMeta & { segments: RainSegment[] };
 /** How far ahead the rain forecast is kept and read: two hours, KO's call. */
 export const RAIN_HORIZON_MINUTES = 120;
 
 /** Weather in words, mildest first, so an hour from any source reads the same and a stretch of hours takes its worst. */
-export const CONDITIONS = ["clear", "partly cloudy", "cloudy", "fog", "drizzle", "showers", "rain", "snow", "storm"] as const;
+export const CONDITIONS = [
+  "clear",
+  "partly cloudy",
+  "cloudy",
+  "fog",
+  "drizzle",
+  "showers",
+  "rain",
+  "snow",
+  "storm",
+] as const;
 export type Condition = (typeof CONDITIONS)[number];
 
 /** One forecast hour, starting at `at`. `rainChance` in percent, `rainMm` over the hour, `code` the source's own, `condition` it in a word. */
@@ -86,7 +128,13 @@ export type ForecastHour = {
 export type WeatherHourly = SliceMeta & { hours: ForecastHour[] };
 
 export type SliceName = "now" | "forecast" | "hourly" | "sky" | "rain";
-export type Slices = { now?: WeatherNow; forecast?: WeatherForecast; hourly?: WeatherHourly; sky?: WeatherSky; rain?: WeatherRain };
+export type Slices = {
+  now?: WeatherNow;
+  forecast?: WeatherForecast;
+  hourly?: WeatherHourly;
+  sky?: WeatherSky;
+  rain?: WeatherRain;
+};
 
 /** One read of a source: the slices it has (last good ones included), when to call again, and anything to report. */
 export type SourceReading = Slices & {
@@ -108,7 +156,8 @@ export type WeatherSource = {
 };
 
 /** The interval a source actually reads at: the shared `pollMinutes`, or its own floor if that is longer. */
-export const sourcePollMinutes = (source: WeatherSource, pollMinutes: number) => Math.max(pollMinutes, source.minPollMinutes ?? 0);
+export const sourcePollMinutes = (source: WeatherSource, pollMinutes: number) =>
+  Math.max(pollMinutes, source.minPollMinutes ?? 0);
 
 /** Hourly: how often forecast and hourly-sky reads happen where nothing documented changes faster. */
 export const HOURLY_MINUTES = 60;
@@ -117,27 +166,60 @@ export const HOURLY_MINUTES = 60;
  * One owner for which source fills each slice, so the integration and `home status` show the same thing.
  * `readings` are in preference order; a slice older than its source's `owns` age plus one polling interval falls through.
  */
-export function mergeWeather(readings: { source: WeatherSource; reading?: SourceReading }[], at: number, pollMinutes = DEFAULT_POLL_MINUTES): Slices {
+export function mergeWeather(
+  readings: { source: WeatherSource; reading?: SourceReading }[],
+  at: number,
+  pollMinutes = DEFAULT_POLL_MINUTES,
+): Slices {
   const pick = <K extends SliceName>(name: K): Slices[K] => {
     for (const { source, reading } of readings) {
       const slice = reading?.[name];
       const maxAge = source.owns[name];
-      if (slice && maxAge !== undefined && at - Date.parse(slice.at) <= maxAge + sourcePollMinutes(source, pollMinutes) * 60_000) return slice;
+      if (
+        slice &&
+        maxAge !== undefined &&
+        at - Date.parse(slice.at) <=
+          maxAge + sourcePollMinutes(source, pollMinutes) * 60_000
+      )
+        return slice;
     }
     return undefined;
   };
-  return { now: pick("now"), forecast: pick("forecast"), hourly: pick("hourly"), sky: pick("sky"), rain: pick("rain") };
+  return {
+    now: pick("now"),
+    forecast: pick("forecast"),
+    hourly: pick("hourly"),
+    sky: pick("sky"),
+    rain: pick("rain"),
+  };
 }
 
 /** GET a URL as text (BOM's XML), with the timeout and user agent every source sends. A non-ok status throws `ConnectorError` with it. */
-export async function getText(fetcher: typeof fetch, url: string, signal?: AbortSignal): Promise<string> {
-  const res = await fetchTimeout(fetcher, url, { headers: { "user-agent": USER_AGENT } }, { signal });
-  if (!res.ok) throw new ConnectorError(`HTTP ${res.status} on GET ${new URL(url).pathname}`, { status: res.status });
+export async function getText(
+  fetcher: typeof fetch,
+  url: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetchTimeout(
+    fetcher,
+    url,
+    { headers: { "user-agent": USER_AGENT } },
+    { signal },
+  );
+  if (!res.ok)
+    throw new ConnectorError(
+      `HTTP ${res.status} on GET ${new URL(url).pathname}`,
+      { status: res.status },
+    );
   return res.text();
 }
 
 /** A number from a string the source sent, or undefined plus a note in `odd`. Never rounds or clamps. */
-export function num(value: unknown, what: string, odd: string[]): number | undefined {
+export function num(
+  value: unknown,
+  what: string,
+  odd: string[],
+): number | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   const n = typeof value === "number" ? value : Number(value);
   if (Number.isFinite(n)) return n;
@@ -146,7 +228,9 @@ export function num(value: unknown, what: string, odd: string[]): number | undef
 }
 
 /** A source's timestamp as UTC ISO, or undefined when it does not parse: one odd time never sinks a whole read. */
-export const iso = (s: string | undefined) => (s && !Number.isNaN(Date.parse(s)) ? new Date(s).toISOString() : undefined);
+export const iso = (s: string | undefined) =>
+  s && !Number.isNaN(Date.parse(s)) ? new Date(s).toISOString() : undefined;
 
 /** The local calendar date (YYYY-MM-DD) of an instant at a UTC offset in seconds. */
-export const localDate = (at: number, offsetSeconds: number) => new Date(at + offsetSeconds * 1000).toISOString().slice(0, 10);
+export const localDate = (at: number, offsetSeconds: number) =>
+  new Date(at + offsetSeconds * 1000).toISOString().slice(0, 10);

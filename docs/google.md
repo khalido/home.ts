@@ -6,13 +6,13 @@ Written 2026-10-15 from KO's questions, chota-bot's code, Google's docs and one 
 
 ## What is set up with Google today
 
-| Where | What | How |
-|---|---|---|
-| home | Weather API (Maps Platform, billed). `GOOGLE_WEATHER_KEY` | `fetch` and zod, no SDK. `src/connectors/weather/google.ts` |
-| home | Google Cast | Local protocol, no Google account. Not an API. |
-| chota-bot | Weather API, its own key | Duplicates `google.ts` (to be replaced by this library) |
-| chota-bot | Calendar. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | better-auth Google provider, scope `calendar.readonly`; `googleapis` 186 |
-| chota-bot | `@ai-sdk/google` (Gemini) | Not about the home |
+| Where     | What                                                      | How                                                                      |
+| --------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| home      | Weather API (Maps Platform, billed). `GOOGLE_WEATHER_KEY` | `fetch` and zod, no SDK. `src/connectors/weather/google.ts`              |
+| home      | Google Cast                                               | Local protocol, no Google account. Not an API.                           |
+| chota-bot | Weather API, its own key                                  | Duplicates `google.ts` (to be replaced by this library)                  |
+| chota-bot | Calendar. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`      | better-auth Google provider, scope `calendar.readonly`; `googleapis` 186 |
+| chota-bot | `@ai-sdk/google` (Gemini)                                 | Not about the home                                                       |
 
 The home library uses no Google SDK. `googleapis` is large and pulls in Node-only auth code. Calendar needs one endpoint. `fetch` plus zod is enough, as it is for Weather.
 
@@ -28,12 +28,14 @@ Google has two precipitation sources. Both are in the Weather API.
 - **Hourly forecast.** `forecast/hours:lookup`. We already call it (`hours=6`) and read only `uvIndex` and `cloudCover`. The same response holds `precipitation.probability.percent`, `precipitation.qpf` and `thunderstormProbability`. Reading them costs no extra call.
 
 Caveats:
+
 - Google's page calls the minute forecast **Experimental**: no backward-compatibility promise. It does not say how the forecast is made, so "ML nowcast" is unconfirmed.
 - Its coverage page lists Australia for current, hourly and daily forecasts, but says nothing about the minute forecast. The probe shows it works for Sydney today.
 - The page gives no price or quota. Google's terms allow caching minute values for one hour at most.
 - The 2-hour window is the first 8 segments.
 
 **Design.**
+
 - A new `rain` slice on `WeatherSource`. Google's minute forecast owns it. Without it, `rainSoon` is built from the hourly probability and says so (`modelled`, coarser).
 - One owning function, `rainSoon(slice, at, minutes = 120)`, returns `{ startsInMin?, endsInMin?, chance, mm, intensity }`, or nothing when the window is dry. Every consumer calls it.
 - Poll every 15 minutes, which matches the segment length. At that rate it is about 2,900 calls a month. The existing code assumes 10,000 free calls a month across the key; whether that figure covers this endpoint is unverified.
@@ -49,13 +51,13 @@ chota's morning print needs an hourly slice (rain chance, mm, condition) for lin
 
 **Sources.** One `CalendarSource` shape, as the weather has `WeatherSource`.
 
-| | Google Calendar API | ICS feed |
-|---|---|---|
-| Build | First | Later, when a non-Google calendar is needed |
-| Recurring events | Google expands them (`singleEvents=true`) | We expand them ourselves (RRULE) |
-| Freshness | Live | Google's secret-address feed lags. Third-party pages say 8 to 48 hours; no Google page found |
-| Auth | OAuth token | A secret URL, kept as an env name |
-| Fits | Family calendar | School, Apple, Outlook feeds |
+|                  | Google Calendar API                       | ICS feed                                                                                     |
+| ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Build            | First                                     | Later, when a non-Google calendar is needed                                                  |
+| Recurring events | Google expands them (`singleEvents=true`) | We expand them ourselves (RRULE)                                                             |
+| Freshness        | Live                                      | Google's secret-address feed lags. Third-party pages say 8 to 48 hours; no Google page found |
+| Auth             | OAuth token                               | A secret URL, kept as an env name                                                            |
+| Fits             | Family calendar                           | School, Apple, Outlook feeds                                                                 |
 
 **Auth.** The caller passes `getToken(): Promise<string>`. The library stores no token. chota passes its better-auth token. A `home calendar login` in the CLI (loopback OAuth, token file in `~/.config/home/`, 0600, like `home enphase login`) comes later and needs an OAuth client in Google Cloud.
 

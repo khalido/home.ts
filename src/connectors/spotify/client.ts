@@ -20,8 +20,17 @@ export type SocketFactory = (url: string) => SocketLike;
 export const OPEN = 1;
 
 /** The statuses Soloist documents. Anything else is passed through and named in `anomaly`. */
-export const STATUSES: ReadonlySet<string> = new Set(["idle", "playing", "paused", "buffering"]);
-export const REPEATS: ReadonlySet<string> = new Set(["off", "context", "track"]);
+export const STATUSES: ReadonlySet<string> = new Set([
+  "idle",
+  "playing",
+  "paused",
+  "buffering",
+]);
+export const REPEATS: ReadonlySet<string> = new Set([
+  "off",
+  "context",
+  "track",
+]);
 
 // Every field optional: a frame missing one still folds, and a field of the wrong type fails only its own frame.
 type Entity = { uri?: string; entity_type?: string; decorations?: Decorations };
@@ -39,42 +48,123 @@ const Entity: z.ZodType<Entity> = z.lazy(() =>
     decorations: z
       .looseObject({
         identity: z.looseObject({ name: z.string().optional() }).optional(),
-        visual_identity: z.looseObject({ cover: z.array(z.looseObject({ url: z.string().optional(), size: z.string().optional() })).optional() }).optional(),
+        visual_identity: z
+          .looseObject({
+            cover: z
+              .array(
+                z.looseObject({
+                  url: z.string().optional(),
+                  size: z.string().optional(),
+                }),
+              )
+              .optional(),
+          })
+          .optional(),
         parent: z.looseObject({ entity: Entity.optional() }).optional(),
-        creators: z.array(z.looseObject({ entity: Entity.optional() })).optional(),
-        playback: z.looseObject({ duration_ms: z.number().optional() }).optional(),
+        creators: z
+          .array(z.looseObject({ entity: Entity.optional() }))
+          .optional(),
+        playback: z
+          .looseObject({ duration_ms: z.number().optional() })
+          .optional(),
       })
       .optional(),
   }),
 );
-const Position = z.looseObject({ position_ms: z.number().optional(), timestamp_ms: z.number().optional(), speed: z.number().optional() });
-const Options = z.looseObject({ shuffle: z.boolean().optional(), repeat: z.string().optional() });
+const Position = z.looseObject({
+  position_ms: z.number().optional(),
+  timestamp_ms: z.number().optional(),
+  speed: z.number().optional(),
+});
+const Options = z.looseObject({
+  shuffle: z.boolean().optional(),
+  repeat: z.string().optional(),
+});
 
-const QueueEntry = z.looseObject({ uid: z.string().optional(), source: z.string().optional(), item: Entity.optional() });
+const QueueEntry = z.looseObject({
+  uid: z.string().optional(),
+  source: z.string().optional(),
+  item: Entity.optional(),
+});
 
 /** Soloist's frames by type, those this library reads. Anything else is skipped. */
 export const Frame = z.discriminatedUnion("type", [
-  z.looseObject({ type: z.literal("auth_state"), logged_in: z.boolean().optional(), is_active: z.boolean().optional(), device_name: z.string().optional() }),
-  z.looseObject({ type: z.literal("playback_state"), status: z.string().optional(), item: Entity.optional(), context: Entity.optional(), position: Position.optional(), volume: z.number().optional(), is_active: z.boolean().optional(), options: Options.optional() }),
+  z.looseObject({
+    type: z.literal("auth_state"),
+    logged_in: z.boolean().optional(),
+    is_active: z.boolean().optional(),
+    device_name: z.string().optional(),
+  }),
+  z.looseObject({
+    type: z.literal("playback_state"),
+    status: z.string().optional(),
+    item: Entity.optional(),
+    context: Entity.optional(),
+    position: Position.optional(),
+    volume: z.number().optional(),
+    is_active: z.boolean().optional(),
+    options: Options.optional(),
+  }),
   z.looseObject({ type: z.literal("track_changed"), item: Entity.optional() }),
-  z.looseObject({ type: z.literal("playback_changed"), status: z.string().optional() }),
-  z.looseObject({ type: z.literal("volume_changed"), volume: z.number().optional() }),
-  z.looseObject({ type: z.literal("device_changed"), is_active: z.boolean().optional(), device_name: z.string().optional() }),
-  z.looseObject({ type: z.literal("context_changed"), context: Entity.optional() }),
-  z.looseObject({ type: z.literal("options_changed"), options: Options.optional() }),
-  z.looseObject({ type: z.literal("position_sync"), position: Position.optional() }),
-  z.looseObject({ type: z.literal("queue_changed"), previous: z.array(QueueEntry).optional(), upcoming: z.array(QueueEntry).optional() }),
-  z.looseObject({ type: z.literal("command_result"), command: z.string().optional() }),
+  z.looseObject({
+    type: z.literal("playback_changed"),
+    status: z.string().optional(),
+  }),
+  z.looseObject({
+    type: z.literal("volume_changed"),
+    volume: z.number().optional(),
+  }),
+  z.looseObject({
+    type: z.literal("device_changed"),
+    is_active: z.boolean().optional(),
+    device_name: z.string().optional(),
+  }),
+  z.looseObject({
+    type: z.literal("context_changed"),
+    context: Entity.optional(),
+  }),
+  z.looseObject({
+    type: z.literal("options_changed"),
+    options: Options.optional(),
+  }),
+  z.looseObject({
+    type: z.literal("position_sync"),
+    position: Position.optional(),
+  }),
+  z.looseObject({
+    type: z.literal("queue_changed"),
+    previous: z.array(QueueEntry).optional(),
+    upcoming: z.array(QueueEntry).optional(),
+  }),
+  z.looseObject({
+    type: z.literal("command_result"),
+    command: z.string().optional(),
+  }),
   z.looseObject({ type: z.literal("error"), message: z.string().optional() }),
 ]);
 export type Frame = z.infer<typeof Frame>;
-export const FRAME_TYPES: ReadonlySet<string> = new Set(Frame.options.map((o) => o.shape.type.value));
+export const FRAME_TYPES: ReadonlySet<string> = new Set(
+  Frame.options.map((o) => o.shape.type.value),
+);
 
 /** A stall the library noticed: see `SpotifyState.stalled`. */
-export type Stall = { track: string; ms: number; how: "frozen" | "overrun"; tried?: string };
+export type Stall = {
+  track: string;
+  ms: number;
+  how: "frozen" | "overrun";
+  tried?: string;
+};
 
 /** What is loaded: a track or an episode. */
-export type Track = { uri: string; type?: string; name?: string; artists: string[]; album?: string; cover?: string; durationMs?: number };
+export type Track = {
+  uri: string;
+  type?: string;
+  name?: string;
+  artists: string[];
+  album?: string;
+  cover?: string;
+  durationMs?: number;
+};
 
 /** Where the position was at a moment: `atMs` is Soloist's wall clock (epoch ms, the same box's), `speed` 1 while playing. */
 export type PositionAnchor = { ms?: number; atMs?: number; speed?: number };
@@ -121,17 +211,38 @@ export function toTrack(item: Entity | undefined): Track | undefined {
   const d = item.decorations ?? {};
   const covers = d.visual_identity?.cover ?? [];
   const cover = covers.find((c) => c.size === "default") ?? covers[0];
-  const artists = (d.creators ?? []).map((c) => name(c.entity)).filter((n): n is string => !!n);
-  return dropUndefined({ uri: item.uri, type: item.entity_type || undefined, name: name(item), artists, album: name(d.parent?.entity), cover: cover?.url, durationMs: d.playback?.duration_ms });
+  const artists = (d.creators ?? [])
+    .map((c) => name(c.entity))
+    .filter((n): n is string => !!n);
+  return dropUndefined({
+    uri: item.uri,
+    type: item.entity_type || undefined,
+    name: name(item),
+    artists,
+    album: name(d.parent?.entity),
+    cover: cover?.url,
+    durationMs: d.playback?.duration_ms,
+  });
 }
 
-const toContext = (e: Entity | undefined) => (e?.uri ? dropUndefined({ uri: e.uri, type: e.entity_type || undefined, name: name(e) }) : undefined);
-const toAnchor = (p: z.infer<typeof Position>): PositionAnchor => dropUndefined({ ms: p.position_ms, atMs: p.timestamp_ms, speed: p.speed });
-const toOptions = (o: z.infer<typeof Options>) => dropUndefined({ shuffle: o.shuffle, repeat: o.repeat });
+const toContext = (e: Entity | undefined) =>
+  e?.uri
+    ? dropUndefined({
+        uri: e.uri,
+        type: e.entity_type || undefined,
+        name: name(e),
+      })
+    : undefined;
+const toAnchor = (p: z.infer<typeof Position>): PositionAnchor =>
+  dropUndefined({ ms: p.position_ms, atMs: p.timestamp_ms, speed: p.speed });
+const toOptions = (o: z.infer<typeof Options>) =>
+  dropUndefined({ shuffle: o.shuffle, repeat: o.repeat });
 
 /** An object without its undefined fields, so a snapshot never carries `key: undefined`. */
 function dropUndefined<T extends object>(o: T): T {
-  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+  return Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== undefined),
+  ) as T;
 }
 
 /**
@@ -141,9 +252,26 @@ function dropUndefined<T extends object>(o: T): T {
 export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
   switch (f.type) {
     case "auth_state": {
-      const next = { ...s, ...dropUndefined({ loggedIn: f.logged_in, active: f.is_active, deviceName: f.device_name || undefined }), asOf };
+      const next = {
+        ...s,
+        ...dropUndefined({
+          loggedIn: f.logged_in,
+          active: f.is_active,
+          deviceName: f.device_name || undefined,
+        }),
+        asOf,
+      };
       // signed out: nothing plays, nothing is queued
-      return f.logged_in === false ? { loggedIn: false, ...dropUndefined({ deviceName: next.deviceName, active: next.active }), asOf } : next;
+      return f.logged_in === false
+        ? {
+            loggedIn: false,
+            ...dropUndefined({
+              deviceName: next.deviceName,
+              active: next.active,
+            }),
+            asOf,
+          }
+        : next;
     }
     case "playback_state": {
       const { track: _t, context: _c, position: _p, ...rest } = s;
@@ -170,7 +298,14 @@ export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
     case "volume_changed":
       return f.volume === undefined ? s : { ...s, volume: f.volume, asOf };
     case "device_changed":
-      return { ...s, ...dropUndefined({ active: f.is_active, deviceName: f.device_name || undefined }), asOf };
+      return {
+        ...s,
+        ...dropUndefined({
+          active: f.is_active,
+          deviceName: f.device_name || undefined,
+        }),
+        asOf,
+      };
     case "context_changed": {
       const { context: _c, ...rest } = s;
       const context = toContext(f.context);
@@ -181,7 +316,15 @@ export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
     case "position_sync":
       return f.position ? { ...s, position: toAnchor(f.position), asOf } : s;
     case "queue_changed":
-      return f.upcoming ? { ...s, upNext: f.upcoming.map((e) => toTrack(e.item)).filter((t): t is Track => !!t), asOf } : s;
+      return f.upcoming
+        ? {
+            ...s,
+            upNext: f.upcoming
+              .map((e) => toTrack(e.item))
+              .filter((t): t is Track => !!t),
+            asOf,
+          }
+        : s;
     default:
       return s; // command_result and error answer a command; they change no state
   }
@@ -190,11 +333,22 @@ export function fold(s: SpotifyState, f: Frame, asOf: string): SpotifyState {
 /** What in the state is outside what Soloist documents, in a few words, or undefined. Passed through, never corrected. */
 export function oddities(s: SpotifyState): string | undefined {
   const odd: string[] = [];
-  if (s.status !== undefined && !STATUSES.has(s.status)) odd.push(`status "${s.status}"`);
-  if (s.volume !== undefined && !(s.volume >= 0 && s.volume <= 100)) odd.push(`volume ${s.volume}, outside 0–100`);
-  if (s.repeat !== undefined && !REPEATS.has(s.repeat)) odd.push(`repeat "${s.repeat}"`);
-  if (s.position?.speed !== undefined && !(s.position.speed >= 0)) odd.push(`position speed ${s.position.speed}`);
-  if (s.position?.ms !== undefined && s.track?.durationMs !== undefined && s.position.ms > s.track.durationMs) odd.push(`position ${s.position.ms} ms past the track's ${s.track.durationMs} ms`);
+  if (s.status !== undefined && !STATUSES.has(s.status))
+    odd.push(`status "${s.status}"`);
+  if (s.volume !== undefined && !(s.volume >= 0 && s.volume <= 100))
+    odd.push(`volume ${s.volume}, outside 0–100`);
+  if (s.repeat !== undefined && !REPEATS.has(s.repeat))
+    odd.push(`repeat "${s.repeat}"`);
+  if (s.position?.speed !== undefined && !(s.position.speed >= 0))
+    odd.push(`position speed ${s.position.speed}`);
+  if (
+    s.position?.ms !== undefined &&
+    s.track?.durationMs !== undefined &&
+    s.position.ms > s.track.durationMs
+  )
+    odd.push(
+      `position ${s.position.ms} ms past the track's ${s.track.durationMs} ms`,
+    );
   return odd.length ? odd.join("; ") : undefined;
 }
 
@@ -215,10 +369,19 @@ export function positionMs(s: SpotifyState, now: number): number | undefined {
  */
 export function toSpotifyUri(input: string): string | undefined {
   const s = input.trim();
-  if (/^spotify:(track|album|playlist|artist|episode|show):[A-Za-z0-9]+$/.test(s)) return s;
-  const link = /^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/.exec(s);
+  if (
+    /^spotify:(track|album|playlist|artist|episode|show):[A-Za-z0-9]+$/.test(s)
+  )
+    return s;
+  const link =
+    /^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/.exec(
+      s,
+    );
   return link ? `spotify:${link[1]}:${link[2]}` : undefined;
 }
 
 /** A command frame: `{ type: "command", command, ...fields }`. */
-export const commandFrame = (command: string, fields: Record<string, unknown> = {}) => JSON.stringify({ type: "command", command, ...fields });
+export const commandFrame = (
+  command: string,
+  fields: Record<string, unknown> = {},
+) => JSON.stringify({ type: "command", command, ...fields });

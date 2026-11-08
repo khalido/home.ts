@@ -25,64 +25,64 @@ Buy two or three and treat the numbers as indicative, not calibrated. Don't use 
 
 ## Temperature and humidity
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| IKEA TIMMERFLOTTE | Thread (Matter) | yes | yes, unconfirmed display | A$14.99 | display on press, 2 AAA |
-| Aqara TH sensor (Matter versions) | Thread / Zigbee | yes | yes | about A$25–35, unverified | ±0.3 °C / ±3 %RH claimed by Aqara, unverified |
-| Eve Weather / Room | Thread (Matter) | yes | yes | about A$80–100, unverified | better-known accuracy, pricey |
-| SwitchBot Meter | Bluetooth, hub to cloud | partly | via hub | about A$20–30 | local needs the hub's API; skip |
+| Device                            | Radio                   | Local? | Google Home?             | AU price                   | Notes                                         |
+| --------------------------------- | ----------------------- | ------ | ------------------------ | -------------------------- | --------------------------------------------- |
+| IKEA TIMMERFLOTTE                 | Thread (Matter)         | yes    | yes, unconfirmed display | A$14.99                    | display on press, 2 AAA                       |
+| Aqara TH sensor (Matter versions) | Thread / Zigbee         | yes    | yes                      | about A$25–35, unverified  | ±0.3 °C / ±3 %RH claimed by Aqara, unverified |
+| Eve Weather / Room                | Thread (Matter)         | yes    | yes                      | about A$80–100, unverified | better-known accuracy, pricey                 |
+| SwitchBot Meter                   | Bluetooth, hub to cloud | partly | via hub                  | about A$20–30              | local needs the hub's API; skip               |
 
 Buy the IKEA unit for rooms. Buy Eve or Aqara only where accuracy matters. Battery life on all of these is months to two years on AAA or coin cells.
 
 ## Motion, occupancy and presence
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| IKEA MYGGSPRAY | Thread (Matter) | yes | yes | unverified | indoor/outdoor motion |
-| Aqara FP2 | Wi-Fi, Matter via Aqara hub | yes via hub | yes | about A$110–130, unverified | mmWave, zones; needs power |
-| Aqara FP300 | Thread / Zigbee | yes | yes | unverified | battery mmWave, newer |
-| Hue motion sensor | Zigbee on the bridge | yes | via Hue | about A$55–70 | already covered by the hue connector |
+| Device            | Radio                       | Local?      | Google Home? | AU price                    | Notes                                |
+| ----------------- | --------------------------- | ----------- | ------------ | --------------------------- | ------------------------------------ |
+| IKEA MYGGSPRAY    | Thread (Matter)             | yes         | yes          | unverified                  | indoor/outdoor motion                |
+| Aqara FP2         | Wi-Fi, Matter via Aqara hub | yes via hub | yes          | about A$110–130, unverified | mmWave, zones; needs power           |
+| Aqara FP300       | Thread / Zigbee             | yes         | yes          | unverified                  | battery mmWave, newer                |
+| Hue motion sensor | Zigbee on the bridge        | yes         | via Hue      | about A$55–70               | already covered by the hue connector |
 
 The Hue bridge already exposes its motion sensors; that is free. Add mmWave only for rooms where people sit still.
 
 ## Door and window contacts
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| IKEA MYGGBETT | Thread (Matter) | yes | yes | unverified | |
-| Aqara contact sensor P2 | Thread (Matter) | yes | yes | about A$30, unverified | |
-| Eve Door & Window | Thread (Matter) | yes | yes | about A$60, unverified | |
+| Device                  | Radio           | Local? | Google Home? | AU price               | Notes |
+| ----------------------- | --------------- | ------ | ------------ | ---------------------- | ----- |
+| IKEA MYGGBETT           | Thread (Matter) | yes    | yes          | unverified             |       |
+| Aqara contact sensor P2 | Thread (Matter) | yes    | yes          | about A$30, unverified |       |
+| Eve Door & Window       | Thread (Matter) | yes    | yes          | about A$60, unverified |       |
 
 Google lists the contact sensor type as supported. CR2032 cells last 1–2 years.
 
 ## Leak sensors
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| IKEA KLIPPBOK | Thread (Matter) | yes | not listed by Google | unverified | cheapest |
-| Aqara water leak sensor | Zigbee / Thread | yes | via hub | about A$25, unverified | |
-| Eve Water Guard | Thread | yes | unverified | unverified | cable probe |
+| Device                  | Radio           | Local? | Google Home?         | AU price               | Notes       |
+| ----------------------- | --------------- | ------ | -------------------- | ---------------------- | ----------- |
+| IKEA KLIPPBOK           | Thread (Matter) | yes    | not listed by Google | unverified             | cheapest    |
+| Aqara water leak sensor | Zigbee / Thread | yes    | via hub              | about A$25, unverified |             |
+| Eve Water Guard         | Thread          | yes    | unverified           | unverified             | cable probe |
 
 Google's page has no leak-detector device type. The alert would show in another controller (or this library) but not in Google Home. Unverified for each model.
 
 ## Air quality (CO2, PM2.5)
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| Aqara TVOC sensor | Zigbee | yes | via hub | unverified | VOC only, no CO2 |
-| Airthings / Awair | Wi-Fi / BLE | local API on some | unverified | A$200+ | CO2 and PM2.5 properly |
-| IKEA VINDSTYRKA / ALPSTUGA | Zigbee / Thread | yes | unverified | unverified | PM2.5, ALPSTUGA adds CO2 per IKEA's range, unverified |
+| Device                     | Radio           | Local?            | Google Home? | AU price   | Notes                                                 |
+| -------------------------- | --------------- | ----------------- | ------------ | ---------- | ----------------------------------------------------- |
+| Aqara TVOC sensor          | Zigbee          | yes               | via hub      | unverified | VOC only, no CO2                                      |
+| Airthings / Awair          | Wi-Fi / BLE     | local API on some | unverified   | A$200+     | CO2 and PM2.5 properly                                |
+| IKEA VINDSTYRKA / ALPSTUGA | Zigbee / Thread | yes               | unverified   | unverified | PM2.5, ALPSTUGA adds CO2 per IKEA's range, unverified |
 
 Google supports the Matter air quality type (spec 1.2). Cheap CO2 sensors vary a lot; a local API or Matter matters more than the brand.
 
 ## Smart plugs with energy monitoring
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| Shelly Plus Plug S / Mini Gen3 | Wi-Fi (+BT) | yes, JSON-RPC and MQTT | no (not Matter by default) | about A$35–45, unverified | library-friendly |
-| IKEA GRILLPLATS | Thread (Matter) | yes | on/off yes | AU variant unverified | energy through Google is not supported |
-| Eve Energy | Thread (Matter) | yes | on/off yes | about A$60–70, unverified | |
-| Sonoff S60 / Tapo P110 | Wi-Fi | Sonoff local mode; Tapo cloud-tied | partial | about A$20–30 | Tapo protocol churns (see ideas.md) |
+| Device                         | Radio           | Local?                             | Google Home?               | AU price                  | Notes                                  |
+| ------------------------------ | --------------- | ---------------------------------- | -------------------------- | ------------------------- | -------------------------------------- |
+| Shelly Plus Plug S / Mini Gen3 | Wi-Fi (+BT)     | yes, JSON-RPC and MQTT             | no (not Matter by default) | about A$35–45, unverified | library-friendly                       |
+| IKEA GRILLPLATS                | Thread (Matter) | yes                                | on/off yes                 | AU variant unverified     | energy through Google is not supported |
+| Eve Energy                     | Thread (Matter) | yes                                | on/off yes                 | about A$60–70, unverified |                                        |
+| Sonoff S60 / Tapo P110         | Wi-Fi           | Sonoff local mode; Tapo cloud-tied | partial                    | about A$20–30             | Tapo protocol churns (see ideas.md)    |
 
 Google's page lists the plug type with only On/Off and Level Control, so power readings will not show in the app. Use Shelly for the numbers, and Matter plugs only where on/off is the point.
 
@@ -100,10 +100,10 @@ Google supports the Matter window covering type. IKEA and Aqara motors, and Swit
 
 ## Energy monitoring
 
-| Device | Radio | Local? | Google Home? | AU price | Notes |
-|---|---|---|---|---|---|
-| Shelly Pro 3EM / EM Gen3 | Wi-Fi, Ethernet | yes, JSON-RPC | no | about A$100–200, unverified | clamps on the board; needs an electrician for the install |
-| Enphase IQ Gateway | LAN | yes, the enphase connector | no | comes with the solar | covers solar and use |
+| Device                   | Radio           | Local?                     | Google Home? | AU price                    | Notes                                                     |
+| ------------------------ | --------------- | -------------------------- | ------------ | --------------------------- | --------------------------------------------------------- |
+| Shelly Pro 3EM / EM Gen3 | Wi-Fi, Ethernet | yes, JSON-RPC              | no           | about A$100–200, unverified | clamps on the board; needs an electrician for the install |
+| Enphase IQ Gateway       | LAN             | yes, the enphase connector | no           | comes with the solar        | covers solar and use                                      |
 
 Enphase gives solar and use. A Shelly on a circuit (AC, hot water, pool) tells you what one load costs, which Amber prices make worth knowing.
 

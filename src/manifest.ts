@@ -7,7 +7,12 @@ import type { Part } from "./home.ts";
 export type IotClass = "local_push" | "local_polling" | "cloud_polling";
 
 /** One environment name the CLI reads for a connector; `.env.example` is written from these. `optional`: `home status` runs without it. */
-export type EnvVar = { name: string; what: string; optional?: boolean; example?: string };
+export type EnvVar = {
+  name: string;
+  what: string;
+  optional?: boolean;
+  example?: string;
+};
 
 export type Manifest<S = unknown> = {
   /** The folder, the config's connector literal, the integration's name and the CLI verb: "hue". */
@@ -28,7 +33,11 @@ export type Manifest<S = unknown> = {
 };
 
 /** Watts as "1.2 kW", or "" without a number. Rounded for reading only. */
-export const kw = (w: unknown) => (typeof w === "number" ? `${(w / 1000).toFixed(1)} kW` : "");
+export const kw = (w: unknown) =>
+  typeof w === "number" ? `${(w / 1000).toFixed(1)} kW` : "";
 
 /** A value's text when it exists, else "": a missing field is left out, never printed as "undefined". */
-export const field = (value: number | undefined, text: (v: number) => string) => (value === undefined ? "" : text(value));
+export const field = (
+  value: number | undefined,
+  text: (v: number) => string,
+) => (value === undefined ? "" : text(value));

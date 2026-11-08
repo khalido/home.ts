@@ -6,21 +6,28 @@ Outside weather for the home: what it is now, today and tomorrow by the hour and
 import { weather, bom, openMeteo } from "@khalido/home/weather";
 import { ftpFetch } from "@khalido/home/weather/ftp";
 
-weather({ latitude, longitude, sources: [bom({ fetch: ftpFetch(), forecastLocation: "Sydney" }), openMeteo()] });
+weather({
+  latitude,
+  longitude,
+  sources: [
+    bom({ fetch: ftpFetch(), forecastLocation: "Sydney" }),
+    openMeteo(),
+  ],
+});
 ```
 
 ## Slices
 
 Each slice carries `source`, `modelled` (a model, not an instrument), `at` (the time it is for) and `fetchedAt`. Observed and modelled data are never shown as each other.
 
-| Slice | What | Owner with BOM first | Fallback |
-|---|---|---|---|
-| `now` | temperature, feels-like, humidity, wind and gust, rain since 9am with its own window, station and distance | BOM (observed) | Open-Meteo `current` (modelled, 15-minutely) |
-| `forecast` | today and tomorrow: min, max, rain chance, rain range (BOM) or amount (models), text, the source's icon code | BOM précis | Open-Meteo daily (modelled) |
-| `hourly` | today and tomorrow hour by hour from the home's midnight: temperature, feels-like, rain chance and amount, wind and gust, cloud, UV, the source's code and a `condition` word. `dayBlocks(hourly, at, timeZone)` cuts it into morning, afternoon and evening | Open-Meteo (the only source read hourly) | none |
-| `sky` | cloud %, UV index, shortwave radiation W/m², now and the next 6 hours | Open-Meteo (the only source with radiation) | Google (no radiation) |
-| `rain` | minute by minute for the next 2 hours, in 15-minute segments: type, chance, amount, weight. `rainSoon(rain, at)` turns it into when rain starts and ends | Google's minute forecast (the only source) | none |
-| `sun` | dawn, sunrise, golden hour, solar noon, sunset, dusk, astronomical night, azimuth, altitude, rising, daylight, and the next dawn, sunrise, sunset and dusk | computed: `sunNow(latitude, longitude, at)` with suncalc, no network | none needed |
+| Slice      | What                                                                                                                                                                                                                                                         | Owner with BOM first                                                 | Fallback                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------- |
+| `now`      | temperature, feels-like, humidity, wind and gust, rain since 9am with its own window, station and distance                                                                                                                                                   | BOM (observed)                                                       | Open-Meteo `current` (modelled, 15-minutely) |
+| `forecast` | today and tomorrow: min, max, rain chance, rain range (BOM) or amount (models), text, the source's icon code                                                                                                                                                 | BOM précis                                                           | Open-Meteo daily (modelled)                  |
+| `hourly`   | today and tomorrow hour by hour from the home's midnight: temperature, feels-like, rain chance and amount, wind and gust, cloud, UV, the source's code and a `condition` word. `dayBlocks(hourly, at, timeZone)` cuts it into morning, afternoon and evening | Open-Meteo (the only source read hourly)                             | none                                         |
+| `sky`      | cloud %, UV index, shortwave radiation W/m², now and the next 6 hours                                                                                                                                                                                        | Open-Meteo (the only source with radiation)                          | Google (no radiation)                        |
+| `rain`     | minute by minute for the next 2 hours, in 15-minute segments: type, chance, amount, weight. `rainSoon(rain, at)` turns it into when rain starts and ends                                                                                                     | Google's minute forecast (the only source)                           | none                                         |
+| `sun`      | dawn, sunrise, golden hour, solar noon, sunset, dusk, astronomical night, azimuth, altitude, rising, daylight, and the next dawn, sunrise, sunset and dusk                                                                                                   | computed: `sunNow(latitude, longitude, at)` with suncalc, no network | none needed                                  |
 
 **Day blocks.** `dayBlocks(state.hourly, now, timeZone, blocks?)` is the owner: by default morning 6–12, afternoon 12–18, evening 18–22 (`BLOCKS`, KO's call) by the local hour each hour starts in, for the rest of today and all of tomorrow. A consumer passes its own parts of the day (`[{ name: "Noon", from: 11, to: 15 }, …]`, each within 0–24), to `dayBlocks` or as `weather({ blocks })`. An hour counts while it has not ended, so at 16:50 today has "afternoon from 16:00" (2 hours) and the evening. Each block holds `hours` (how many it summarises), min and max temperature, the highest rain chance, the rain summed (missing if any hour lacks it, never zero), the highest wind, gust and UV index, `late` when it starts after its part of the day does, and the worst hour's `condition`. `condition` is one word from `CONDITIONS`, mildest first: clear, partly cloudy, cloudy, fog, drizzle, showers, rain, snow, storm; Open-Meteo maps WMO codes to it by family (`wmoCondition`). The snapshot's `blocks` is recomputed at every report and every 5 minutes; `blockText` gives the words `home weather` prints; it names UV from 3 (`UV_SHOWN`, where WHO starts advising sun protection).
 
@@ -39,15 +46,15 @@ Each slice carries `source`, `modelled` (a model, not an instrument), `at` (the 
 - **Observations `IDx60920`** (NSW 560 KB): every station in the state. `now` is the nearest station reporting air temperature whose last observation is within an hour of the file's newest (some stations are daily manual reports, days old), unless `station` pins a WMO id. Distance is great-circle from the station's 4-decimal coordinates. Most stations report every 10 minutes and the file lands about 3 minutes later; at the 15-minute default this is 96 reads, about **54 MB of FTP a day** for the NSW file.
 - **Précis forecast `IDx11060` and siblings** (NSW 736 KB): needs `forecastLocation` (a name like "Sydney" or an aac like `NSW_PT131`), because the locations carry no coordinates and a guessed town would be worse than asking. Without one, `forecast` falls through. Today is the period containing now; after the afternoon issue it has no min, max or rain range, and they stay missing. Read again at the file's own `next-routine-issue-time-utc` plus 5 minutes (hourly if it names none), so an amendment between routine issues waits for the next one.
 
-| State | `observations` | `forecasts` |
-|---|---|---|
-| NSW and ACT (default) | IDN60920 | IDN11060 |
-| Victoria | IDV60920 | IDV10753 |
-| Queensland | IDQ60920 | IDQ11295 |
-| South Australia | IDS60920 | IDS10044 |
-| Western Australia | IDW60920 | IDW14199 |
-| Tasmania | IDT60920 | IDT16710 |
-| Northern Territory | IDD60920 | IDD10207 |
+| State                 | `observations` | `forecasts` |
+| --------------------- | -------------- | ----------- |
+| NSW and ACT (default) | IDN60920       | IDN11060    |
+| Victoria              | IDV60920       | IDV10753    |
+| Queensland            | IDQ60920       | IDQ11295    |
+| South Australia       | IDS60920       | IDS10044    |
+| Western Australia     | IDW60920       | IDW14199    |
+| Tasmania              | IDT60920       | IDT16710    |
+| Northern Territory    | IDD60920       | IDD10207    |
 
 Each id was checked on the server on 2026-10-13 (the file exists; for the forecasts, its `amoc` names the state and service `WSP`/`FPR`). `IDN10064` is a 19 KB Sydney-metro-only forecast in the same shape, if that covers the home.
 

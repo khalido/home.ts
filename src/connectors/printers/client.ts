@@ -1,5 +1,10 @@
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
-import { attributesOf, decodeMessage, getPrinterAttributesRequest, type IppMessage } from "./codec.ts";
+import {
+  attributesOf,
+  decodeMessage,
+  getPrinterAttributesRequest,
+  type IppMessage,
+} from "./codec.ts";
 
 // Pure reads: a `fetch`, an address and a path come in, the printer's attributes go out. No writes here yet.
 // TODO(writes, behind KO's hand): Identify-Printer (0x003C, a beep) first, then Print-Job (0x0002) with application/pdf
@@ -25,18 +30,33 @@ export const REQUESTED = [
 ];
 
 /** Where a printer answers: IPP is HTTP POST to `/<rp>`; port 443 (or a found `_ipps._tcp`) is TLS. */
-export type PrinterAddress = { host: string; port?: number; rp?: string; secure?: boolean };
+export type PrinterAddress = {
+  host: string;
+  port?: number;
+  rp?: string;
+  secure?: boolean;
+};
 
 /** Most printers answer on this path (IPP Everywhere); the TXT `rp` says when theirs differs. */
 export const DEFAULT_RP = "ipp/print";
 
 /** The URL to POST to and the `ipp(s)://` URI the request names. A TXT `rp` may or may not start with a slash. */
-export function printerUrl(a: PrinterAddress): { http: string; ipp: string; secure: boolean; path: string } {
+export function printerUrl(a: PrinterAddress): {
+  http: string;
+  ipp: string;
+  secure: boolean;
+  path: string;
+} {
   const secure = a.secure ?? a.port === 443;
   const port = a.port ?? (secure ? 443 : 631);
   const path = (a.rp || DEFAULT_RP).replace(/^\/+/, "");
   const host = a.host.includes(":") ? `[${a.host}]` : a.host;
-  return { http: `${secure ? "https" : "http"}://${host}:${port}/${path}`, ipp: `${secure ? "ipps" : "ipp"}://${host}:${port}/${path}`, secure, path };
+  return {
+    http: `${secure ? "https" : "http"}://${host}:${port}/${path}`,
+    ipp: `${secure ? "ipps" : "ipp"}://${host}:${port}/${path}`,
+    secure,
+    path,
+  };
 }
 
 /** A few status codes by name, for the error text; any other shows as hex. */
@@ -61,20 +81,34 @@ const STATUS: Record<number, string> = {
 export async function getPrinterAttributes(
   fetcher: typeof fetch,
   address: PrinterAddress,
-  options: { requestId?: number; signal?: AbortSignal; timeoutMs?: number } = {},
+  options: {
+    requestId?: number;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  } = {},
 ): Promise<IppMessage> {
   const url = printerUrl(address);
   const res = await fetchTimeout(
     fetcher,
     url.http,
-    { method: "POST", headers: { "content-type": "application/ipp", accept: "application/ipp" }, body: getPrinterAttributesRequest(url.ipp, REQUESTED, options.requestId) },
+    {
+      method: "POST",
+      headers: { "content-type": "application/ipp", accept: "application/ipp" },
+      body: getPrinterAttributesRequest(url.ipp, REQUESTED, options.requestId),
+    },
     options,
   );
-  if (!res.ok) throw new ConnectorError(`HTTP ${res.status} on POST /${url.path}`, { status: res.status });
+  if (!res.ok)
+    throw new ConnectorError(`HTTP ${res.status} on POST /${url.path}`, {
+      status: res.status,
+    });
   const message = decodeMessage(new Uint8Array(await res.arrayBuffer()));
   if (message.code >= 0x0100) {
     const why = attributesOf(message, 1)["status-message"]?.[0];
-    throw new ConnectorError(`IPP ${STATUS[message.code] ?? `status 0x${message.code.toString(16).padStart(4, "0")}`}${typeof why === "string" ? `: ${why}` : ""}`, { status: message.code, code: "ipp" });
+    throw new ConnectorError(
+      `IPP ${STATUS[message.code] ?? `status 0x${message.code.toString(16).padStart(4, "0")}`}${typeof why === "string" ? `: ${why}` : ""}`,
+      { status: message.code, code: "ipp" },
+    );
   }
   return message;
 }

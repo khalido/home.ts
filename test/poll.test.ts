@@ -3,7 +3,13 @@ import { type Clock, createHome, type Integration } from "../src/index.ts";
 import { poller } from "../src/poll.ts";
 
 /** A clock whose sleeps never end by themselves: only an abort (or a nudge) ends one. */
-const stuck: Clock = { now: () => 0, sleep: (_ms, signal) => new Promise((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true })) };
+const stuck: Clock = {
+  now: () => 0,
+  sleep: (_ms, signal) =>
+    new Promise((resolve) =>
+      signal?.addEventListener("abort", () => resolve(), { once: true }),
+    ),
+};
 
 describe("poller", () => {
   test("wait resolves on nudge, and says so", async () => {
@@ -37,7 +43,11 @@ describe("poller", () => {
 describe("createHome refresh", () => {
   const counting = (name: string) => {
     const counter = { refreshed: 0 };
-    const i: Integration = { name, run: async () => {}, refresh: () => void counter.refreshed++ };
+    const i: Integration = {
+      name,
+      run: async () => {},
+      refresh: () => void counter.refreshed++,
+    };
     return { i, counter };
   };
 
@@ -49,6 +59,8 @@ describe("createHome refresh", () => {
     expect([a.counter.refreshed, b.counter.refreshed]).toEqual([1, 1]);
     home.refresh("b");
     expect([a.counter.refreshed, b.counter.refreshed]).toEqual([1, 2]);
-    expect(() => home.refresh("nope")).toThrow('no integration "nope"; have a, b');
+    expect(() => home.refresh("nope")).toThrow(
+      'no integration "nope"; have a, b',
+    );
   });
 });

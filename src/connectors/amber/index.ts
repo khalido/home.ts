@@ -7,7 +7,13 @@ import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { amberClient, AmberError, type AmberState } from "./client.ts";
 
-export { AmberError, type AmberState, amberClient, type Interval, type PriceInterval } from "./client.ts";
+export {
+  AmberError,
+  type AmberState,
+  amberClient,
+  type Interval,
+  type PriceInterval,
+} from "./client.ts";
 
 /** Poll every 60 s: prices move in 5-minute intervals and the current one is revised inside it; 5 calls in 5 min, limit 50. */
 export const POLL_MS = 60_000;
@@ -16,17 +22,27 @@ export const POLL_MS = 60_000;
 export const configSchema = z.looseObject({
   connector: z.literal("amber"),
   key: envName.describe("env name holding the Amber API key"),
-  siteId: z.string().optional().describe("the site; the first active one when left out"),
+  siteId: z
+    .string()
+    .optional()
+    .describe("the site; the first active one when left out"),
 });
 
 /** Amber settings for a home. `siteId` is looked up once when left out. */
-export type AmberConfig = { key: string; siteId?: string; fetch: typeof fetch; clock?: Clock };
+export type AmberConfig = {
+  key: string;
+  siteId?: string;
+  fetch: typeof fetch;
+  clock?: Clock;
+};
 
 /** What the snapshot holds: prices now and when they were read. */
 export type AmberSnapshot = AmberState & { asOf: string };
 
 /** Amber prices as a home integration: one read now, then every 60 s. */
-export function amber(config: AmberConfig): Integration<AmberSnapshot, "amber"> {
+export function amber(
+  config: AmberConfig,
+): Integration<AmberSnapshot, "amber"> {
   const client = amberClient(config);
   const clock = config.clock ?? realClock;
   const poll = poller(clock);
@@ -39,13 +55,24 @@ export function amber(config: AmberConfig): Integration<AmberSnapshot, "amber"> 
       while (!signal.aborted) {
         try {
           siteId ??= await client.siteId(signal);
-          last = { ...(await client.prices(siteId, signal)), asOf: asOf(clock) };
+          last = {
+            ...(await client.prices(siteId, signal)),
+            asOf: asOf(clock),
+          };
           update({ status: "connected", anomaly: last.anomaly, state: last });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
           if (error instanceof AmberError && error.status === 401)
-            return update({ status: "unavailable", detail: "Amber rejected the key", state: last });
-          update({ status: "disconnected", detail: errorText(error), state: last });
+            return update({
+              status: "unavailable",
+              detail: "Amber rejected the key",
+              state: last,
+            });
+          update({
+            status: "disconnected",
+            detail: errorText(error),
+            state: last,
+          });
         }
         await poll.wait(POLL_MS, signal);
       }
@@ -62,7 +89,9 @@ export function amberText(a: AmberState): string {
     `sell ${a.exportCents?.toFixed(1) ?? "?"}c`,
     negativePrice ?? "",
     field(a.renewables, (v) => `${Math.round(v)}% renewables`),
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export const manifest: Manifest<AmberSnapshot> = {
@@ -72,8 +101,18 @@ export const manifest: Manifest<AmberSnapshot> = {
   pollSeconds: POLL_MS / 1000,
   access: "cloud HTTPS, AMBER_KEY; 50 calls per 5 min",
   env: [
-    { name: "AMBER_KEY", example: "psk_xxxxxxxx", what: "Amber Electric API key (app.amber.com.au/developers)" },
-    { name: "AMBER_SITE_ID", example: "", optional: true, what: "the first active site is used when unset" },
+    {
+      name: "AMBER_KEY",
+      example: "psk_xxxxxxxx",
+      what: "Amber Electric API key (app.amber.com.au/developers)",
+    },
+    {
+      name: "AMBER_SITE_ID",
+      example: "",
+      optional: true,
+      what: "the first active site is used when unset",
+    },
   ],
-  lines: ({ state }) => (state?.importCents === undefined ? [] : [amberText(state)]),
+  lines: ({ state }) =>
+    state?.importCents === undefined ? [] : [amberText(state)],
 };

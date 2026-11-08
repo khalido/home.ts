@@ -24,23 +24,23 @@ Candidates researched (Sonnet, 2026-10-14), ranked by value over effort for this
 
 Home Assistant's public install counts ([current_data.json](https://analytics.home-assistant.io/current_data.json), 701,678 active installs, 21,086 in Australia; HA gives no per-country integration counts, so the Australian notes are judgement). Already covered and near the top: Cast 284k, IPP 163k, Hue 88k. Lower: Enphase 10.7k, Daikin 6.5k, Amber 1.4k. The library covers devices KO owns (decisions), so this is a guide for anyone extending it, not a plan.
 
-| Category | Connector | Installs | Local, no cloud account | Effort | Why |
-|---|---|---|---|---|---|
-| Energy | Shelly | 141k | yes, Gen2 JSON-RPC | small | most-installed local energy device; plugs and meters |
-| Energy | Fronius | 10.1k | yes, Solar API v1 | small | common Australian inverter, one GET |
-| Energy | forecast.solar | 67k | keyless free tier | small | solar forecast beside Enphase |
-| Energy | Tesla Powerwall | 2.1k + fleet 5.3k | PW2 yes; PW3 mostly cloud | medium | the commonest home battery here |
-| Energy | SMA, GoodWe | 5.0k, 3.7k | yes (GoodWe over UDP, Node-only) | medium | next most common Australian inverters |
-| Energy | Sungrow, Huawei | custom, Modbus TCP | yes | medium, Node-only | big local market share, poorly served |
-| Climate | AirTouch 5 | 543 | yes, TCP | medium, Node-only | Australian ducted zoning |
-| Climate | Mitsubishi MELCloud, Sensibo | 7.0k, 6.0k | no | small to medium | split systems after Daikin; Sensibo covers any IR AC |
-| Lighting | WLED | 34k | yes | small | trivial JSON |
-| Media | Sonos | 90k | yes | medium | the biggest local media brand after Cast |
-| Media | Samsung, LG TVs | 95k, 68k | yes, WebSocket with pairing | medium | on or off, what is playing |
-| Security | Reolink, UniFi Protect, Frigate | 62k, 25k, 29k | yes | medium | cameras and person events |
-| Network | MQTT | 270k | yes | medium | one connector reaches Zigbee2MQTT, Tasmota, ESPHome and Frigate |
-| Network | Synology, NUT UPS | 52k, 25k | yes | small | NAS and UPS health |
-| Sensors | Ecowitt | 16k | yes, the station posts to you | small, needs a listener | backyard weather station |
+| Category | Connector                       | Installs           | Local, no cloud account          | Effort                  | Why                                                             |
+| -------- | ------------------------------- | ------------------ | -------------------------------- | ----------------------- | --------------------------------------------------------------- |
+| Energy   | Shelly                          | 141k               | yes, Gen2 JSON-RPC               | small                   | most-installed local energy device; plugs and meters            |
+| Energy   | Fronius                         | 10.1k              | yes, Solar API v1                | small                   | common Australian inverter, one GET                             |
+| Energy   | forecast.solar                  | 67k                | keyless free tier                | small                   | solar forecast beside Enphase                                   |
+| Energy   | Tesla Powerwall                 | 2.1k + fleet 5.3k  | PW2 yes; PW3 mostly cloud        | medium                  | the commonest home battery here                                 |
+| Energy   | SMA, GoodWe                     | 5.0k, 3.7k         | yes (GoodWe over UDP, Node-only) | medium                  | next most common Australian inverters                           |
+| Energy   | Sungrow, Huawei                 | custom, Modbus TCP | yes                              | medium, Node-only       | big local market share, poorly served                           |
+| Climate  | AirTouch 5                      | 543                | yes, TCP                         | medium, Node-only       | Australian ducted zoning                                        |
+| Climate  | Mitsubishi MELCloud, Sensibo    | 7.0k, 6.0k         | no                               | small to medium         | split systems after Daikin; Sensibo covers any IR AC            |
+| Lighting | WLED                            | 34k                | yes                              | small                   | trivial JSON                                                    |
+| Media    | Sonos                           | 90k                | yes                              | medium                  | the biggest local media brand after Cast                        |
+| Media    | Samsung, LG TVs                 | 95k, 68k           | yes, WebSocket with pairing      | medium                  | on or off, what is playing                                      |
+| Security | Reolink, UniFi Protect, Frigate | 62k, 25k, 29k      | yes                              | medium                  | cameras and person events                                       |
+| Network  | MQTT                            | 270k               | yes                              | medium                  | one connector reaches Zigbee2MQTT, Tasmota, ESPHome and Frigate |
+| Network  | Synology, NUT UPS               | 52k, 25k           | yes                              | small                   | NAS and UPS health                                              |
+| Sensors  | Ecowitt                         | 16k                | yes, the station posts to you    | small, needs a listener | backyard weather station                                        |
 
 Takeaways: energy is where this library is strongest and where demand is; one MQTT connector would cover the cheap-sensor world without per-device code; Australian AC beyond Daikin is cloud or custom-only. Rejected before and still rejected: Tuya (cloud, churn), Matter, Apple TV, Roborock. Transport NSW has 98 HA installs: it is here for chota-bot, not for popularity.
 

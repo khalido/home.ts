@@ -58,7 +58,12 @@ Make a **room table** first, in the SVG's header comment: each room, its floor, 
   "plan": { "svg": "home.svg" },
   "rooms": [
     // id matches <g class="room" id="…">; hueRoom: the Hue room whose lights this room's marker shows, once known
-    { "id": "room-living", "name": "Living", "floor": "ground", "hueRoom": "<hue room id>" },
+    {
+      "id": "room-living",
+      "name": "Living",
+      "floor": "ground",
+      "hueRoom": "<hue room id>",
+    },
   ],
   // devices: set `room` on one that already exists; adding a device is the connector's job, not this skill's
 }

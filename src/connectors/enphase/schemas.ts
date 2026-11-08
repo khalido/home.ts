@@ -22,7 +22,13 @@ export const Production = z.looseObject({
 });
 
 /** `GET /ivp/meters`: which current transformers exist and whether they are switched on. */
-export const Meters = z.array(z.looseObject({ eid: z.number().optional(), measurementType: z.string(), state: z.string() }));
+export const Meters = z.array(
+  z.looseObject({
+    eid: z.number().optional(),
+    measurementType: z.string(),
+    state: z.string(),
+  }),
+);
 
 /** `GET /ivp/meters/readings`: one reading per meter, joined to `/ivp/meters` by `eid`. */
 export const Readings = z.array(

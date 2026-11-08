@@ -21,16 +21,16 @@ Built 8 Nov in three groups agreed with chota-bot, each reviewed (`/ko-review`, 
 
 On Bun on a Raspberry Pi 5 (Pi OS Lite Trixie arm64, Wi-Fi), one long-lived `loadHome`, thin agent tools. Its 2-day install wait is off, so it can take 0.1.0 as soon as it's out.
 
-| chota wants | home API | Missing or untried |
-| :- | :- | :- |
-| Lights, scenes | `integration("hue").client.put`, `recallScene` | Hue not paired; writes return `unknown[]` |
-| AC status and set | `part("daikin").state`, `client.write(...)` | 120 s poll; `write` returns `void`; only `setPower` tried live |
-| Morning brief | `energyNow`, `bestWindow` | Enphase unreachable since 28 Oct |
-| Announce on Nest speakers | `integration("cast").announce` + `serveClip` | never run on a device; check `serveClip` picks the LAN address, not Tailscale's |
-| Music | `integration("spotify")`, `speakerState`, `spotifyChanges`, `duck` around `announce` | never run against Soloist |
-| Print a PDF on the Brother | none | Next item 3 |
-| Spend to categorise | `part("up").state`, `setCategory` | writes untried |
-| Admin page, alerts | `health()`, `onChange` | an "expected off" option, so a printer off at night isn't `down` |
+| chota wants                | home API                                                                             | Missing or untried                                                              |
+| :------------------------- | :----------------------------------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| Lights, scenes             | `integration("hue").client.put`, `recallScene`                                       | Hue not paired; writes return `unknown[]`                                       |
+| AC status and set          | `part("daikin").state`, `client.write(...)`                                          | 120 s poll; `write` returns `void`; only `setPower` tried live                  |
+| Morning brief              | `energyNow`, `bestWindow`                                                            | Enphase unreachable since 28 Oct                                                |
+| Announce on Nest speakers  | `integration("cast").announce` + `serveClip`                                         | never run on a device; check `serveClip` picks the LAN address, not Tailscale's |
+| Music                      | `integration("spotify")`, `speakerState`, `spotifyChanges`, `duck` around `announce` | never run against Soloist                                                       |
+| Print a PDF on the Brother | none                                                                                 | Next item 3                                                                     |
+| Spend to categorise        | `part("up").state`, `setCategory`                                                    | writes untried                                                                  |
+| Admin page, alerts         | `health()`, `onChange`                                                               | an "expected off" option, so a printer off at night isn't `down`                |
 
 On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so the address cache matters more. `cast/serve.d.ts` needs `@types/node`. Check Vite's SSR build keeps `@khalido/home` external.
 

@@ -109,7 +109,7 @@ jobs:
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         with:
-          max_steps: '60'
+          max_steps: "60"
           # Never want a pull request from it? `mode: answer` keeps the shell,
           # so it still runs your tests before it answers, and opens nothing.
           # Belt and braces is that plus `contents: read` above.

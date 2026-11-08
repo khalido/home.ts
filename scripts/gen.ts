@@ -7,15 +7,27 @@ const HEADER = `# Names the \`home\` CLI, the live tests and the bench read. Dum
 # from each connector's manifest (src/connectors/*/index.ts); edit those, not this file.`;
 
 /** Outside any connector: which config `home` reads. */
-const HOME_CONFIG: EnvVar = { name: "HOME_CONFIG", example: "", optional: true, what: "a home config (JSONC), e.g. ~/home/home.jsonc; else the names above" };
+const HOME_CONFIG: EnvVar = {
+  name: "HOME_CONFIG",
+  example: "",
+  optional: true,
+  what: "a home config (JSONC), e.g. ~/home/home.jsonc; else the names above",
+};
 
 /** `NAME=example  # what`, the comments in one column; an optional name says so. */
 const line = (e: EnvVar) => {
-  const what = [e.optional ? "optional" : "", e.what].filter(Boolean).join(": ");
+  const what = [e.optional ? "optional" : "", e.what]
+    .filter(Boolean)
+    .join(": ");
   const assign = `${e.name}=${e.example ?? ""}`;
   return what ? `${assign.padEnd(37)} # ${what}` : assign;
 };
 
-export const envExampleText = () => `${[HEADER, ...MANIFESTS.flatMap((m) => m.env).map(line), line(HOME_CONFIG)].join("\n")}\n`;
+export const envExampleText = () =>
+  `${[HEADER, ...MANIFESTS.flatMap((m) => m.env).map(line), line(HOME_CONFIG)].join("\n")}\n`;
 
-if (import.meta.main) await Bun.write(new URL("../.env.example", import.meta.url), envExampleText());
+if (import.meta.main)
+  await Bun.write(
+    new URL("../.env.example", import.meta.url),
+    envExampleText(),
+  );

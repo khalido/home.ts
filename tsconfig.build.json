@@ -8,5 +8,13 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/cli/**", "src/connectors/weather/ftp.ts", "src/connectors/cast/tls.ts", "src/connectors/cast/serve.ts", "src/finders.ts", "src/finders-entry.ts", "src/node-fetch.ts"]
+  "exclude": [
+    "src/cli/**",
+    "src/connectors/weather/ftp.ts",
+    "src/connectors/cast/tls.ts",
+    "src/connectors/cast/serve.ts",
+    "src/finders.ts",
+    "src/finders-entry.ts",
+    "src/node-fetch.ts"
+  ]
 }

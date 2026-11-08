@@ -30,7 +30,11 @@ export const BALANCED_W = 20;
 /** The grid flow in a word, from the raw `gridW`. */
 function flowOf(gridW?: number): EnergyNow["flow"] {
   if (gridW === undefined) return undefined;
-  return Math.abs(gridW) <= BALANCED_W ? "balanced" : gridW > 0 ? "importing" : "exporting";
+  return Math.abs(gridW) <= BALANCED_W
+    ? "balanced"
+    : gridW > 0
+      ? "importing"
+      : "exporting";
 }
 
 /**
@@ -38,16 +42,26 @@ function flowOf(gridW?: number): EnergyNow["flow"] {
  * feed-in `perKwh` above zero), else undefined. Both can hold in one interval; the import side wins.
  */
 function negativePrice(prices?: AmberState): EnergyNow["negativePrice"] {
-  if (prices?.importCents !== undefined && prices.importCents < 0) return "paid to use";
-  if (prices?.exportCents !== undefined && prices.exportCents < 0) return "exporting at a loss";
+  if (prices?.importCents !== undefined && prices.importCents < 0)
+    return "paid to use";
+  if (prices?.exportCents !== undefined && prices.exportCents < 0)
+    return "exporting at a loss";
   return undefined;
 }
 
 /** One owner for the combined number, so every view (CLI, jaldi, the bot) shows the same thing. */
-export function energyNow(power?: EnphaseState & Partial<Pick<EnphaseSnapshot, "productionWPeakToday">>, prices?: AmberState): EnergyNow {
+export function energyNow(
+  power?: EnphaseState & Partial<Pick<EnphaseSnapshot, "productionWPeakToday">>,
+  prices?: AmberState,
+): EnergyNow {
   const gridW = power?.netW;
   const surplusW = gridW === undefined ? undefined : gridW < 0 ? -gridW : 0;
-  const rate = gridW === undefined ? undefined : gridW >= 0 ? prices?.importCents : prices?.exportCents;
+  const rate =
+    gridW === undefined
+      ? undefined
+      : gridW >= 0
+        ? prices?.importCents
+        : prices?.exportCents;
   return {
     solarW: power?.productionW,
     solarPeakTodayW: power?.productionWPeakToday,
@@ -55,7 +69,10 @@ export function energyNow(power?: EnphaseState & Partial<Pick<EnphaseSnapshot, "
     gridW,
     importCents: prices?.importCents,
     exportCents: prices?.exportCents,
-    centsPerHour: gridW === undefined || rate === undefined ? undefined : (gridW / 1000) * rate, // export: negative kW × earned c/kWh = negative cost
+    centsPerHour:
+      gridW === undefined || rate === undefined
+        ? undefined
+        : (gridW / 1000) * rate, // export: negative kW × earned c/kWh = negative cost
     renewables: prices?.renewables,
     priceDescriptor: prices?.priceDescriptor,
     spike: prices?.spike,
@@ -63,7 +80,10 @@ export function energyNow(power?: EnphaseState & Partial<Pick<EnphaseSnapshot, "
     negativePrice: negativePrice(prices),
     flow: flowOf(gridW),
     surplusW,
-    surplusCentsPerHour: surplusW === undefined || prices?.exportCents === undefined ? undefined : (surplusW / 1000) * prices.exportCents,
+    surplusCentsPerHour:
+      surplusW === undefined || prices?.exportCents === undefined
+        ? undefined
+        : (surplusW / 1000) * prices.exportCents,
   };
 }
 
@@ -72,10 +92,18 @@ export function energyNow(power?: EnphaseState & Partial<Pick<EnphaseSnapshot, "
  * else of today's peak so far, with which scale it is (they mean different things, so a drawing says which).
  * Never clamped: above 1 is above the scale. Undefined when there is no solar reading or nothing to scale by.
  */
-export function solarLevel(now: EnergyNow, capacityW?: number): { fraction: number; scale: "capacity" | "today's peak" } | undefined {
+export function solarLevel(
+  now: EnergyNow,
+  capacityW?: number,
+): { fraction: number; scale: "capacity" | "today's peak" } | undefined {
   if (now.solarW === undefined) return undefined;
-  if (capacityW !== undefined && capacityW > 0) return { fraction: now.solarW / capacityW, scale: "capacity" };
-  if (now.solarPeakTodayW !== undefined && now.solarPeakTodayW > 0) return { fraction: now.solarW / now.solarPeakTodayW, scale: "today's peak" };
+  if (capacityW !== undefined && capacityW > 0)
+    return { fraction: now.solarW / capacityW, scale: "capacity" };
+  if (now.solarPeakTodayW !== undefined && now.solarPeakTodayW > 0)
+    return {
+      fraction: now.solarW / now.solarPeakTodayW,
+      scale: "today's peak",
+    };
   return undefined;
 }
 
@@ -85,14 +113,25 @@ export function solarLevel(now: EnergyNow, capacityW?: number): { fraction: numb
  */
 export function gridText(now: EnergyNow): string {
   const kw = (w: number) => `${(w / 1000).toFixed(1)} kW`;
-  const rate = (c: number | undefined, positive: string, negative: string) => (c === undefined ? "" : `, ${c >= 0 ? positive : negative} ${Math.round(Math.abs(c))} c/h`);
-  if (now.flow === "exporting" && now.surplusW !== undefined) return `exporting ${kw(now.surplusW)}${rate(now.surplusCentsPerHour, "earning", "costing")}`;
-  if (now.flow === "importing" && now.gridW !== undefined) return `importing ${kw(now.gridW)}${rate(now.centsPerHour, "costing", "earning")}`;
+  const rate = (c: number | undefined, positive: string, negative: string) =>
+    c === undefined
+      ? ""
+      : `, ${c >= 0 ? positive : negative} ${Math.round(Math.abs(c))} c/h`;
+  if (now.flow === "exporting" && now.surplusW !== undefined)
+    return `exporting ${kw(now.surplusW)}${rate(now.surplusCentsPerHour, "earning", "costing")}`;
+  if (now.flow === "importing" && now.gridW !== undefined)
+    return `importing ${kw(now.gridW)}${rate(now.centsPerHour, "costing", "earning")}`;
   return now.flow === "balanced" ? `balanced (${now.gridW} W)` : "";
 }
 
 /** A run of the forecast and its time-weighted averages: import price, feed-in price and the grid's renewable share. */
-export type PriceWindow = { start: string; end: string; importCents?: number; exportCents?: number; renewables?: number };
+export type PriceWindow = {
+  start: string;
+  end: string;
+  importCents?: number;
+  exportCents?: number;
+  renewables?: number;
+};
 
 const HOUR_MS = 3_600_000;
 
@@ -103,36 +142,71 @@ const HOUR_MS = 3_600_000;
  * 5 minutes ago). Prices are flat within an interval, so the best window starts or ends on an interval's edge: both are
  * tried. Averages weigh each interval by the time it covers; the earliest wins a tie. Undefined when nothing fits.
  */
-export function bestWindow(forecast: PriceInterval[] | undefined, hours: number, options: { by?: "price" | "renewables"; from?: number } = {}): PriceWindow | undefined {
-  if (!(hours > 0 && Number.isFinite(hours))) throw new RangeError(`bestWindow: hours must be above 0, got ${hours}`);
+export function bestWindow(
+  forecast: PriceInterval[] | undefined,
+  hours: number,
+  options: { by?: "price" | "renewables"; from?: number } = {},
+): PriceWindow | undefined {
+  if (!(hours > 0 && Number.isFinite(hours)))
+    throw new RangeError(`bestWindow: hours must be above 0, got ${hours}`);
   const by = options.by ?? "price";
-  const rows = (forecast ?? []).map((r) => ({ ...r, t0: Date.parse(r.start), t1: Date.parse(r.end) }));
+  const rows = (forecast ?? []).map((r) => ({
+    ...r,
+    t0: Date.parse(r.start),
+    t1: Date.parse(r.end),
+  }));
   const from = options.from ?? rows[0]?.t0 ?? 0;
   const length = Math.round(hours * HOUR_MS); // whole ms, so the covered time adds up to it exactly
-  const starts = [...new Set(rows.flatMap((r) => [Math.max(r.t0, from), r.t1 - length]).filter((t) => t >= from))].sort((a, b) => a - b);
+  const starts = [
+    ...new Set(
+      rows
+        .flatMap((r) => [Math.max(r.t0, from), r.t1 - length])
+        .filter((t) => t >= from),
+    ),
+  ].sort((a, b) => a - b);
   let best: PriceWindow | undefined;
   let bestScore = Infinity;
   for (const start of starts) {
     const window = windowAt(rows, start, length, by);
-    const score = window && (by === "price" ? window.importCents! : -window.renewables!);
-    if (window && score! < bestScore) (best = window), (bestScore = score!);
+    const score =
+      window && (by === "price" ? window.importCents! : -window.renewables!);
+    if (window && score! < bestScore) ((best = window), (bestScore = score!));
   }
   return best;
 }
 
 /** The window of `length` ms from `start`, or undefined when an interval in it is missing, or lacks the number `by` needs. Any other average is left out unless every interval has it. */
-function windowAt(rows: (PriceInterval & { t0: number; t1: number })[], start: number, length: number, by: "price" | "renewables"): PriceWindow | undefined {
+function windowAt(
+  rows: (PriceInterval & { t0: number; t1: number })[],
+  start: number,
+  length: number,
+  by: "price" | "renewables",
+): PriceWindow | undefined {
   const end = start + length;
-  const sum = { importCents: 0, exportCents: 0, renewables: 0, importMs: 0, exportMs: 0, renewablesMs: 0 };
+  const sum = {
+    importCents: 0,
+    exportCents: 0,
+    renewables: 0,
+    importMs: 0,
+    exportMs: 0,
+    renewablesMs: 0,
+  };
   let at = start;
   for (const r of rows) {
     if (r.t1 <= at) continue;
     if (at >= end) break;
-    if (r.t0 > at || (by === "price" ? r.importCents : r.renewables) === undefined) return undefined; // a gap, or no number to judge by
+    if (
+      r.t0 > at ||
+      (by === "price" ? r.importCents : r.renewables) === undefined
+    )
+      return undefined; // a gap, or no number to judge by
     const ms = Math.min(r.t1, end) - at;
-    if (r.importCents !== undefined) (sum.importCents += r.importCents * ms), (sum.importMs += ms);
-    if (r.exportCents !== undefined) (sum.exportCents += r.exportCents * ms), (sum.exportMs += ms);
-    if (r.renewables !== undefined) (sum.renewables += r.renewables * ms), (sum.renewablesMs += ms);
+    if (r.importCents !== undefined)
+      ((sum.importCents += r.importCents * ms), (sum.importMs += ms));
+    if (r.exportCents !== undefined)
+      ((sum.exportCents += r.exportCents * ms), (sum.exportMs += ms));
+    if (r.renewables !== undefined)
+      ((sum.renewables += r.renewables * ms), (sum.renewablesMs += ms));
     at += ms;
   }
   if (at < end) return undefined;
@@ -141,6 +215,7 @@ function windowAt(rows: (PriceInterval & { t0: number; t1: number })[], start: n
     end: new Date(end).toISOString(),
     importCents: sum.importMs === length ? sum.importCents / length : undefined,
     exportCents: sum.exportMs === length ? sum.exportCents / length : undefined,
-    renewables: sum.renewablesMs === length ? sum.renewables / length : undefined,
+    renewables:
+      sum.renewablesMs === length ? sum.renewables / length : undefined,
   };
 }

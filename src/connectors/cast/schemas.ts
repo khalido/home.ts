@@ -14,7 +14,9 @@ export const Application = z.looseObject({
   appId: z.string().optional(),
   displayName: z.string().optional(),
   isIdleScreen: z.boolean().optional(),
-  namespaces: z.array(z.looseObject({ name: z.string().optional() })).optional(),
+  namespaces: z
+    .array(z.looseObject({ name: z.string().optional() }))
+    .optional(),
   sessionId: z.string().optional(),
   statusText: z.string().optional(),
   transportId: z.string().optional(),
@@ -48,7 +50,12 @@ export const MediaStatus = z.looseObject({
             contentType: z.string().optional(),
             streamType: z.string().optional(),
             duration: z.number().nullish(), // seconds; null for a live stream
-            metadata: z.looseObject({ title: z.string().optional(), artist: z.string().optional() }).optional(),
+            metadata: z
+              .looseObject({
+                title: z.string().optional(),
+                artist: z.string().optional(),
+              })
+              .optional(),
           })
           .optional(),
       }),
@@ -56,7 +63,11 @@ export const MediaStatus = z.looseObject({
     .optional(),
 });
 
-const Member = z.looseObject({ deviceId: z.string().optional(), name: z.string().optional(), volume: Volume.optional() });
+const Member = z.looseObject({
+  deviceId: z.string().optional(),
+  name: z.string().optional(),
+  volume: Volume.optional(),
+});
 
 export const MultizoneStatus = z.looseObject({
   type: z.literal("MULTIZONE_STATUS"),
@@ -71,8 +82,20 @@ export const MemberChange = z.looseObject({
 });
 
 /** Every payload the reducer reads; anything else (PONG, LAUNCH_STATUS, …) fails to parse and is ignored by type. */
-export const CastPayload = z.discriminatedUnion("type", [ReceiverStatus, MediaStatus, MultizoneStatus, MemberChange]);
+export const CastPayload = z.discriminatedUnion("type", [
+  ReceiverStatus,
+  MediaStatus,
+  MultizoneStatus,
+  MemberChange,
+]);
 export type CastPayload = z.infer<typeof CastPayload>;
 
 /** The types the reducer knows; a payload of one of these that fails its schema is an anomaly, any other type is ignored. */
-export const KNOWN_TYPES = new Set(["RECEIVER_STATUS", "MEDIA_STATUS", "MULTIZONE_STATUS", "DEVICE_ADDED", "DEVICE_UPDATED", "DEVICE_REMOVED"]);
+export const KNOWN_TYPES = new Set([
+  "RECEIVER_STATUS",
+  "MEDIA_STATUS",
+  "MULTIZONE_STATUS",
+  "DEVICE_ADDED",
+  "DEVICE_UPDATED",
+  "DEVICE_REMOVED",
+]);

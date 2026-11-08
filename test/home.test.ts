@@ -71,7 +71,14 @@ describe("createHome.refresh", () => {
 describe("createHome.start", () => {
   test("a second start, after the first has stopped, runs every integration again", async () => {
     let runs = 0;
-    const i: Integration<number> = { name: "a", refresh() {}, run: (signal) => new Promise((r) => (runs++, signal.addEventListener("abort", () => r()))) };
+    const i: Integration<number> = {
+      name: "a",
+      refresh() {},
+      run: (signal) =>
+        new Promise(
+          (r) => (runs++, signal.addEventListener("abort", () => r())),
+        ),
+    };
     const home = createHome([i]);
     for (let n = 0; n < 2; n++) {
       const stop = new AbortController();

@@ -1,3 +1,7 @@
 [install]
 # Supply-chain worms ship as fresh releases: never install a version younger than 3 days.
 minimumReleaseAge = "3d"
+
+[fmt]
+# Bun's defaults. Left alone: files a script writes (a test checks them for drift) and device replies kept as they came.
+ignorePatterns = ["home.schema.json", "test/fixtures/", "examples/home.svg"]

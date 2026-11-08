@@ -10,7 +10,18 @@ import { manifest as weather } from "./connectors/weather/index.ts";
 import type { Manifest } from "./manifest.ts";
 
 /** Every connector's manifest, in the order `home status` and `.env.example` list them. */
-export const MANIFESTS: Manifest<any>[] = [hue, daikin, enphase, amber, up, weather, cast, printers, spotify];
+export const MANIFESTS: Manifest<any>[] = [
+  hue,
+  daikin,
+  enphase,
+  amber,
+  up,
+  weather,
+  cast,
+  printers,
+  spotify,
+];
 
 /** One connector's manifest by name, or undefined. */
-export const manifestOf = (name: string): Manifest<any> | undefined => MANIFESTS.find((m) => m.name === name);
+export const manifestOf = (name: string): Manifest<any> | undefined =>
+  MANIFESTS.find((m) => m.name === name);

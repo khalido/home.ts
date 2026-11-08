@@ -15,7 +15,10 @@ export function poller(clock: Clock) {
       const nudged = new AbortController();
       wake = () => nudged.abort();
       try {
-        await clock.sleep(ms, signal ? AbortSignal.any([signal, nudged.signal]) : nudged.signal);
+        await clock.sleep(
+          ms,
+          signal ? AbortSignal.any([signal, nudged.signal]) : nudged.signal,
+        );
         return nudged.signal.aborted;
       } finally {
         wake = undefined;

@@ -35,7 +35,7 @@ skills/draw-home a coding agent draws a home as SVG and writes the config's room
 skills/use-home  an agent uses `home`: reading safely, connecting, addresses, discovery, the rules for writes
 ```
 
-**Words.** A *connector* is a folder under `src/connectors/`, its factory, and the `connector:` field in the config. An *integration* is the running object the factory returns (`Integration`): a `name`, `run(signal, update)` and `refresh()`. A *Part* is one integration's slice of the snapshot: `status`, `detail`, `anomaly`, `state`. `unavailable` means stopped for good (a rejected key); unreachable is `disconnected`. A *manifest* is what a connector declares about itself (`Manifest` in `manifest.ts`): the CLI, `.env.example` and `loadHome` read it rather than knowing each connector.
+**Words.** A _connector_ is a folder under `src/connectors/`, its factory, and the `connector:` field in the config. An _integration_ is the running object the factory returns (`Integration`): a `name`, `run(signal, update)` and `refresh()`. A _Part_ is one integration's slice of the snapshot: `status`, `detail`, `anomaly`, `state`. `unavailable` means stopped for good (a rejected key); unreachable is `disconnected`. A _manifest_ is what a connector declares about itself (`Manifest` in `manifest.ts`): the CLI, `.env.example` and `loadHome` read it rather than knowing each connector.
 
 ## Rules
 
@@ -61,17 +61,17 @@ Before writing one, search Home Assistant's [integration list](https://www.home-
 
 ## Where things are written down
 
-| Where | Holds |
-|---|---|
-| `README.md` | for a visitor: what this is, the connectors, install, links |
-| `AGENTS.md` (this file; `CLAUDE.md` imports it) | rules and how the code is shaped |
-| `src/connectors/<name>/README.md` | everything about one connector: protocol, what the live device said, sources |
-| `docs/decisions.md` | KO's decisions and why, newest last; overrides other docs where they conflict |
-| `docs/philosophy.md`, `docs/using.md`, `docs/config.md`, `docs/cli.md` | why, wiring it in, the config, the command |
-| `docs/cast.md`, `docs/google.md`, `docs/up.md`, `docs/matter.md`, `docs/weather-probe.md`, `docs/enphase-notes.md` | the design or investigation behind a connector |
-| `docs/ideas.md` | connectors and features considered, with the research, not yet decided |
-| `docs/devices.md` | devices worth buying for a home: local, Google Home, AU price, whether this library can read them |
-| `docs/handover.md` | where things stand and what is next; disposable, rewritten |
+| Where                                                                                                              | Holds                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `README.md`                                                                                                        | for a visitor: what this is, the connectors, install, links                                       |
+| `AGENTS.md` (this file; `CLAUDE.md` imports it)                                                                    | rules and how the code is shaped                                                                  |
+| `src/connectors/<name>/README.md`                                                                                  | everything about one connector: protocol, what the live device said, sources                      |
+| `docs/decisions.md`                                                                                                | KO's decisions and why, newest last; overrides other docs where they conflict                     |
+| `docs/philosophy.md`, `docs/using.md`, `docs/config.md`, `docs/cli.md`                                             | why, wiring it in, the config, the command                                                        |
+| `docs/cast.md`, `docs/google.md`, `docs/up.md`, `docs/matter.md`, `docs/weather-probe.md`, `docs/enphase-notes.md` | the design or investigation behind a connector                                                    |
+| `docs/ideas.md`                                                                                                    | connectors and features considered, with the research, not yet decided                            |
+| `docs/devices.md`                                                                                                  | devices worth buying for a home: local, Google Home, AU price, whether this library can read them |
+| `docs/handover.md`                                                                                                 | where things stand and what is next; disposable, rewritten                                        |
 
 ## Drawing a home
 

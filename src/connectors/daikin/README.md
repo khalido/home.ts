@@ -14,15 +14,15 @@ Plain HTTP on port 80, no key, no registration. Everything is one endpoint, `POS
 - **Read** (`op: 2`): `/dsiot/edge/adr_0100.dgc_status?filter=pv,pt,md` (indoor unit, tree under `e_1002`) and `/dsiot/edge/adr_0200.dgc_status?filter=pv,pt,md` (outdoor unit, `e_1003`), in one request. Each response carries `rsc`; `2000` is OK. Every value is a hex string `pv`, and `md` gives the unit's own step (`st`), min (`mi`) and max (`mx`).
 - **Values are read by name**, never by position in the child list. Multi-byte values are little-endian; temperatures are signed.
 
-| Path | Meaning | Decoding |
-|---|---|---|
-| `e_1002/e_A002/p_01` | power | `00` off, `01` on |
-| `e_1002/e_3001/p_01` | mode | `0000` fan, `0100` heat, `0200` cool, `0300` auto, `0500` dry |
-| `e_1002/e_3001/p_02`, `p_03`, `p_1D` | setpoint for cool, heat, auto | one byte, °C × 2 |
-| `e_1002/e_3001/p_09`, `p_0A`, `p_26`, `p_28` | fan for cool, heat, auto, fan | `0300`–`0700` speeds 1–5, `0A00` auto, `0B00` quiet |
-| `e_1002/e_A00B/p_01` | room °C | signed byte, whole degrees (`mi F7` is −9) |
-| `e_1002/e_A00B/p_02` | humidity % | byte |
-| `e_1003/e_A00D/p_01` | outside °C | signed little-endian, °C × 2 (`mi EEFF` is −9 °C) |
+| Path                                         | Meaning                       | Decoding                                                      |
+| -------------------------------------------- | ----------------------------- | ------------------------------------------------------------- |
+| `e_1002/e_A002/p_01`                         | power                         | `00` off, `01` on                                             |
+| `e_1002/e_3001/p_01`                         | mode                          | `0000` fan, `0100` heat, `0200` cool, `0300` auto, `0500` dry |
+| `e_1002/e_3001/p_02`, `p_03`, `p_1D`         | setpoint for cool, heat, auto | one byte, °C × 2                                              |
+| `e_1002/e_3001/p_09`, `p_0A`, `p_26`, `p_28` | fan for cool, heat, auto, fan | `0300`–`0700` speeds 1–5, `0A00` auto, `0B00` quiet           |
+| `e_1002/e_A00B/p_01`                         | room °C                       | signed byte, whole degrees (`mi F7` is −9)                    |
+| `e_1002/e_A00B/p_02`                         | humidity %                    | byte                                                          |
+| `e_1003/e_A00D/p_01`                         | outside °C                    | signed little-endian, °C × 2 (`mi EEFF` is −9 °C)             |
 
 Dry mode has no setpoint or fan field in this map, so both read as undefined there rather than a default. An unknown mode, fan or power code is left undefined and named in `anomaly`.
 
@@ -53,13 +53,13 @@ One read-only request, saved with the MAC, SSID, `edid` and the unit's ASCII ids
 
 All setpoint and fan fields, read from `e_3001` with `md` (setpoint is one byte, °C × 2, and `md.st` is 245 on all of them):
 
-| Field | Meaning | Value | Range |
-|---|---|---|---|
-| `p_02` | cool setpoint | 25 °C | 18–32 |
-| `p_03` | heat setpoint | 25 °C | 10–30 |
-| `p_1D` | auto setpoint | 24 °C | 18–30 |
-| `p_09`, `p_0A` | cool, heat fan | `0500`, speed 3 | |
-| `p_26`, `p_28` | auto, fan-mode fan | auto, speed 5 | |
+| Field          | Meaning            | Value           | Range |
+| -------------- | ------------------ | --------------- | ----- |
+| `p_02`         | cool setpoint      | 25 °C           | 18–32 |
+| `p_03`         | heat setpoint      | 25 °C           | 10–30 |
+| `p_1D`         | auto setpoint      | 24 °C           | 18–30 |
+| `p_09`, `p_0A` | cool, heat fan     | `0500`, speed 3 |       |
+| `p_26`, `p_28` | auto, fan-mode fan | auto, speed 5   |       |
 
 Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, `mi FA`, `mx 00`), and the `p_05`–`p_08`, `p_20`–`p_25` fields (3- and 4-byte values, mostly `0F…`, likely schedules or limits). Meaning unknown.
 
@@ -67,11 +67,11 @@ Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, 
 
 Both Daikin protocol sources are GPL-3.0, so they are read for facts only (endpoints, field paths, value maps) and no code is copied; that keeps this package MIT.
 
-| Source | Licence | Used for |
-|---|---|---|
-| [Home Assistant `daikin` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/daikin) ([docs](https://www.home-assistant.io/integrations/daikin/)) | Apache-2.0 | `iot_class` `local_polling`, the 120 s poll, zeroconf `_dkapi._tcp`; built on `pydaikin==2.20.0` |
-| [fredrike/pydaikin](https://github.com/fredrike/pydaikin), `daikin_brp084.py` | GPL-3.0, facts only | UDP discovery packet, the `dsiot` paths, mode and fan maps, per-mode setpoint and fan fields, write tree, value encodings |
-| [cambot1901/ha-daikin-alira](https://github.com/cambot1901/ha-daikin-alira) | GPL-3.0, facts only | a second account of the read and write requests on an Alira; its sensor polls every 30 s with a 10 s timeout |
+| Source                                                                                                                                                                              | Licence             | Used for                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [Home Assistant `daikin` integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/daikin) ([docs](https://www.home-assistant.io/integrations/daikin/)) | Apache-2.0          | `iot_class` `local_polling`, the 120 s poll, zeroconf `_dkapi._tcp`; built on `pydaikin==2.20.0`                          |
+| [fredrike/pydaikin](https://github.com/fredrike/pydaikin), `daikin_brp084.py`                                                                                                       | GPL-3.0, facts only | UDP discovery packet, the `dsiot` paths, mode and fan maps, per-mode setpoint and fan fields, write tree, value encodings |
+| [cambot1901/ha-daikin-alira](https://github.com/cambot1901/ha-daikin-alira)                                                                                                         | GPL-3.0, facts only | a second account of the read and write requests on an Alira; its sensor polls every 30 s with a 10 s timeout              |
 
 ## Energy, second read (2026-10-16)
 

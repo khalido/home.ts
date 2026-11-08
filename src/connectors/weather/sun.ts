@@ -3,7 +3,12 @@ import { getPosition, getTimes } from "suncalc";
 const DAY_MS = 86_400_000;
 
 /** The next of each event after `at`: today's while it is still ahead, else tomorrow's; missing when that day has none (polar). */
-export type SunNext = { dawn?: string; sunrise?: string; sunset?: string; dusk?: string };
+export type SunNext = {
+  dawn?: string;
+  sunrise?: string;
+  sunset?: string;
+  dusk?: string;
+};
 
 /**
  * The sun at a place and instant, computed locally (suncalc 2: degrees, azimuth clockwise from north). No network.
@@ -37,14 +42,20 @@ export type SunNow = {
 const isoOf = (d: Date | null) => d?.toISOString();
 
 /** One owner for the sun's numbers. `at` is epoch ms. */
-export function sunNow(latitude: number, longitude: number, at: number): SunNow {
+export function sunNow(
+  latitude: number,
+  longitude: number,
+  at: number,
+): SunNow {
   const date = new Date(at);
   const times = getTimes(date, latitude, longitude);
   const tomorrow = getTimes(new Date(at + DAY_MS), latitude, longitude);
   const { azimuth, altitude } = getPosition(date, latitude, longitude);
   const next = (name: "dawn" | "sunrise" | "sunset" | "dusk") => {
     const today = times[name];
-    return today && today.getTime() > at ? today.toISOString() : isoOf(tomorrow[name]);
+    return today && today.getTime() > at
+      ? today.toISOString()
+      : isoOf(tomorrow[name]);
   };
   return {
     at: date.toISOString(),
@@ -61,7 +72,12 @@ export function sunNow(latitude: number, longitude: number, at: number): SunNow 
     altitudeDeg: altitude,
     rising: at < times.solarNoon.getTime(),
     daylight: altitude > 0,
-    next: { dawn: next("dawn"), sunrise: next("sunrise"), sunset: next("sunset"), dusk: next("dusk") },
+    next: {
+      dawn: next("dawn"),
+      sunrise: next("sunrise"),
+      sunset: next("sunset"),
+      dusk: next("dusk"),
+    },
     alwaysUp: times.alwaysUp,
     alwaysDown: times.alwaysDown,
   };
@@ -75,7 +91,12 @@ export const SUN_TOLERANCE_MS = 2 * 60_000;
  * two minutes out, else undefined. Each is compared with the nearest computed event of the solar days either side of it,
  * so near solar midnight at high latitude, where the solar day containing it can be the neighbouring one, it still pairs.
  */
-export function sunDisagrees(source: string, latitude: number, longitude: number, reported: { sunrise?: string; sunset?: string }): string | undefined {
+export function sunDisagrees(
+  source: string,
+  latitude: number,
+  longitude: number,
+  reported: { sunrise?: string; sunset?: string },
+): string | undefined {
   const notes = (["sunrise", "sunset"] as const).flatMap((name) => {
     const t = Date.parse(reported[name] ?? "");
     if (Number.isNaN(t)) return [];
@@ -85,7 +106,9 @@ export function sunDisagrees(source: string, latitude: number, longitude: number
       .map((c) => ({ computed: c, offMs: Math.abs(t - Date.parse(c)) }))
       .sort((a, b) => a.offMs - b.offMs)[0];
     if (nearest && nearest.offMs <= SUN_TOLERANCE_MS) return [];
-    return [`${source} ${name} ${reported[name]} ${nearest ? `is ${(nearest.offMs / 60_000).toFixed(1)} min from the computed ${nearest.computed}` : "on a day the computed sun has none"}`];
+    return [
+      `${source} ${name} ${reported[name]} ${nearest ? `is ${(nearest.offMs / 60_000).toFixed(1)} min from the computed ${nearest.computed}` : "on a day the computed sun has none"}`,
+    ];
   });
   return notes.length ? notes.join("; ") : undefined;
 }

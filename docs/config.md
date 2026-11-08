@@ -10,7 +10,13 @@ import { ftpFetch } from "@khalido/home/weather/ftp";
 
 const path = "/path/to/home.jsonc";
 const readFile = (p: string) => readFileSync(resolve(dirname(path), p), "utf8"); // paths in the config are relative to it
-const home = createHome(loadHome(parseJsonc(readFileSync(path, "utf8")), { env: process.env, readFile, ftpFetch: ftpFetch() }));
+const home = createHome(
+  loadHome(parseJsonc(readFileSync(path, "utf8")), {
+    env: process.env,
+    readFile,
+    ftpFetch: ftpFetch(),
+  }),
+);
 ```
 
 `loadHome` runs on Bun and Node. Hue and Enphase need a fetch that handles their certificates: Bun's `tls` fetch option by default, and under Node `tls: NODE_TLS` from `@khalido/home/node`. Under Node, a config with Hue or Enphase and no `tls` is a problem `loadHome` names, not a silent failure at the first read.

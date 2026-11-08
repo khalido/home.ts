@@ -33,8 +33,8 @@ Amber Electric's live wholesale-linked prices, read through Amber's public API. 
 
 ## Sources
 
-| Source | Licence | Used for |
-|---|---|---|
-| [Amber developer page](https://app.amber.com.au/developers) | Amber's terms | the key and the API |
-| [amberelectric/public-api](https://github.com/amberelectric/public-api) (`swagger.json`) | MIT per GitHub | endpoints, field enums (`descriptor`: extremelyLow, veryLow, low, neutral, high, spike, and the retired negative; `spikeStatus`: none, potential, spike); the spec is version 1.0 at `/v1`, there is no v2 |
-| [Home Assistant `amberelectric`](https://github.com/home-assistant/core/tree/dev/homeassistant/components/amberelectric) | Apache-2.0 | 1-minute poll, current plus forecast intervals |
+| Source                                                                                                                   | Licence        | Used for                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Amber developer page](https://app.amber.com.au/developers)                                                              | Amber's terms  | the key and the API                                                                                                                                                                                        |
+| [amberelectric/public-api](https://github.com/amberelectric/public-api) (`swagger.json`)                                 | MIT per GitHub | endpoints, field enums (`descriptor`: extremelyLow, veryLow, low, neutral, high, spike, and the retired negative; `spikeStatus`: none, potential, spike); the spec is version 1.0 at `/v1`, there is no v2 |
+| [Home Assistant `amberelectric`](https://github.com/home-assistant/core/tree/dev/homeassistant/components/amberelectric) | Apache-2.0     | 1-minute poll, current plus forecast intervals                                                                                                                                                             |

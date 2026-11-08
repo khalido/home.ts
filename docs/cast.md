@@ -6,15 +6,15 @@
 
 `dns-sd -B _googlecast._tcp` found seven entries, all on port 8009 except the group:
 
-| Name (`fn`) | Model (`md`) | Receiver status |
-|---|---|---|
-| Display A | Google Nest Hub (Fuchsia) | Backdrop, `isIdleScreen`, volume 0.47 |
-| Display B | Google Nest Hub Max (Fuchsia) | Backdrop, `isIdleScreen`, 0.46 |
-| Speaker A | Google Nest Mini | no app, 0.375 |
-| Speaker B | Google Home Speaker | no app, 0.30 |
-| TV A | Chromecast Ultra | Backdrop, volume `attenuation` 0.80 |
-| TV B | Google TV Streamer | `isStandBy: true`, `isActiveInput: false`, volume `fixed` |
-| Whole house | Google Cast Group | members below |
+| Name (`fn`) | Model (`md`)                  | Receiver status                                           |
+| ----------- | ----------------------------- | --------------------------------------------------------- |
+| Display A   | Google Nest Hub (Fuchsia)     | Backdrop, `isIdleScreen`, volume 0.47                     |
+| Display B   | Google Nest Hub Max (Fuchsia) | Backdrop, `isIdleScreen`, 0.46                            |
+| Speaker A   | Google Nest Mini              | no app, 0.375                                             |
+| Speaker B   | Google Home Speaker           | no app, 0.30                                              |
+| TV A        | Chromecast Ultra              | Backdrop, volume `attenuation` 0.80                       |
+| TV B        | Google TV Streamer            | `isStandBy: true`, `isActiveInput: false`, volume `fixed` |
+| Whole house | Google Cast Group             | members below                                             |
 
 Each answered a TLS connect plus receiver `GET_STATUS` (nothing launched, no sound, no screen change) in 25–150 ms, TLS 1.2 on the two older speakers, 1.3 elsewhere. Every certificate is self-signed, CN the device id, valid 48 hours, so they rotate.
 
@@ -24,12 +24,12 @@ Not probed: media status (nothing was playing), socket lifetime, members' status
 
 ## Library pick
 
-| Package | Latest | Code | Verdict |
-|---|---|---|---|
-| `castv2` | 0.1.10, 2019 | 438 lines JS | untyped, loads `cast_channel.proto` from `__dirname` at runtime via `protobufjs` 6, hardcodes `rejectUnauthorized = false` |
-| `castv2-client` | 1.2.0, 2016 | 788 | callbacks over `castv2` |
-| `chromecast-api` | 0.4.2, 2023 | | adds SSDP, xml2js, a YouTube remote |
-| `@foxxmd/chromecast-client` | 1.0.4, Jan 2024 | 917 | the best: typed, heartbeat, reconnect, DashCast; but on `castv2`, zod 3 beside our zod 4, no multizone |
+| Package                     | Latest          | Code         | Verdict                                                                                                                    |
+| --------------------------- | --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `castv2`                    | 0.1.10, 2019    | 438 lines JS | untyped, loads `cast_channel.proto` from `__dirname` at runtime via `protobufjs` 6, hardcodes `rejectUnauthorized = false` |
+| `castv2-client`             | 1.2.0, 2016     | 788          | callbacks over `castv2`                                                                                                    |
+| `chromecast-api`            | 0.4.2, 2023     |              | adds SSDP, xml2js, a YouTube remote                                                                                        |
+| `@foxxmd/chromecast-client` | 1.0.4, Jan 2024 | 917          | the best: typed, heartbeat, reconnect, DashCast; but on `castv2`, zod 3 beside our zod 4, no multizone                     |
 
 The probe's codec was about 25 lines and spoke to all six devices; a library would be larger than the code it saves and still miss groups. A deliberate exception to "libraries over hand-rolling"; `protobufjs` for one six-field message is not worth a dependency. pychromecast (MIT) and Home Assistant's `cast` (Apache-2.0) are the reference for state and groups.
 
@@ -57,14 +57,24 @@ src/connectors/cast/
 
 ```ts
 type CastDevice = {
-  name: string; model?: string; kind: "device" | "group";
-  app?: string; idle?: boolean;    // idle: no app, or Backdrop's isIdleScreen
-  standby?: boolean;               // TVs
-  volume?: number; muted?: boolean; volumeControl?: "master" | "attenuation" | "fixed";
-  playerState?: "PLAYING" | "PAUSED" | "BUFFERING" | "IDLE"; title?: string; artist?: string;
-  members?: string[]; leader?: string;     // groups; leader = the device the group's certificate names
-  groups?: string[]; playingVia?: string;  // devices
-  status: "connected" | "disconnected"; asOf: string;
+  name: string;
+  model?: string;
+  kind: "device" | "group";
+  app?: string;
+  idle?: boolean; // idle: no app, or Backdrop's isIdleScreen
+  standby?: boolean; // TVs
+  volume?: number;
+  muted?: boolean;
+  volumeControl?: "master" | "attenuation" | "fixed";
+  playerState?: "PLAYING" | "PAUSED" | "BUFFERING" | "IDLE";
+  title?: string;
+  artist?: string;
+  members?: string[];
+  leader?: string; // groups; leader = the device the group's certificate names
+  groups?: string[];
+  playingVia?: string; // devices
+  status: "connected" | "disconnected";
+  asOf: string;
 };
 type CastSnapshot = { devices: Record<string, CastDevice>; asOf: string };
 ```
@@ -76,8 +86,16 @@ As built: the snapshot is keyed by mDNS id, and `members`, `leader`, `groups` an
 ```ts
 export const configSchema = z.looseObject({
   connector: z.literal("cast"),
-  name: z.string().describe("the device's or group's name in the Google Home app (mDNS fn), for display"),
-  castId: z.string().describe("the mDNS id, the stable identity; `home discover --write` fills it"),
+  name: z
+    .string()
+    .describe(
+      "the device's or group's name in the Google Home app (mDNS fn), for display",
+    ),
+  castId: z
+    .string()
+    .describe(
+      "the mDNS id, the stable identity; `home discover --write` fills it",
+    ),
 });
 ```
 

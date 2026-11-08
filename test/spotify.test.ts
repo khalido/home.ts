@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import type { Part } from "../src/index.ts";
 import { manualClock } from "./clock.ts";
-import { type Applied, manifest, positionMs, speakerState, spotify, spotifyChanges, spotifyText, type SocketLike, type SpotifyState, toSpotifyUri } from "../src/connectors/spotify/index.ts";
+import {
+  type Applied,
+  manifest,
+  positionMs,
+  speakerState,
+  spotify,
+  spotifyChanges,
+  spotifyText,
+  type SocketLike,
+  type SpotifyState,
+  toSpotifyUri,
+} from "../src/connectors/spotify/index.ts";
 import type { ConnectorError } from "../src/connector.ts";
 import { fold, oddities } from "../src/connectors/spotify/client.ts";
 
@@ -40,20 +51,48 @@ class FakeSocket implements SocketLike {
   commands = () => this.sent.map((m) => m.command);
 }
 
-const entity = (uri: string, name: string, extra: Record<string, unknown> = {}) => ({ uri, entity_type: uri.split(":")[1] ?? "", decorations: { identity: { name }, ...extra } });
+const entity = (
+  uri: string,
+  name: string,
+  extra: Record<string, unknown> = {},
+) => ({
+  uri,
+  entity_type: uri.split(":")[1] ?? "",
+  decorations: { identity: { name }, ...extra },
+});
 
 const TRACK = entity("spotify:track:abc123", "Song A", {
-  visual_identity: { cover: [{ url: "https://i.example/small.jpg", size: "small" }, { url: "https://i.example/default.jpg", size: "default" }] },
+  visual_identity: {
+    cover: [
+      { url: "https://i.example/small.jpg", size: "small" },
+      { url: "https://i.example/default.jpg", size: "default" },
+    ],
+  },
   parent: { entity: entity("spotify:album:alb1", "Album A") },
-  creators: [{ entity: entity("spotify:artist:a1", "Artist One") }, { entity: entity("spotify:artist:a2", "Artist Two") }],
+  creators: [
+    { entity: entity("spotify:artist:a1", "Artist One") },
+    { entity: entity("spotify:artist:a2", "Artist Two") },
+  ],
   playback: { duration_ms: 200_000 },
 });
 
-function setup(config: { maxVolume?: number; url?: string; repairStalls?: boolean; stallCheckMs?: number } = {}) {
+function setup(
+  config: {
+    maxVolume?: number;
+    url?: string;
+    repairStalls?: boolean;
+    stallCheckMs?: number;
+  } = {},
+) {
   const { clock, advance } = manualClock();
   const sockets: FakeSocket[] = [];
   const parts: Part<SpotifyState>[] = [];
-  const s = spotify({ stallCheckMs: 0, ...config, clock, connect: (url) => (sockets.push(new FakeSocket(url)), sockets.at(-1)!) });
+  const s = spotify({
+    stallCheckMs: 0,
+    ...config,
+    clock,
+    connect: (url) => (sockets.push(new FakeSocket(url)), sockets.at(-1)!),
+  });
   const abort = new AbortController();
   const running = s.run(abort.signal, (p) => parts.push(p));
   const last = () => parts.at(-1)!;
@@ -61,8 +100,20 @@ function setup(config: { maxVolume?: number; url?: string; repairStalls?: boolea
   const online = async (playback: Record<string, unknown> = {}) => {
     const sock = sockets.at(-1)!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
-    sock.push({ type: "playback_state", status: "idle", item: { uri: "", entity_type: "" }, volume: 40, options: { shuffle: false, repeat: "off" }, ...playback });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
+    sock.push({
+      type: "playback_state",
+      status: "idle",
+      item: { uri: "", entity_type: "" },
+      volume: 40,
+      options: { shuffle: false, repeat: "off" },
+      ...playback,
+    });
     sock.push({ type: "queue_changed", previous: [], upcoming: [] });
     await advance(100);
     sock.sent.length = 0;
@@ -75,7 +126,12 @@ function setup(config: { maxVolume?: number; url?: string; repairStalls?: boolea
 const tick = () => Bun.sleep(1);
 
 /** A write, the lane's gap, Soloist's command_result, then `events` (what Soloist reports after). Returns the write's result and the frame sent. */
-async function sent(h: ReturnType<typeof setup>, sock: FakeSocket, call: () => Promise<Applied>, ...events: Record<string, unknown>[]) {
+async function sent(
+  h: ReturnType<typeof setup>,
+  sock: FakeSocket,
+  call: () => Promise<Applied>,
+  ...events: Record<string, unknown>[]
+) {
   const p = call();
   await h.advance(100);
   const frame = sock.ack();
@@ -86,13 +142,25 @@ async function sent(h: ReturnType<typeof setup>, sock: FakeSocket, call: () => P
 
 describe("toSpotifyUri", () => {
   test("open.spotify.com links become URIs", () => {
-    expect(toSpotifyUri("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x1")).toBe("spotify:track:4uLU6hMCjMI75M1A2tKUQC");
-    expect(toSpotifyUri("https://open.spotify.com/intl-en/playlist/37i9dQZF1DX")).toBe("spotify:playlist:37i9dQZF1DX");
-    expect(toSpotifyUri("https://open.spotify.com/embed/album/1DFixLWuPkv3KT3TnV35m3")).toBe("spotify:album:1DFixLWuPkv3KT3TnV35m3");
+    expect(
+      toSpotifyUri(
+        "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x1",
+      ),
+    ).toBe("spotify:track:4uLU6hMCjMI75M1A2tKUQC");
+    expect(
+      toSpotifyUri("https://open.spotify.com/intl-en/playlist/37i9dQZF1DX"),
+    ).toBe("spotify:playlist:37i9dQZF1DX");
+    expect(
+      toSpotifyUri(
+        "https://open.spotify.com/embed/album/1DFixLWuPkv3KT3TnV35m3",
+      ),
+    ).toBe("spotify:album:1DFixLWuPkv3KT3TnV35m3");
   });
 
   test("URIs pass through; short links and words do not", () => {
-    expect(toSpotifyUri(" spotify:album:1DFixLWuPkv3KT3TnV35m3 ")).toBe("spotify:album:1DFixLWuPkv3KT3TnV35m3");
+    expect(toSpotifyUri(" spotify:album:1DFixLWuPkv3KT3TnV35m3 ")).toBe(
+      "spotify:album:1DFixLWuPkv3KT3TnV35m3",
+    );
     expect(toSpotifyUri("https://spotify.link/abc")).toBeUndefined();
     expect(toSpotifyUri("friday")).toBeUndefined();
   });
@@ -102,14 +170,43 @@ describe("fold", () => {
   const AT = "2026-11-08T00:00:00.000Z";
   test("playback_state is a full snapshot; events patch one field", () => {
     let s: SpotifyState = { asOf: AT };
-    s = fold(s, { type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" }, AT);
-    s = fold(s, { type: "playback_state", status: "paused", item: TRACK, context: entity("spotify:playlist:p1", "Mix"), volume: 40, options: { shuffle: true, repeat: "context" }, position: { position_ms: 1000, timestamp_ms: 5, speed: 0 } }, AT);
+    s = fold(
+      s,
+      {
+        type: "auth_state",
+        logged_in: true,
+        is_active: true,
+        device_name: "Kitchen",
+      },
+      AT,
+    );
+    s = fold(
+      s,
+      {
+        type: "playback_state",
+        status: "paused",
+        item: TRACK,
+        context: entity("spotify:playlist:p1", "Mix"),
+        volume: 40,
+        options: { shuffle: true, repeat: "context" },
+        position: { position_ms: 1000, timestamp_ms: 5, speed: 0 },
+      },
+      AT,
+    );
     expect(s).toEqual({
       loggedIn: true,
       active: true,
       deviceName: "Kitchen",
       status: "paused",
-      track: { uri: "spotify:track:abc123", type: "track", name: "Song A", artists: ["Artist One", "Artist Two"], album: "Album A", cover: "https://i.example/default.jpg", durationMs: 200_000 },
+      track: {
+        uri: "spotify:track:abc123",
+        type: "track",
+        name: "Song A",
+        artists: ["Artist One", "Artist Two"],
+        album: "Album A",
+        cover: "https://i.example/default.jpg",
+        durationMs: 200_000,
+      },
       context: { uri: "spotify:playlist:p1", type: "playlist", name: "Mix" },
       position: { ms: 1000, atMs: 5, speed: 0 },
       volume: 40,
@@ -117,40 +214,103 @@ describe("fold", () => {
       repeat: "context",
       asOf: AT,
     });
-    s = fold(s, { type: "track_changed", item: entity("spotify:track:zzz", "Song B") }, AT);
+    s = fold(
+      s,
+      { type: "track_changed", item: entity("spotify:track:zzz", "Song B") },
+      AT,
+    );
     s = fold(s, { type: "playback_changed", status: "playing" }, AT);
     s = fold(s, { type: "volume_changed", volume: 55 }, AT);
-    s = fold(s, { type: "device_changed", is_active: false, device_name: "Lounge" }, AT);
+    s = fold(
+      s,
+      { type: "device_changed", is_active: false, device_name: "Lounge" },
+      AT,
+    );
     s = fold(s, { type: "options_changed", options: { shuffle: false } }, AT);
-    expect([s.track?.name, s.status, s.volume, s.deviceName, s.active, s.shuffle, s.repeat]).toEqual(["Song B", "playing", 55, "Lounge", false, false, "context"]);
+    expect([
+      s.track?.name,
+      s.status,
+      s.volume,
+      s.deviceName,
+      s.active,
+      s.shuffle,
+      s.repeat,
+    ]).toEqual(["Song B", "playing", 55, "Lounge", false, false, "context"]);
   });
 
   test("an empty item uri is nothing loaded; signing out clears the playback", () => {
-    let s = fold({ asOf: AT }, { type: "playback_state", status: "idle", item: { uri: "", entity_type: "" } }, AT);
+    let s = fold(
+      { asOf: AT },
+      {
+        type: "playback_state",
+        status: "idle",
+        item: { uri: "", entity_type: "" },
+      },
+      AT,
+    );
     expect(s.track).toBeUndefined();
     expect("track" in s).toBe(false);
-    s = fold({ ...s, track: { uri: "spotify:track:x", artists: [] }, volume: 30 }, { type: "auth_state", logged_in: false, is_active: false, device_name: "Kitchen" }, AT);
-    expect(s).toEqual({ loggedIn: false, active: false, deviceName: "Kitchen", asOf: AT });
+    s = fold(
+      { ...s, track: { uri: "spotify:track:x", artists: [] }, volume: 30 },
+      {
+        type: "auth_state",
+        logged_in: false,
+        is_active: false,
+        device_name: "Kitchen",
+      },
+      AT,
+    );
+    expect(s).toEqual({
+      loggedIn: false,
+      active: false,
+      deviceName: "Kitchen",
+      asOf: AT,
+    });
   });
 
   test("odd readings pass through, named", () => {
-    const s: SpotifyState = { asOf: AT, status: "stalled", volume: 140, repeat: "sometimes", position: { ms: 300_000, speed: -1 }, track: { uri: "spotify:track:x", artists: [], durationMs: 200_000 } };
-    expect(oddities(s)).toBe('status "stalled"; volume 140, outside 0–100; repeat "sometimes"; position speed -1; position 300000 ms past the track\'s 200000 ms');
-    expect(oddities({ asOf: AT, status: "playing", volume: 0 })).toBeUndefined();
+    const s: SpotifyState = {
+      asOf: AT,
+      status: "stalled",
+      volume: 140,
+      repeat: "sometimes",
+      position: { ms: 300_000, speed: -1 },
+      track: { uri: "spotify:track:x", artists: [], durationMs: 200_000 },
+    };
+    expect(oddities(s)).toBe(
+      'status "stalled"; volume 140, outside 0–100; repeat "sometimes"; position speed -1; position 300000 ms past the track\'s 200000 ms',
+    );
+    expect(
+      oddities({ asOf: AT, status: "playing", volume: 0 }),
+    ).toBeUndefined();
   });
 });
 
 describe("positionMs", () => {
-  const base: SpotifyState = { asOf: "", status: "playing", track: { uri: "spotify:track:x", artists: [], durationMs: 200_000 }, position: { ms: 10_000, atMs: 1_000_000, speed: 1 } };
+  const base: SpotifyState = {
+    asOf: "",
+    status: "playing",
+    track: { uri: "spotify:track:x", artists: [], durationMs: 200_000 },
+    position: { ms: 10_000, atMs: 1_000_000, speed: 1 },
+  };
   test("moves on while playing, at its speed; a clock behind the anchor is not clamped", () => {
     expect(positionMs(base, 1_005_000)).toBe(15_000);
-    expect(positionMs({ ...base, position: { ...base.position, speed: 1.5 } }, 1_002_000)).toBe(13_000);
+    expect(
+      positionMs(
+        { ...base, position: { ...base.position, speed: 1.5 } },
+        1_002_000,
+      ),
+    ).toBe(13_000);
     expect(positionMs(base, 999_000)).toBe(9_000);
   });
   test("stands still while paused; undefined without a track or an anchor", () => {
     expect(positionMs({ ...base, status: "paused" }, 1_005_000)).toBe(10_000);
-    expect(positionMs({ ...base, track: undefined }, 1_005_000)).toBeUndefined();
-    expect(positionMs({ ...base, position: undefined }, 1_005_000)).toBeUndefined();
+    expect(
+      positionMs({ ...base, track: undefined }, 1_005_000),
+    ).toBeUndefined();
+    expect(
+      positionMs({ ...base, position: undefined }, 1_005_000),
+    ).toBeUndefined();
   });
   test("is not held to the track's length", () => {
     expect(positionMs(base, 1_000_000 + 250_000)).toBe(260_000);
@@ -163,7 +323,16 @@ describe("the integration", () => {
     expect(h.sockets[0]!.url).toBe("ws://127.0.0.1:9091");
     expect(h.parts).toEqual([]);
     await h.online({ status: "paused", item: TRACK });
-    expect(h.last()).toMatchObject({ status: "connected", state: { loggedIn: true, deviceName: "Kitchen", status: "paused", volume: 40, track: { name: "Song A" } } });
+    expect(h.last()).toMatchObject({
+      status: "connected",
+      state: {
+        loggedIn: true,
+        deviceName: "Kitchen",
+        status: "paused",
+        volume: 40,
+        track: { name: "Song A" },
+      },
+    });
     expect(h.last().detail).toBeUndefined();
     h.sockets[0]!.push({ type: "volume_changed", volume: 55 });
     expect(h.last().state?.volume).toBe(55);
@@ -174,7 +343,10 @@ describe("the integration", () => {
     const h = setup({ url: "ws://127.0.0.1:9999" });
     h.sockets[0]!.close();
     await tick();
-    expect(h.last()).toMatchObject({ status: "disconnected", detail: "nothing answered at ws://127.0.0.1:9999" });
+    expect(h.last()).toMatchObject({
+      status: "disconnected",
+      detail: "nothing answered at ws://127.0.0.1:9999",
+    });
     await h.advance(1000);
     expect(h.sockets).toHaveLength(2);
     h.sockets[1]!.close();
@@ -198,7 +370,11 @@ describe("the integration", () => {
     await h.online({ status: "playing", item: TRACK });
     h.sockets[1]!.close();
     await tick();
-    expect(h.last()).toMatchObject({ status: "disconnected", detail: "Soloist closed the socket", state: { status: "playing", track: { name: "Song A" } } });
+    expect(h.last()).toMatchObject({
+      status: "disconnected",
+      detail: "Soloist closed the socket",
+      state: { status: "playing", track: { name: "Song A" } },
+    });
     await h.advance(1000); // back to 1 s, not 4
     expect(h.sockets).toHaveLength(3);
     await h.stop();
@@ -208,9 +384,17 @@ describe("the integration", () => {
     const { clock } = manualClock();
     const parts: Part<SpotifyState>[] = [];
     const abort = new AbortController();
-    const running = spotify({ clock, connect: () => { throw new Error("WebSocket is not defined"); } }).run(abort.signal, (p) => parts.push(p));
+    const running = spotify({
+      clock,
+      connect: () => {
+        throw new Error("WebSocket is not defined");
+      },
+    }).run(abort.signal, (p) => parts.push(p));
     await tick();
-    expect(parts.at(-1)).toMatchObject({ status: "disconnected", detail: "could not open ws://127.0.0.1:9091: WebSocket is not defined" });
+    expect(parts.at(-1)).toMatchObject({
+      status: "disconnected",
+      detail: "could not open ws://127.0.0.1:9091: WebSocket is not defined",
+    });
     abort.abort();
     await running;
   });
@@ -219,21 +403,46 @@ describe("the integration", () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: false, is_active: false, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: false,
+      is_active: false,
+      device_name: "Kitchen",
+    });
     expect(sock.commands()).toEqual([]);
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     expect(sock.commands()).toEqual(["get_state"]);
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     expect(sock.commands()).toEqual(["get_state"]);
   });
   test("signed out is connected, says so, and refuses writes without sending them", async () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: false, is_active: false, device_name: "Kitchen" });
-    expect(h.last()).toMatchObject({ status: "connected", state: { loggedIn: false, deviceName: "Kitchen" } });
+    sock.push({
+      type: "auth_state",
+      logged_in: false,
+      is_active: false,
+      device_name: "Kitchen",
+    });
+    expect(h.last()).toMatchObject({
+      status: "connected",
+      state: { loggedIn: false, deviceName: "Kitchen" },
+    });
     expect(h.last().detail).toContain("waiting for someone to pick it");
-    expect(manifest.lines(h.last())).toEqual(["Kitchen: waiting for someone to pick it"]);
+    expect(manifest.lines(h.last())).toEqual([
+      "Kitchen: waiting for someone to pick it",
+    ]);
     await expect(h.s.pause()).rejects.toMatchObject({ code: "waiting" });
     expect(sock.sent).toEqual([]);
     h.s.refresh();
@@ -246,10 +455,23 @@ describe("the integration", () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     expect(h.parts.every((p) => p.status !== "connected")).toBe(true);
-    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40 });
-    expect(h.last()).toMatchObject({ status: "connected", state: { status: "playing", track: { name: "Song A" } } });
+    sock.push({
+      type: "playback_state",
+      status: "playing",
+      item: TRACK,
+      volume: 40,
+    });
+    expect(h.last()).toMatchObject({
+      status: "connected",
+      state: { status: "playing", track: { name: "Song A" } },
+    });
     await h.stop();
   });
 
@@ -257,9 +479,17 @@ describe("the integration", () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     await h.advance(10_000);
-    expect(h.last()).toMatchObject({ status: "connected", state: { loggedIn: true, deviceName: "Kitchen" } });
+    expect(h.last()).toMatchObject({
+      status: "connected",
+      state: { loggedIn: true, deviceName: "Kitchen" },
+    });
     await h.stop();
   });
 
@@ -267,7 +497,10 @@ describe("the integration", () => {
     const h = setup();
     h.sockets[0]!.open();
     await h.advance(10_000);
-    expect(h.last()).toMatchObject({ status: "disconnected", detail: "Soloist said nothing in 10 s" });
+    expect(h.last()).toMatchObject({
+      status: "disconnected",
+      detail: "Soloist said nothing in 10 s",
+    });
     await h.stop();
   });
 
@@ -293,7 +526,9 @@ describe("the integration", () => {
     expect(sock.commands()).toEqual(["get_state"]);
     sock.push({ type: "error", message: "busy" });
     await tick();
-    expect(h.last().anomaly).toBe("get_state failed: Soloist refused get_state: busy");
+    expect(h.last().anomaly).toBe(
+      "get_state failed: Soloist refused get_state: busy",
+    );
     await h.advance(100);
     expect(sock.commands()).toEqual(["get_state", "pause"]);
     sock.ack();
@@ -306,19 +541,37 @@ describe("the integration", () => {
     const h = setup();
     const sock = await h.online();
     sock.push({ type: "volume_changed", volume: "loud" });
-    expect(h.last().anomaly).toBe("a volume_changed the schema did not recognise");
+    expect(h.last().anomaly).toBe(
+      "a volume_changed the schema did not recognise",
+    );
     expect(h.last().state?.volume).toBe(40);
     const n = h.parts.length;
     sock.push({ type: "something_new" });
     expect(h.parts.length).toBe(n);
     sock.push({ type: "volume_changed", volume: 120 });
-    expect(h.last()).toMatchObject({ anomaly: "volume 120, outside 0–100", state: { volume: 120 } });
+    expect(h.last()).toMatchObject({
+      anomaly: "volume 120, outside 0–100",
+      state: { volume: 120 },
+    });
     await h.stop();
   });
 
   test("lines: speaker, status, track, volume", () => {
-    const state: SpotifyState = { asOf: "", deviceName: "Kitchen", loggedIn: true, status: "playing", volume: 35, track: { uri: "spotify:track:x", name: "Song", artists: ["Band", "Other"] } };
-    expect(manifest.lines({ status: "connected", state })).toEqual(['Kitchen: playing "Song" by Band, Other · 35%']);
+    const state: SpotifyState = {
+      asOf: "",
+      deviceName: "Kitchen",
+      loggedIn: true,
+      status: "playing",
+      volume: 35,
+      track: {
+        uri: "spotify:track:x",
+        name: "Song",
+        artists: ["Band", "Other"],
+      },
+    };
+    expect(manifest.lines({ status: "connected", state })).toEqual([
+      'Kitchen: playing "Song" by Band, Other · 35%',
+    ]);
     expect(spotifyText({ asOf: "" })).toBe("Soloist: status unknown");
   });
 });
@@ -326,25 +579,101 @@ describe("the integration", () => {
 describe("writes", () => {
   test("each command's frame, resolved once Soloist reports the change", async () => {
     const h = setup();
-    const sock = await h.online({ status: "paused", item: TRACK, position: { position_ms: 50_000, timestamp_ms: 0, speed: 0 } });
+    const sock = await h.online({
+      status: "paused",
+      item: TRACK,
+      position: { position_ms: 50_000, timestamp_ms: 0, speed: 0 },
+    });
     const other = entity("spotify:track:other", "Song B");
-    const cases: [() => Promise<Applied>, Record<string, unknown>, Record<string, unknown>[]][] = [
-      [() => h.s.play("https://open.spotify.com/album/alb1?si=1"), { command: "play", uri: "spotify:album:alb1" }, [{ type: "context_changed", context: entity("spotify:album:alb1", "Album A") }, { type: "playback_changed", status: "playing" }]],
-      [() => h.s.pause(), { command: "pause" }, [{ type: "playback_changed", status: "paused" }]],
-      [() => h.s.resume(), { command: "play" }, [{ type: "playback_changed", status: "playing" }]],
-      [() => h.s.next(), { command: "skip_next" }, [{ type: "track_changed", item: other }]],
-      [() => h.s.prev(), { command: "skip_prev" }, [{ type: "track_changed", item: TRACK }]],
-      [() => h.s.seek(30_000), { command: "seek", position_ms: 30_000 }, [{ type: "position_sync", position: { position_ms: 30_010, timestamp_ms: 1, speed: 1 } }]],
-      [() => h.s.setVolume(50), { command: "set_volume", volume: 50 }, [{ type: "volume_changed", volume: 50 }]],
-      [() => h.s.queue("spotify:track:t1"), { command: "add_to_queue", uri: "spotify:track:t1" }, [{ type: "queue_changed", upcoming: [{ uid: "q1", source: "queue", item: entity("spotify:track:t1", "Queued") }] }]],
-      [() => h.s.setShuffle(true), { command: "set_shuffle", enabled: true }, [{ type: "options_changed", options: { shuffle: true, repeat: "off" } }]],
+    const cases: [
+      () => Promise<Applied>,
+      Record<string, unknown>,
+      Record<string, unknown>[],
+    ][] = [
+      [
+        () => h.s.play("https://open.spotify.com/album/alb1?si=1"),
+        { command: "play", uri: "spotify:album:alb1" },
+        [
+          {
+            type: "context_changed",
+            context: entity("spotify:album:alb1", "Album A"),
+          },
+          { type: "playback_changed", status: "playing" },
+        ],
+      ],
+      [
+        () => h.s.pause(),
+        { command: "pause" },
+        [{ type: "playback_changed", status: "paused" }],
+      ],
+      [
+        () => h.s.resume(),
+        { command: "play" },
+        [{ type: "playback_changed", status: "playing" }],
+      ],
+      [
+        () => h.s.next(),
+        { command: "skip_next" },
+        [{ type: "track_changed", item: other }],
+      ],
+      [
+        () => h.s.prev(),
+        { command: "skip_prev" },
+        [{ type: "track_changed", item: TRACK }],
+      ],
+      [
+        () => h.s.seek(30_000),
+        { command: "seek", position_ms: 30_000 },
+        [
+          {
+            type: "position_sync",
+            position: { position_ms: 30_010, timestamp_ms: 1, speed: 1 },
+          },
+        ],
+      ],
+      [
+        () => h.s.setVolume(50),
+        { command: "set_volume", volume: 50 },
+        [{ type: "volume_changed", volume: 50 }],
+      ],
+      [
+        () => h.s.queue("spotify:track:t1"),
+        { command: "add_to_queue", uri: "spotify:track:t1" },
+        [
+          {
+            type: "queue_changed",
+            upcoming: [
+              {
+                uid: "q1",
+                source: "queue",
+                item: entity("spotify:track:t1", "Queued"),
+              },
+            ],
+          },
+        ],
+      ],
+      [
+        () => h.s.setShuffle(true),
+        { command: "set_shuffle", enabled: true },
+        [
+          {
+            type: "options_changed",
+            options: { shuffle: true, repeat: "off" },
+          },
+        ],
+      ],
     ];
     for (const [call, frame, events] of cases) {
       const r = await sent(h, sock, call, ...events);
       expect(r.frame).toEqual({ type: "command", ...frame });
       expect(r.result.confirmed).toBe(true);
     }
-    expect(h.last().state).toMatchObject({ status: "playing", volume: 50, shuffle: true, upNext: [{ uri: "spotify:track:t1", name: "Queued" }] });
+    expect(h.last().state).toMatchObject({
+      status: "playing",
+      volume: 50,
+      shuffle: true,
+      upNext: [{ uri: "spotify:track:t1", name: "Queued" }],
+    });
     await h.stop();
   });
 
@@ -367,14 +696,22 @@ describe("writes", () => {
 
   test("Soloist's error rejects the command in flight; offline and bad input reject without sending, each with a code", async () => {
     const h = setup();
-    await expect(h.s.pause()).rejects.toMatchObject({ code: "offline", message: "Soloist is not connected at ws://127.0.0.1:9091" });
+    await expect(h.s.pause()).rejects.toMatchObject({
+      code: "offline",
+      message: "Soloist is not connected at ws://127.0.0.1:9091",
+    });
     await h.advance(100); // the refused pause still took its turn in the lane
     const sock = await h.online();
     const p = h.s.next();
     sock.push({ type: "error", message: "command requires authentication" });
-    await expect(p).rejects.toMatchObject({ code: "refused", message: "Soloist refused skip_next: command requires authentication" });
+    await expect(p).rejects.toMatchObject({
+      code: "refused",
+      message: "Soloist refused skip_next: command requires authentication",
+    });
     await expect(h.s.play("friday")).rejects.toMatchObject({ code: "invalid" });
-    await expect(h.s.queue("spotify:album:alb1")).rejects.toThrow("only a Spotify track");
+    await expect(h.s.queue("spotify:album:alb1")).rejects.toThrow(
+      "only a Spotify track",
+    );
     await expect(h.s.setVolume(120)).rejects.toThrow("0–100");
     await expect(h.s.seek(-1)).rejects.toThrow("0 or more");
     expect(sock.commands()).toEqual(["skip_next"]);
@@ -392,9 +729,14 @@ describe("writes", () => {
   test("a command with no answer times out after 3 s; a drop fails it at once", async () => {
     const h = setup();
     const sock = await h.online();
-    const caught = h.s.pause().catch((e: ConnectorError) => [e.code, e.message]);
+    const caught = h.s
+      .pause()
+      .catch((e: ConnectorError) => [e.code, e.message]);
     await h.advance(3000);
-    expect(await caught).toEqual(["timeout", "Soloist did not answer pause in 3 s"]);
+    expect(await caught).toEqual([
+      "timeout",
+      "Soloist did not answer pause in 3 s",
+    ]);
     await h.advance(100);
     const q = h.s.next();
     sock.close();
@@ -405,10 +747,16 @@ describe("writes", () => {
   test("a requested volume is held to maxVolume and rounded; state.volume is what Soloist reported", async () => {
     const h = setup({ maxVolume: 60 });
     const sock = await h.online();
-    const a = await sent(h, sock, () => h.s.setVolume(90), { type: "volume_changed", volume: 60 });
+    const a = await sent(h, sock, () => h.s.setVolume(90), {
+      type: "volume_changed",
+      volume: 60,
+    });
     expect(a.frame).toMatchObject({ command: "set_volume", volume: 60 });
     expect(a.result).toMatchObject({ confirmed: true, state: { volume: 60 } });
-    const b = await sent(h, sock, () => h.s.setVolume(33.4), { type: "volume_changed", volume: 33 });
+    const b = await sent(h, sock, () => h.s.setVolume(33.4), {
+      type: "volume_changed",
+      volume: 33,
+    });
     expect(b.frame).toMatchObject({ volume: 33 });
     await h.stop();
   });
@@ -438,7 +786,12 @@ describe("writes", () => {
     sock.ack();
     sock.push({ type: "track_changed", item: entity("spotify:track:c", "C") });
     await n2;
-    expect(sock.commands()).toEqual(["set_volume", "set_volume", "skip_next", "skip_next"]);
+    expect(sock.commands()).toEqual([
+      "set_volume",
+      "set_volume",
+      "skip_next",
+      "skip_next",
+    ]);
     await h.stop();
   });
 
@@ -446,11 +799,31 @@ describe("writes", () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     sock.push({ type: "playback_state", status: "playing", item: TRACK });
-    expect(sock.sent).toEqual([{ type: "command", command: "get_queue", limit: 10 }]);
-    sock.push({ type: "queue_changed", previous: [], upcoming: [{ uid: "1", source: "context", item: entity("spotify:track:n", "Next") }, { uid: "2", item: { uri: "" } }] });
-    expect(h.last().state?.upNext).toEqual([{ uri: "spotify:track:n", type: "track", name: "Next", artists: [] }]);
+    expect(sock.sent).toEqual([
+      { type: "command", command: "get_queue", limit: 10 },
+    ]);
+    sock.push({
+      type: "queue_changed",
+      previous: [],
+      upcoming: [
+        {
+          uid: "1",
+          source: "context",
+          item: entity("spotify:track:n", "Next"),
+        },
+        { uid: "2", item: { uri: "" } },
+      ],
+    });
+    expect(h.last().state?.upNext).toEqual([
+      { uri: "spotify:track:n", type: "track", name: "Next", artists: [] },
+    ]);
     sock.push({ type: "playback_state", status: "playing", item: TRACK });
     expect(sock.commands()).toEqual(["get_queue"]);
     await h.stop();
@@ -478,20 +851,33 @@ describe("confirming", () => {
 
   test("prev: a position update early in the track is not a prev; a restart from 5 s in is", async () => {
     const h = setup();
-    const sock = await h.online({ status: "playing", item: TRACK, position: { position_ms: 1000, timestamp_ms: 0, speed: 1 } });
+    const sock = await h.online({
+      status: "playing",
+      item: TRACK,
+      position: { position_ms: 1000, timestamp_ms: 0, speed: 1 },
+    });
     const early = h.s.prev();
     await h.advance(100);
     sock.ack();
     await tick();
-    sock.push({ type: "position_sync", position: { position_ms: 1200, timestamp_ms: 100, speed: 1 } });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 1200, timestamp_ms: 100, speed: 1 },
+    });
     await h.advance(2000);
     expect((await early).confirmed).toBe(false);
-    sock.push({ type: "position_sync", position: { position_ms: 40_000, timestamp_ms: 2100, speed: 1 } });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 40_000, timestamp_ms: 2100, speed: 1 },
+    });
     const late = h.s.prev();
     await h.advance(100);
     sock.ack();
     await tick();
-    sock.push({ type: "position_sync", position: { position_ms: 0, timestamp_ms: 2200, speed: 1 } });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 0, timestamp_ms: 2200, speed: 1 },
+    });
     expect((await late).confirmed).toBe(true);
     await h.stop();
   });
@@ -499,7 +885,11 @@ describe("confirming", () => {
   test("next at the end of the queue confirms on idle", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK });
-    const { result } = await sent(h, sock, () => h.s.next(), { type: "playback_state", status: "idle", item: { uri: "" } });
+    const { result } = await sent(h, sock, () => h.s.next(), {
+      type: "playback_state",
+      status: "idle",
+      item: { uri: "" },
+    });
     expect(result.confirmed).toBe(true);
     await h.stop();
   });
@@ -522,8 +912,18 @@ describe("confirming", () => {
     const h = setup();
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
-    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40 });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
+    sock.push({
+      type: "playback_state",
+      status: "playing",
+      item: TRACK,
+      volume: 40,
+    });
     const v = h.s.setVolume(20);
     await h.advance(1000);
     await h.advance(100);
@@ -553,8 +953,12 @@ describe("the first play's volume (Soloist issue #23)", () => {
     const h = setup({ maxVolume: 60 });
     const sock = await h.online({ volume: 100 });
     sock.push({ type: "playback_changed", status: "playing" });
-    expect(sock.sent).toEqual([{ type: "command", command: "set_volume", volume: 60 }]);
-    expect(h.last().anomaly).toBe("started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)");
+    expect(sock.sent).toEqual([
+      { type: "command", command: "set_volume", volume: 60 },
+    ]);
+    expect(h.last().anomaly).toBe(
+      "started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)",
+    );
     expect(h.last().state?.volume).toBe(100); // the reading stays what Soloist said until it says otherwise
     sock.ack();
     sock.push({ type: "volume_changed", volume: 60 });
@@ -569,14 +973,33 @@ describe("the first play's volume (Soloist issue #23)", () => {
     const h = setup({ maxVolume: 60 });
     const sock = h.sockets[0]!;
     sock.open();
-    sock.push({ type: "auth_state", logged_in: false, is_active: false, device_name: "Kitchen" });
-    sock.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    sock.push({
+      type: "auth_state",
+      logged_in: false,
+      is_active: false,
+      device_name: "Kitchen",
+    });
+    sock.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     expect(sock.commands()).toEqual(["get_state"]);
-    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 100 });
+    sock.push({
+      type: "playback_state",
+      status: "playing",
+      item: TRACK,
+      volume: 100,
+    });
     await h.advance(100);
     sock.push({ type: "queue_changed", upcoming: [] }); // the get_queue that follows a first playback_state
     await h.advance(100);
-    expect(sock.sent.at(-1)).toEqual({ type: "command", command: "set_volume", volume: 60 });
+    expect(sock.sent.at(-1)).toEqual({
+      type: "command",
+      command: "set_volume",
+      volume: 60,
+    });
     await h.stop();
   });
 
@@ -586,7 +1009,9 @@ describe("the first play's volume (Soloist issue #23)", () => {
     sock.push({ type: "playback_changed", status: "playing" });
     expect(sock.sent).toEqual([]);
     sock.push({ type: "volume_changed", volume: 100 });
-    expect(sock.sent).toEqual([{ type: "command", command: "set_volume", volume: 60 }]);
+    expect(sock.sent).toEqual([
+      { type: "command", command: "set_volume", volume: 60 },
+    ]);
     await h.stop();
   });
 
@@ -604,7 +1029,9 @@ describe("the first play's volume (Soloist issue #23)", () => {
     await h.stop();
 
     const mid = setup({ maxVolume: 60 });
-    expect((await mid.online({ status: "playing", volume: 90 })).sent).toEqual([]);
+    expect((await mid.online({ status: "playing", volume: 90 })).sent).toEqual(
+      [],
+    );
     await mid.stop();
 
     const free = setup();
@@ -639,7 +1066,9 @@ describe("interrupt", () => {
   test("resumes even when fn throws", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK });
-    const caught = h.s.interrupt(() => Promise.reject(new Error("chime failed"))).catch((e: Error) => e.message);
+    const caught = h.s
+      .interrupt(() => Promise.reject(new Error("chime failed")))
+      .catch((e: Error) => e.message);
     await tick(); // an aside starts on the next turn
     sock.ack();
     sock.push({ type: "playback_changed", status: "paused" });
@@ -654,17 +1083,31 @@ describe("interrupt", () => {
   test("someone resuming or skipping from a phone meanwhile keeps their choice", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK });
-    const a = h.s.interrupt(() => sock.push({ type: "playback_changed", status: "playing" }));
+    const a = h.s.interrupt(() =>
+      sock.push({ type: "playback_changed", status: "playing" }),
+    );
     await tick(); // an aside starts on the next turn
     sock.ack();
     sock.push({ type: "playback_changed", status: "paused" });
-    expect(await a).toEqual({ value: undefined, music: "kept", why: "someone changed it meanwhile: it is playing" });
+    expect(await a).toEqual({
+      value: undefined,
+      music: "kept",
+      why: "someone changed it meanwhile: it is playing",
+    });
     await h.advance(100);
-    const b = h.s.interrupt(() => sock.push({ type: "track_changed", item: entity("spotify:track:other", "Other") }));
+    const b = h.s.interrupt(() =>
+      sock.push({
+        type: "track_changed",
+        item: entity("spotify:track:other", "Other"),
+      }),
+    );
     await tick(); // an aside starts on the next turn
     sock.ack();
     sock.push({ type: "playback_changed", status: "paused" });
-    expect(await b).toMatchObject({ music: "kept", why: "the track changed meanwhile" });
+    expect(await b).toMatchObject({
+      music: "kept",
+      why: "the track changed meanwhile",
+    });
     expect(sock.commands()).toEqual(["pause", "pause"]);
     await h.stop();
   });
@@ -681,7 +1124,10 @@ describe("interrupt", () => {
     expect(ran).toBe(false);
     await h.advance(1);
     expect(ran).toBe(true);
-    expect(await done).toMatchObject({ music: "kept", why: "Soloist never reported the pause" });
+    expect(await done).toMatchObject({
+      music: "kept",
+      why: "Soloist never reported the pause",
+    });
     await h.stop();
   });
 
@@ -691,7 +1137,8 @@ describe("interrupt", () => {
     const p = h.s.interrupt(() => "a");
     await tick(); // an aside starts on the next turn
     sock.push({ type: "error", message: "command requires authentication" });
-    const why = "pause before interrupt failed: Soloist refused pause: command requires authentication";
+    const why =
+      "pause before interrupt failed: Soloist refused pause: command requires authentication";
     expect(await p).toEqual({ value: "a", music: "untouched", why });
     expect(sock.commands()).toEqual(["pause"]);
     expect(h.last().detail).toBe(why);
@@ -718,11 +1165,19 @@ describe("interrupt", () => {
   test("not playing, or not connected: just runs fn", async () => {
     const h = setup();
     const sock = await h.online({ status: "paused", item: TRACK });
-    expect(await h.s.interrupt(() => 42)).toEqual({ value: 42, music: "untouched", why: "it was not playing" });
+    expect(await h.s.interrupt(() => 42)).toEqual({
+      value: 42,
+      music: "untouched",
+      why: "it was not playing",
+    });
     expect(sock.sent).toEqual([]);
     sock.push({ type: "playback_changed", status: "playing" });
     sock.close();
-    expect(await h.s.interrupt(() => 43)).toEqual({ value: 43, music: "untouched", why: "Soloist is not connected" });
+    expect(await h.s.interrupt(() => 43)).toEqual({
+      value: 43,
+      music: "untouched",
+      why: "Soloist is not connected",
+    });
     await h.stop();
   });
 });
@@ -732,7 +1187,10 @@ describe("duck", () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
     const order: string[] = [];
-    const done = h.s.duck(() => order.push(`announce at ${h.last().state?.volume}`), { to: 20 });
+    const done = h.s.duck(
+      () => order.push(`announce at ${h.last().state?.volume}`),
+      { to: 20 },
+    );
     await tick(); // an aside starts on the next turn
     expect(sock.ack()).toMatchObject({ command: "set_volume", volume: 20 });
     sock.push({ type: "volume_changed", volume: 20 });
@@ -762,11 +1220,18 @@ describe("duck", () => {
   test("someone setting the volume meanwhile keeps it", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
-    const done = h.s.duck(() => sock.push({ type: "volume_changed", volume: 45 }), { to: 20 });
+    const done = h.s.duck(
+      () => sock.push({ type: "volume_changed", volume: 45 }),
+      { to: 20 },
+    );
     await tick(); // an aside starts on the next turn
     sock.ack();
     sock.push({ type: "volume_changed", volume: 20 });
-    expect(await done).toEqual({ value: undefined, music: "kept", why: "someone set the volume to 45 meanwhile" });
+    expect(await done).toEqual({
+      value: undefined,
+      music: "kept",
+      why: "someone set the volume to 45 meanwhile",
+    });
     expect(sock.commands()).toEqual(["set_volume"]);
     await h.stop();
   });
@@ -774,7 +1239,9 @@ describe("duck", () => {
   test("restores even when fn throws", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK, volume: 70 });
-    const caught = h.s.duck(() => Promise.reject(new Error("chime failed")), { to: 20 }).catch((e: Error) => e.message);
+    const caught = h.s
+      .duck(() => Promise.reject(new Error("chime failed")), { to: 20 })
+      .catch((e: Error) => e.message);
     await tick(); // an aside starts on the next turn
     sock.ack();
     sock.push({ type: "volume_changed", volume: 20 });
@@ -788,10 +1255,20 @@ describe("duck", () => {
   test("not playing, already quiet, or a bad level: just fn, or refused", async () => {
     const h = setup();
     const sock = await h.online({ status: "playing", item: TRACK, volume: 15 });
-    expect(await h.s.duck(() => 1, { to: 20 })).toEqual({ value: 1, music: "untouched", why: "it was already at 15" });
+    expect(await h.s.duck(() => 1, { to: 20 })).toEqual({
+      value: 1,
+      music: "untouched",
+      why: "it was already at 15",
+    });
     sock.push({ type: "playback_changed", status: "paused" });
-    expect(await h.s.duck(() => 2, { to: 5 })).toEqual({ value: 2, music: "untouched", why: "it was not playing" });
-    await expect(h.s.duck(() => 3, { to: 140 })).rejects.toMatchObject({ code: "invalid" });
+    expect(await h.s.duck(() => 2, { to: 5 })).toEqual({
+      value: 2,
+      music: "untouched",
+      why: "it was not playing",
+    });
+    await expect(h.s.duck(() => 3, { to: 140 })).rejects.toMatchObject({
+      code: "invalid",
+    });
     expect(sock.sent).toEqual([]);
     await h.stop();
   });
@@ -818,7 +1295,12 @@ describe("duck", () => {
     sock.push({ type: "volume_changed", volume: 70 });
     await second;
     expect(order).toEqual(["interrupt", "duck"]);
-    expect(sock.commands()).toEqual(["pause", "play", "set_volume", "set_volume"]);
+    expect(sock.commands()).toEqual([
+      "pause",
+      "play",
+      "set_volume",
+      "set_volume",
+    ]);
     await h.stop();
   });
 });
@@ -827,7 +1309,20 @@ describe("repeat", () => {
   test("two commands in the docs' order, one write, confirmed on the mode", async () => {
     const h = setup();
     const sock = await h.online();
-    const order = { off: [["set_repeat_track", false], ["set_repeat_context", false]], context: [["set_repeat_track", false], ["set_repeat_context", true]], track: [["set_repeat_context", false], ["set_repeat_track", true]] } as const;
+    const order = {
+      off: [
+        ["set_repeat_track", false],
+        ["set_repeat_context", false],
+      ],
+      context: [
+        ["set_repeat_track", false],
+        ["set_repeat_context", true],
+      ],
+      track: [
+        ["set_repeat_context", false],
+        ["set_repeat_track", true],
+      ],
+    } as const;
     for (const mode of ["track", "context", "off"] as const) {
       sock.sent.length = 0;
       const p = h.s.setRepeat(mode);
@@ -836,47 +1331,133 @@ describe("repeat", () => {
       await tick();
       sock.ack();
       await tick();
-      sock.push({ type: "options_changed", options: { shuffle: false, repeat: mode } });
+      sock.push({
+        type: "options_changed",
+        options: { shuffle: false, repeat: mode },
+      });
       expect((await p).confirmed).toBe(true);
-      expect(sock.sent.map((m) => [m.command, m.enabled])).toEqual(order[mode].map((x) => [...x]));
+      expect(sock.sent.map((m) => [m.command, m.enabled])).toEqual(
+        order[mode].map((x) => [...x]),
+      );
     }
-    await expect(h.s.setRepeat("all" as never)).rejects.toMatchObject({ code: "invalid" });
+    await expect(h.s.setRepeat("all" as never)).rejects.toMatchObject({
+      code: "invalid",
+    });
     await h.stop();
   });
 });
 
 describe("speakerState", () => {
-  const state = (s: Partial<SpotifyState>): SpotifyState => ({ asOf: "", ...s });
+  const state = (s: Partial<SpotifyState>): SpotifyState => ({
+    asOf: "",
+    ...s,
+  });
   test("one word to switch on", () => {
     expect(speakerState(undefined)).toBe("offline");
-    expect(speakerState({ status: "disconnected", state: state({ status: "playing" }) })).toBe("offline");
+    expect(
+      speakerState({
+        status: "disconnected",
+        state: state({ status: "playing" }),
+      }),
+    ).toBe("offline");
     expect(speakerState({ status: "connecting" })).toBe("connecting");
-    expect(speakerState({ status: "connected", state: state({ loggedIn: false }) })).toBe("waiting");
-    expect(speakerState({ status: "connected", state: state({ loggedIn: true, status: "paused" }) })).toBe("paused");
-    expect(speakerState({ status: "connected", state: state({ loggedIn: true, status: "stalled" }) })).toBe("stalled"); // passed through
-    expect(speakerState({ status: "connected", state: state({ loggedIn: true }) })).toBe("idle");
+    expect(
+      speakerState({ status: "connected", state: state({ loggedIn: false }) }),
+    ).toBe("waiting");
+    expect(
+      speakerState({
+        status: "connected",
+        state: state({ loggedIn: true, status: "paused" }),
+      }),
+    ).toBe("paused");
+    expect(
+      speakerState({
+        status: "connected",
+        state: state({ loggedIn: true, status: "stalled" }),
+      }),
+    ).toBe("stalled"); // passed through
+    expect(
+      speakerState({ status: "connected", state: state({ loggedIn: true }) }),
+    ).toBe("idle");
   });
 });
 
 describe("spotifyChanges", () => {
-  const part = (status: Part["status"], s: Partial<SpotifyState> = {}): Part<SpotifyState> => ({ status, state: { asOf: "", loggedIn: true, ...s } });
+  const part = (
+    status: Part["status"],
+    s: Partial<SpotifyState> = {},
+  ): Part<SpotifyState> => ({
+    status,
+    state: { asOf: "", loggedIn: true, ...s },
+  });
   const track = (uri: string) => ({ uri, artists: [] });
-  const types = (b: Part<SpotifyState> | undefined, a: Part<SpotifyState>) => spotifyChanges(b, a).map((e) => e.type);
+  const types = (b: Part<SpotifyState> | undefined, a: Part<SpotifyState>) =>
+    spotifyChanges(b, a).map((e) => e.type);
 
   test("nothing at boot: no before, or createHome's bare placeholder", () => {
-    expect(spotifyChanges(undefined, part("connected", { status: "playing", track: track("t") }))).toEqual([]);
-    expect(spotifyChanges({ status: "connecting" }, part("connected", { status: "playing", track: track("t") }))).toEqual([]);
+    expect(
+      spotifyChanges(
+        undefined,
+        part("connected", { status: "playing", track: track("t") }),
+      ),
+    ).toEqual([]);
+    expect(
+      spotifyChanges(
+        { status: "connecting" },
+        part("connected", { status: "playing", track: track("t") }),
+      ),
+    ).toEqual([]);
   });
 
   test("playback: started then the track, resumed, paused, stopped; buffering counts as playing", () => {
-    expect(spotifyChanges(part("connected", { status: "idle" }), part("connected", { status: "playing", track: track("t") }))).toEqual([{ type: "started" }, { type: "track", track: track("t") }]);
-    expect(types(part("connected", { status: "paused", track: track("t") }), part("connected", { status: "playing", track: track("t") }))).toEqual(["resumed"]);
-    expect(types(part("connected", { status: "paused" }), part("connected", { status: "buffering" }))).toEqual(["resumed"]);
-    expect(types(part("connected", { status: "buffering" }), part("connected", { status: "playing" }))).toEqual([]);
-    expect(types(part("connected", { status: "playing" }), part("connected", { status: "paused" }))).toEqual(["paused"]);
-    expect(types(part("connected", { status: "paused" }), part("connected", { status: "idle" }))).toEqual(["stopped"]);
-    expect(types(part("connected", { status: "playing", track: track("a") }), part("connected", { status: "playing", track: track("b") }))).toEqual(["track"]);
-    expect(types(part("connected", { status: "playing", volume: 30 }), part("connected", { status: "playing", volume: 60 }))).toEqual([]);
+    expect(
+      spotifyChanges(
+        part("connected", { status: "idle" }),
+        part("connected", { status: "playing", track: track("t") }),
+      ),
+    ).toEqual([{ type: "started" }, { type: "track", track: track("t") }]);
+    expect(
+      types(
+        part("connected", { status: "paused", track: track("t") }),
+        part("connected", { status: "playing", track: track("t") }),
+      ),
+    ).toEqual(["resumed"]);
+    expect(
+      types(
+        part("connected", { status: "paused" }),
+        part("connected", { status: "buffering" }),
+      ),
+    ).toEqual(["resumed"]);
+    expect(
+      types(
+        part("connected", { status: "buffering" }),
+        part("connected", { status: "playing" }),
+      ),
+    ).toEqual([]);
+    expect(
+      types(
+        part("connected", { status: "playing" }),
+        part("connected", { status: "paused" }),
+      ),
+    ).toEqual(["paused"]);
+    expect(
+      types(
+        part("connected", { status: "paused" }),
+        part("connected", { status: "idle" }),
+      ),
+    ).toEqual(["stopped"]);
+    expect(
+      types(
+        part("connected", { status: "playing", track: track("a") }),
+        part("connected", { status: "playing", track: track("b") }),
+      ),
+    ).toEqual(["track"]);
+    expect(
+      types(
+        part("connected", { status: "playing", volume: 30 }),
+        part("connected", { status: "playing", volume: 60 }),
+      ),
+    ).toEqual([]);
   });
 
   test("the connection and the session: offline once, online through connecting, waiting, picked", () => {
@@ -885,9 +1466,18 @@ describe("spotifyChanges", () => {
     expect(types(playing, lost)).toEqual(["offline"]);
     expect(types(lost, lost)).toEqual([]);
     expect(types(lost, { ...lost, status: "connecting" })).toEqual([]);
-    expect(types({ ...lost, status: "connecting" }, playing)).toEqual(["online"]);
-    expect(types(playing, part("connected", { loggedIn: false }))).toEqual(["waiting"]);
-    expect(types(part("connected", { loggedIn: false }), part("connected", { loggedIn: true }))).toEqual(["picked"]);
+    expect(types({ ...lost, status: "connecting" }, playing)).toEqual([
+      "online",
+    ]);
+    expect(types(playing, part("connected", { loggedIn: false }))).toEqual([
+      "waiting",
+    ]);
+    expect(
+      types(
+        part("connected", { loggedIn: false }),
+        part("connected", { loggedIn: true }),
+      ),
+    ).toEqual(["picked"]);
   });
 
   test("a drop during an aside is offline, never own; a reconnect that signed in says online and picked", async () => {
@@ -902,18 +1492,37 @@ describe("spotifyChanges", () => {
     await Bun.sleep(30); // fn ends
     await h.advance(100); // the resume's turn in the lane: it fails offline
     expect((await done).music).toBe("failed");
-    const events = h.parts.slice(1).flatMap((p, i) => spotifyChanges(h.parts[i], p));
+    const events = h.parts
+      .slice(1)
+      .flatMap((p, i) => spotifyChanges(h.parts[i], p));
     expect(events).toContainEqual({ type: "offline" });
     const before = h.last();
     await h.advance(1000);
     const next = h.sockets.at(-1)!;
     next.open();
-    next.push({ type: "auth_state", logged_in: false, is_active: false, device_name: "Kitchen" });
-    expect(spotifyChanges(before, h.last()).map((e) => e.type)).toEqual(["online", "waiting"]);
+    next.push({
+      type: "auth_state",
+      logged_in: false,
+      is_active: false,
+      device_name: "Kitchen",
+    });
+    expect(spotifyChanges(before, h.last()).map((e) => e.type)).toEqual([
+      "online",
+      "waiting",
+    ]);
     const waiting = h.last();
-    next.push({ type: "auth_state", logged_in: true, is_active: true, device_name: "Kitchen" });
+    next.push({
+      type: "auth_state",
+      logged_in: true,
+      is_active: true,
+      device_name: "Kitchen",
+    });
     next.push({ type: "playback_state", status: "playing", item: TRACK });
-    expect(spotifyChanges(waiting, h.last()).map((e) => e.type)).toEqual(["picked", "started", "track"]);
+    expect(spotifyChanges(waiting, h.last()).map((e) => e.type)).toEqual([
+      "picked",
+      "started",
+      "track",
+    ]);
     await h.stop();
   });
 
@@ -928,24 +1537,46 @@ describe("spotifyChanges", () => {
     sock.ack();
     sock.push({ type: "playback_changed", status: "playing" });
     await done;
-    const events = h.parts.slice(1).flatMap((p, i) => spotifyChanges(h.parts[i], p));
-    expect(events).toEqual([{ type: "paused", own: true }, { type: "resumed", own: true }]);
+    const events = h.parts
+      .slice(1)
+      .flatMap((p, i) => spotifyChanges(h.parts[i], p));
+    expect(events).toEqual([
+      { type: "paused", own: true },
+      { type: "resumed", own: true },
+    ]);
     expect(h.last().state?.aside).toBeUndefined();
     sock.push({ type: "playback_changed", status: "paused" });
-    expect(spotifyChanges(h.parts.at(-2), h.last())).toEqual([{ type: "paused" }]);
+    expect(spotifyChanges(h.parts.at(-2), h.last())).toEqual([
+      { type: "paused" },
+    ]);
     await h.stop();
   });
 });
 
 describe("stalls (Soloist issue #5)", () => {
   /** Answer the get_state a stall check sends with this position, Soloist's clock at `atMs`. */
-  async function answer(h: ReturnType<typeof setup>, sock: FakeSocket, ms: number, atMs: number) {
+  async function answer(
+    h: ReturnType<typeof setup>,
+    sock: FakeSocket,
+    ms: number,
+    atMs: number,
+  ) {
     await tick();
     expect(sock.sent.at(-1)).toMatchObject({ command: "get_state" });
-    sock.push({ type: "playback_state", status: "playing", item: TRACK, volume: 40, position: { position_ms: ms, timestamp_ms: atMs, speed: 1 } });
+    sock.push({
+      type: "playback_state",
+      status: "playing",
+      item: TRACK,
+      volume: 40,
+      position: { position_ms: ms, timestamp_ms: atMs, speed: 1 },
+    });
     await tick();
   }
-  const playingAt = (ms: number) => ({ status: "playing", item: TRACK, position: { position_ms: ms, timestamp_ms: 0, speed: 1 } });
+  const playingAt = (ms: number) => ({
+    status: "playing",
+    item: TRACK,
+    position: { position_ms: ms, timestamp_ms: 0, speed: 1 },
+  });
 
   test("a position that stops moving is a stall: anomaly and a stalled event, no write without repairStalls", async () => {
     const h = setup({ stallCheckMs: 20_000 });
@@ -955,9 +1586,18 @@ describe("stalls (Soloist issue #5)", () => {
     await h.advance(20_000);
     const before = h.last();
     await answer(h, sock, 99_100, 40_000);
-    expect(h.last().state?.stalled).toEqual({ track: "spotify:track:abc123", ms: 99_100, how: "frozen" });
-    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5)");
-    expect(spotifyChanges(before, h.last())).toContainEqual({ type: "stalled", stall: { track: "spotify:track:abc123", ms: 99_100, how: "frozen" } });
+    expect(h.last().state?.stalled).toEqual({
+      track: "spotify:track:abc123",
+      ms: 99_100,
+      how: "frozen",
+    });
+    expect(h.last().anomaly).toBe(
+      "playback stalled at 1:39 (Soloist issue #5)",
+    );
+    expect(spotifyChanges(before, h.last())).toContainEqual({
+      type: "stalled",
+      stall: { track: "spotify:track:abc123", ms: 99_100, how: "frozen" },
+    });
     expect(sock.commands()).toEqual(["get_state", "get_state"]);
     const stalled = h.last();
     await h.advance(20_000);
@@ -990,14 +1630,28 @@ describe("stalls (Soloist issue #5)", () => {
     await h.advance(20_000);
     await answer(h, sock, 99_000, 40_000);
     await h.advance(100);
-    expect(sock.ack()).toEqual({ type: "command", command: "seek", position_ms: 99_000 });
-    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    expect(sock.ack()).toEqual({
+      type: "command",
+      command: "seek",
+      position_ms: 99_000,
+    });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 },
+    });
     await tick();
-    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5); tried a seek");
+    expect(h.last().anomaly).toBe(
+      "playback stalled at 1:39 (Soloist issue #5); tried a seek",
+    );
     expect(h.last().state?.aside).toBe("repair");
     await h.advance(5000);
     await answer(h, sock, 104_000, 45_300);
-    expect(sock.commands()).toEqual(["get_state", "get_state", "seek", "get_state"]);
+    expect(sock.commands()).toEqual([
+      "get_state",
+      "get_state",
+      "seek",
+      "get_state",
+    ]);
     expect(h.last().state?.aside).toBeUndefined();
     await h.stop();
   });
@@ -1011,7 +1665,10 @@ describe("stalls (Soloist issue #5)", () => {
     await answer(h, sock, 99_000, 40_000);
     await h.advance(100);
     sock.ack();
-    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 },
+    });
     await tick();
     await h.advance(5000);
     await answer(h, sock, 99_000, 45_300);
@@ -1022,7 +1679,9 @@ describe("stalls (Soloist issue #5)", () => {
     expect(sock.ack()).toMatchObject({ command: "play" });
     sock.push({ type: "playback_changed", status: "playing" });
     await tick();
-    expect(h.last().anomaly).toBe("playback stalled at 1:39 (Soloist issue #5); tried a seek, then pause and play");
+    expect(h.last().anomaly).toBe(
+      "playback stalled at 1:39 (Soloist issue #5); tried a seek, then pause and play",
+    );
     expect(h.last().state?.stalled?.track).toBe("spotify:track:abc123"); // still on: the next check that sees it move clears it
     sock.sent.length = 0;
     await h.advance(20_000);
@@ -1042,7 +1701,10 @@ describe("stalls (Soloist issue #5)", () => {
     await answer(h, sock, 99_000, 40_000);
     await h.advance(100);
     sock.ack(); // the seek
-    sock.push({ type: "position_sync", position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 } });
+    sock.push({
+      type: "position_sync",
+      position: { position_ms: 99_000, timestamp_ms: 40_200, speed: 1 },
+    });
     await tick();
     const announced: string[] = [];
     const done = h.s.interrupt(() => announced.push("said"));
@@ -1050,7 +1712,11 @@ describe("stalls (Soloist issue #5)", () => {
     expect(sock.commands()).toEqual(["get_state", "get_state", "seek"]); // the interrupt waits its turn
     sock.push({ type: "playback_changed", status: "paused" }); // someone paused from a phone
     await h.advance(5000);
-    expect(await done).toMatchObject({ value: 1, music: "untouched", why: "it was not playing" });
+    expect(await done).toMatchObject({
+      value: 1,
+      music: "untouched",
+      why: "it was not playing",
+    });
     expect(sock.commands()).toEqual(["get_state", "get_state", "seek"]); // no pause and play from the repair
     expect(h.last().state?.aside).toBeUndefined();
     await h.stop();
@@ -1071,7 +1737,10 @@ describe("stalls (Soloist issue #5)", () => {
 
   test("repeat-track running past the track's length is not an overrun", async () => {
     const h = setup({ stallCheckMs: 20_000 });
-    const sock = await h.online({ ...playingAt(196_000), options: { shuffle: false, repeat: "track" } });
+    const sock = await h.online({
+      ...playingAt(196_000),
+      options: { shuffle: false, repeat: "track" },
+    });
     await h.advance(19_900);
     await answer(h, sock, 196_000, 0);
     expect(h.last().state?.stalled).toBeUndefined();
@@ -1086,9 +1755,14 @@ describe("stalls (Soloist issue #5)", () => {
     await h.advance(100);
     const stalled = h.last();
     expect(stalled.state?.stalled).toMatchObject({ how: "overrun" });
-    expect(stalled.anomaly).toBe("playback stuck past the end of the track (Soloist issue #5); tried a skip");
+    expect(stalled.anomaly).toBe(
+      "playback stuck past the end of the track (Soloist issue #5); tried a skip",
+    );
     expect(sock.ack()).toMatchObject({ command: "skip_next" });
-    sock.push({ type: "track_changed", item: entity("spotify:track:next", "Next") });
+    sock.push({
+      type: "track_changed",
+      item: entity("spotify:track:next", "Next"),
+    });
     await tick();
     expect(h.last().state?.stalled).toBeUndefined();
     await h.stop();

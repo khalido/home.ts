@@ -16,7 +16,8 @@ export function manualClock() {
   };
   const advance = async (ms: number) => {
     t += ms;
-    for (const s of sleeps.filter((x) => x.at <= t)) sleeps.splice(sleeps.indexOf(s), 1), s.wake();
+    for (const s of sleeps.filter((x) => x.at <= t))
+      (sleeps.splice(sleeps.indexOf(s), 1), s.wake());
     await Bun.sleep(5);
   };
   return { clock, advance };
