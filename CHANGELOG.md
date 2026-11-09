@@ -4,13 +4,15 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
-From chota-bot's live writes on a Raspberry Pi.
+## [0.1.2] - 2026-11-09
+
+From chota-bot's live writes on a Raspberry Pi. `setVolume` on an inactive speaker now rejects, and `track` events can come later than before.
 
 ### Added
 
-- **spotify:** `activate()`.
-- **cast:** `announceAll(targets, clip, options)`, one result per target, and repeated `--to` on `home cast announce`.
-- **cast:** `form` on each device (`speaker`, `display`, `tv`, from `castForm(model)`), so "all speakers" can skip TVs. The address cache keeps the model.
+- **spotify:** `activate()`, and `home spotify activate`.
+- **cast:** `announceAll(targets, clip, options)`, one result per device, and repeated `--to` on `home cast announce` (`--json` is an array with several).
+- **cast:** `form` on a device whose model it knows (`speaker`, `display`, `tv`, from `castForm(model)`), so "all speakers" can skip TVs. The address cache keeps the model; a cached device without one goes through discovery once.
 - **up:** the integration has `client`, for a consumer's writes.
 
 ### Changed
@@ -18,14 +20,14 @@ From chota-bot's live writes on a Raspberry Pi.
 - **spotify:** `setVolume` while the speaker isn't the active device rejects with code `inactive`, instead of `confirmed: false`: Soloist accepts it and drops it. `duck` then runs `fn` with `music: "untouched"`.
 - **spotify:** `play` while inactive goes active first.
 - **spotify:** the `track` event waits for the track's name.
-- **cast:** a clip that doesn't start playing fails after 15 s, naming its type. An error the receiver reports sooner gives its reason and code.
+- **cast:** a clip that doesn't start playing fails after 15 s (or `timeoutMs`), naming its type. An error the receiver reports sooner gives its reason, and its code if it has one.
 
 ### Fixed
 
 - **spotify:** `maxVolume` waits until the speaker is active, retries until Soloist reports the lower volume, and says "lowered it" only then; if it never shows, `detail` says so. It said "lowered it" at 56 with a cap of 40. The window also opens when the speaker goes active.
 - **spotify:** `setRepeat("off")` from `track` stayed on `track`: the two commands now go 600 ms apart.
 - **spotify:** a volume within 1 of the request confirms, since Soloist rounds it.
-- **spotify:** a stall repair can run again when a track is played again.
+- **spotify:** a stall repair can run again when a track comes back after another.
 - **`home cast announce`** exits 1 when a clip didn't play.
 
 ## [0.1.1] - 2026-11-09
@@ -66,6 +68,7 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/khalido/home.ts/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/khalido/home.ts/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/khalido/home.ts/releases/tag/v0.1.0
