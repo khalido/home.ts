@@ -4,8 +4,8 @@
 
 ## Where things stand
 
-- **0.1.1 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
-- **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It worked first time on 0.1.1.
+- **0.1.2 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
+- **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1 and 0.1.2.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. Writes that have reached a device: `setPower(true)` on the Daikin; spotify's and Cast's announce (0.1.1, chota-bot's Pi, 2026-11-09; the connector READMEs have the results).
 
 ## spotify (Soloist)
@@ -44,7 +44,7 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 
 ## Next, in order
 
-0. **0.1.2 is built, in `## [Unreleased]`** (chota-bot's wishlist; not released). Not done on purpose: a settle window for events, `available_actions`. After release, chota-bot's live tests: the cap on a real start at full volume, `activate` then `play(uri)` with no phone, `duck` around an announce, announce over playback, to a group, `home cast volume`, `mute`, `stop`. Open: one speaker read 50 before a failed announce and 56 after; the restore path is the same as a played clip's, and KO was editing the group then.
+0. **chota-bot's live tests of 0.1.2** (it has the list; results come back here for the READMEs): the first-play cap at full volume, `activate` then `play(uri)` with no phone open, `setRepeat("off")`, `duck` around an announce, announce over playback, to a group, `announceAll`, `home cast volume`, `mute`, `stop`. Each with KO's OK. Open: one speaker read 50 before a failed announce and 56 after; the restore path is the same as a played clip's, and KO was editing the group then. Not built on purpose: a settle window for events, `available_actions`. 0.1.2's inactive refusal is by the release skill's rule a minor; KO kept the patch number.
 
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
