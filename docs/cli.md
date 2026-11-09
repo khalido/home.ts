@@ -15,11 +15,11 @@ home config check [path]      # validate a home config: what it would set up, se
 home discover --write [path]  # with a config (the path, else --config or HOME_CONFIG): match what answers by identity, add new devices, update moved hosts and renamed Cast names in place
 home probe                    # read-only, no keys: Hue's public config, Daikin by UDP broadcast, the IQ Gateway's /info, each weather source, each Cast device's and printer's status
 home locate "<street address>" [--write [path]]  # latitude and longitude from OpenStreetMap's Nominatim; --write sets them in the config's location (and timezone, when absent, to this machine's)
-home cast announce --to <name> (--say "<text>" | --file <path>) [--volume 0-100]  # play a clip, then put back what was playing and the volume
+home cast announce --to <name> [--to <name>…] (--say "<text>" | --file <path>) [--volume 0-100]  # exit 1 if any didn't play; play a clip, then put back what was playing and the volume
 home cast volume <name> <0-100>
 home cast mute <name> on|off
 home cast stop <name>         # end the running app; the device returns to its idle screen
-home spotify pause | play [link] | next | volume <0-100>  # the Soloist speaker at SOLOIST_WS; volume held to SOLOIST_MAX_VOLUME; prints what Soloist then reported
+home spotify activate | pause | play [link] | next | volume <0-100>  # the Soloist speaker at SOLOIST_WS; volume held to SOLOIST_MAX_VOLUME; prints what Soloist then reported
 ```
 
 ## Output

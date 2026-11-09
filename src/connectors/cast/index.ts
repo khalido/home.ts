@@ -27,7 +27,8 @@ import {
 } from "./writes.ts";
 
 export type { CastConnect } from "./codec.ts";
-export type { CastDevice, CastSnapshot, Resolved } from "./state.ts";
+export { castForm } from "./state.ts";
+export type { CastDevice, CastForm, CastSnapshot, Resolved } from "./state.ts";
 export type {
   AnnounceResult,
   CastActions,
@@ -77,11 +78,17 @@ export type CastConfig = {
    * `host` and `port` (an address cache) an entry connects at once; discovery runs only when an entry has none, or a
    * cached address fails. A cached port other than 8009 is a group's (devices always listen on 8009).
    */
-  expect?: { castId: string; name: string; host?: string; port?: number }[];
+  expect?: {
+    castId: string;
+    name: string;
+    model?: string;
+    host?: string;
+    port?: number;
+  }[];
   /** Each address that connected and passed the certificate check, for an address cache; again with the device's new name when it reports a rename. `name` is the device's own, never a config's. */
   seen?: (
     id: string,
-    address: { host: string; port: number; name?: string },
+    address: { host: string; port: number; name?: string; model?: string },
   ) => void;
   clock?: Clock;
   /** Heartbeat interval; a socket silent for three of them is dropped. */
@@ -304,6 +311,7 @@ export function cast(
         host: d.host!,
         port: d.port!,
         name: named.has(id) ? d.name : undefined,
+        model: d.model,
       }); // a config's name never reaches the cache
       publish();
       void (async () => {
@@ -468,14 +476,19 @@ export function cast(
       report = update;
       running = signal;
       const expect = config.expect ?? [];
+      // A device with no model (a cache from before 0.1.2) goes through discovery once, or it would never get a `form`.
       const cached = expect.filter(
-        (e) => e.host !== undefined && e.port !== undefined,
+        (e) =>
+          e.host !== undefined &&
+          e.port !== undefined &&
+          (e.port !== 8009 || e.model !== undefined),
       );
       snapshot = found(
         snapshot,
         cached.map((e) => ({
           id: e.castId,
           name: e.name,
+          model: e.model,
           host: e.host!,
           port: e.port!,
           group: e.port !== 8009,

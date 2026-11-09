@@ -976,12 +976,15 @@ describe("the first play's volume (Soloist issue #23)", () => {
     expect(sock.sent).toEqual([
       { type: "command", command: "set_volume", volume: 60 },
     ]);
+    expect(h.last().anomaly).toBeUndefined(); // not until it took
+    expect(h.last().state?.volume).toBe(100); // the reading stays what Soloist said until it says otherwise
+    sock.ack();
+    await tick();
+    sock.push({ type: "volume_changed", volume: 60 });
+    await tick();
     expect(h.last().anomaly).toBe(
       "started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)",
     );
-    expect(h.last().state?.volume).toBe(100); // the reading stays what Soloist said until it says otherwise
-    sock.ack();
-    sock.push({ type: "volume_changed", volume: 60 });
     sock.push({ type: "volume_changed", volume: 95 }); // someone turned it up inside the window: theirs to keep
     expect(sock.commands()).toEqual(["set_volume"]);
     sock.push({ type: "playback_changed", status: "idle" });
@@ -1020,6 +1023,96 @@ describe("the first play's volume (Soloist issue #23)", () => {
       command: "set_volume",
       volume: 60,
     });
+    await h.stop();
+  });
+
+  test("while inactive it waits, since Soloist drops the write; going active lowers it", async () => {
+    const h = setup({ maxVolume: 40 });
+    const sock = await h.online({ volume: 40 });
+    sock.push({ type: "device_changed", is_active: false });
+    sock.push({ type: "playback_changed", status: "playing" });
+    sock.push({ type: "volume_changed", volume: 56 });
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    sock.push({ type: "device_changed", is_active: true });
+    await h.advance(100);
+    expect(sock.sent).toEqual([
+      { type: "command", command: "set_volume", volume: 40 },
+    ]);
+    await h.stop();
+  });
+
+  test("going active during a song opens the window, without any status change", async () => {
+    const h = setup({ maxVolume: 40 });
+    const sock = await h.online({ status: "paused", volume: 30 });
+    sock.push({ type: "device_changed", is_active: false });
+    sock.push({ type: "device_changed", is_active: true });
+    sock.push({ type: "volume_changed", volume: 100 });
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["set_volume"]);
+    await h.stop();
+  });
+
+  test("a new start while a lowering is on its way re-arms it: the jump after playing is still caught", async () => {
+    const h = setup({ maxVolume: 40 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "buffering" });
+    await h.advance(100);
+    sock.push({ type: "playback_changed", status: "playing" }); // opens a new window with the write still out
+    sock.ack();
+    await tick();
+    sock.push({ type: "volume_changed", volume: 40 });
+    await tick();
+    sock.push({ type: "volume_changed", volume: 100 });
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["set_volume", "set_volume"]);
+    await h.stop();
+  });
+
+  test("41 with a cap of 40 is within rounding: left alone", async () => {
+    const h = setup({ maxVolume: 40 });
+    const sock = await h.online({ volume: 41 });
+    sock.push({ type: "playback_changed", status: "playing" });
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("a refused lowering isn't resent in that window, and says so", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "playing" });
+    await h.advance(100);
+    sock.push({ type: "error", message: "no" });
+    await tick();
+    expect(h.last().detail).toContain("lowering the volume to 60 failed");
+    sock.push({ type: "volume_changed", volume: 90 });
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["set_volume"]);
+    await h.stop();
+  });
+
+  test("a lowering that never shows is retried, never called done, and ends in detail", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "idle" });
+    sock.push({ type: "playback_changed", status: "playing" });
+    await h.advance(100);
+    sock.ack();
+    await tick();
+    await h.advance(2000); // no volume_changed: unconfirmed
+    await h.advance(100);
+    expect(sock.commands().length).toBe(2); // retried
+    for (let i = 0; i < 6; i++) {
+      sock.ack();
+      await tick();
+      await h.advance(2000);
+      await h.advance(100);
+    }
+    expect(h.last().anomaly).toBeUndefined();
+    expect(h.last().detail).toBe(
+      "could not lower the volume to 60: Soloist has not reported it",
+    );
     await h.stop();
   });
 
@@ -1379,6 +1472,93 @@ describe("duck", () => {
   });
 });
 
+describe("while the speaker is not active", () => {
+  const inactive = async (playback = {}) => {
+    const h = setup();
+    const sock = await h.online(playback);
+    sock.push({ type: "device_changed", is_active: false });
+    return { h, sock };
+  };
+
+  test("activate confirms on going active, and sends nothing when it already is", async () => {
+    const { h, sock } = await inactive();
+    const { frame, result } = await sent(h, sock, () => h.s.activate(), {
+      type: "device_changed",
+      is_active: true,
+    });
+    expect(frame).toEqual({ type: "command", command: "activate" });
+    expect(result.confirmed).toBe(true);
+    sock.sent.length = 0;
+    expect((await h.s.activate()).confirmed).toBe(true);
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("setVolume is refused unsent, with code inactive", async () => {
+    const { h, sock } = await inactive();
+    const e = (await h.s.setVolume(30).catch((x) => x)) as ConnectorError;
+    expect(e.code).toBe("inactive");
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("duck runs fn over the music and says why it left it alone", async () => {
+    const { h, sock } = await inactive({ status: "playing", volume: 62 });
+    const r = await h.s.duck(() => "said", { to: 20 });
+    expect(r).toMatchObject({ value: "said", music: "untouched" });
+    expect(r.why).toContain("not the active device");
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("play goes active first, then plays", async () => {
+    const { h, sock } = await inactive({ status: "paused" });
+    const p = h.s.play();
+    await h.advance(100);
+    expect(sock.ack()).toEqual({ type: "command", command: "activate" });
+    await tick();
+    sock.push({ type: "device_changed", is_active: true });
+    await h.advance(100);
+    expect(sock.ack()).toEqual({ type: "command", command: "play" });
+    await tick();
+    sock.push({ type: "playback_changed", status: "playing" });
+    expect((await p).confirmed).toBe(true);
+    await h.stop();
+  });
+
+  test("play with a bad link sends nothing, activate included", async () => {
+    const { h, sock } = await inactive();
+    await expect(h.s.play("not a link")).rejects.toThrow();
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("resume doesn't go active: it worked inactive, and going active can jump the volume", async () => {
+    const { h, sock } = await inactive({ status: "paused" });
+    const p = h.s.resume();
+    await h.advance(100);
+    expect(sock.ack()).toEqual({ type: "command", command: "play" });
+    await tick();
+    sock.push({ type: "playback_changed", status: "playing" });
+    await p;
+    await h.stop();
+  });
+
+  test("a reported volume within 1 of the request confirms: Soloist rounds it", async () => {
+    const h = setup();
+    const sock = await h.online({ volume: 20 });
+    const { result } = await sent(h, sock, () => h.s.setVolume(44), {
+      type: "volume_changed",
+      volume: 43,
+    });
+    expect(result.confirmed).toBe(true);
+    await h.stop();
+  });
+});
+
 describe("repeat", () => {
   test("two commands in the docs' order, one write, confirmed on the mode", async () => {
     const h = setup();
@@ -1403,6 +1583,7 @@ describe("repeat", () => {
       await h.advance(100);
       sock.ack();
       await tick();
+      await h.advance(600);
       sock.ack();
       await tick();
       sock.push({
@@ -1464,9 +1645,22 @@ describe("spotifyChanges", () => {
     status,
     state: { asOf: "", loggedIn: true, ...s },
   });
-  const track = (uri: string) => ({ uri, artists: [] });
+  const track = (uri: string) => ({ uri, name: uri, artists: [] });
   const types = (b: Part<SpotifyState> | undefined, a: Part<SpotifyState>) =>
     spotifyChanges(b, a).map((e) => e.type);
+
+  test("a new track waits for its name; the same track named later is the event", () => {
+    const bare = { uri: "t2", artists: [] };
+    const before = part("connected", { status: "playing", track: track("t1") });
+    const nameless = part("connected", { status: "playing", track: bare });
+    expect(types(before, nameless)).toEqual([]);
+    expect(
+      types(
+        nameless,
+        part("connected", { status: "playing", track: track("t2") }),
+      ),
+    ).toEqual(["track"]);
+  });
 
   test("nothing at boot: no before, or createHome's bare placeholder", () => {
     expect(

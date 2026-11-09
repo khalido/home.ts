@@ -3,6 +3,7 @@ import type { Clock, Part } from "../src/index.ts";
 import { idleClock, manualClock } from "./clock.ts";
 import {
   cast,
+  castForm,
   type CastConnect,
   type CastSnapshot,
 } from "../src/connectors/cast/index.ts";
@@ -496,6 +497,7 @@ describe("cast()", () => {
     const expect_ = devices.map((d) => ({
       castId: d.id,
       name: d.name,
+      model: d.model,
       host: d.file === "speaker" ? "192.0.2.250" : d.host,
       port: d.port,
     })); // the speaker's cache is stale
@@ -532,6 +534,7 @@ describe("cast()", () => {
     const expect_ = devices.map((d) => ({
       castId: d.id,
       name: d.name,
+      model: d.model,
       host: d.file === "speaker" ? "192.0.2.250" : d.host,
       port: d.port,
     }));
@@ -566,6 +569,7 @@ describe("cast()", () => {
     const expect_ = devices.map((d) => ({
       castId: d.id,
       name: `Old ${d.name}`,
+      model: d.model,
       host: d.host,
       port: d.port,
     }));
@@ -604,6 +608,7 @@ describe("cast()", () => {
     const expect_ = devices.map((d) => ({
       castId: d.id,
       name: d.name,
+      model: d.model,
       host: d.host,
       port: d.port,
     }));
@@ -760,5 +765,36 @@ describe("cast() review fixes", () => {
     expect(Object.keys(parts.at(-1)!.state!.devices)).toHaveLength(7);
     stop.abort();
     await running;
+  });
+});
+
+describe("castForm", () => {
+  test("from the model name; a model it doesn't know has none", () => {
+    expect(
+      [
+        "Google Nest Mini",
+        "Google Home Speaker",
+        "Google Home Max",
+        "Google Nest Hub",
+        "Google Nest Hub Max",
+        "Pixel Tablet",
+        "Chromecast Ultra",
+        "Chromecast Audio",
+        "Google TV Streamer",
+        "Some Soundbar",
+      ].map(castForm),
+    ).toEqual([
+      "speaker",
+      "speaker",
+      "speaker",
+      "display",
+      "display",
+      "display",
+      "tv",
+      "speaker",
+      "tv",
+      undefined,
+    ]);
+    expect(castForm(undefined)).toBeUndefined();
   });
 });

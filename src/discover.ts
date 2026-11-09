@@ -307,6 +307,7 @@ export type CachedAddress = {
   host: string;
   port?: number;
   name?: string;
+  model?: string; // Cast: what kind of device, without a discovery
   seenAt: string;
 };
 
@@ -345,7 +346,7 @@ export function addressBook(
     seen(
       connector: Connector,
       id: string | undefined,
-      address: { host: string; port?: number; name?: string },
+      address: { host: string; port?: number; name?: string; model?: string },
     ): void {
       if (!cache || id === undefined) return;
       const key = addressKey(connector, id);
@@ -355,14 +356,17 @@ export function addressBook(
         c.host === address.host &&
         c.port === address.port &&
         isFresh(c) &&
-        (!address.name || address.name === c.name)
+        (!address.name || address.name === c.name) &&
+        (!address.model || address.model === c.model)
       )
         return;
       const name = address.name || c?.name;
+      const model = address.model || c?.model;
       entries[key] = {
         host: address.host,
         ...(address.port === undefined ? {} : { port: address.port }),
         ...(name ? { name } : {}),
+        ...(model ? { model } : {}),
         seenAt: new Date(now()).toISOString(),
       };
       cache.write({ ...entries });

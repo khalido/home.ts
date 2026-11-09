@@ -1,6 +1,6 @@
 # Spotify (Soloist)
 
-What a [Spotify Soloist](https://developer.spotify.com/documentation/soloist) speaker is playing (start with its [basic integration](https://developer.spotify.com/documentation/soloist/howtos/basic-integration)), and control over it, over Soloist's local WebSocket. `iot_class`: **local_push**. Reads seen live on a real Soloist (2026-11-09); writes tested against a fake socket only.
+What a [Spotify Soloist](https://developer.spotify.com/documentation/soloist) speaker is playing (start with its [basic integration](https://developer.spotify.com/documentation/soloist/howtos/basic-integration)), and control over it, over Soloist's local WebSocket. `iot_class`: **local_push**. Reads and most writes seen live on a real Soloist (0.1.1, 2026-11-09); what 0.1.2 changed since is tested against a fake socket only.
 
 Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7, x86_64, Apple Silicon, Windows x86_64). The machine running it is a speaker in every Spotify app on the network; this connector is how a program on the same machine sees and steers it. It doesn't search Spotify or read a library: Soloist plays URIs and reports its own session. Search belongs to the consumer (KO, 2026-11-08; `docs/ideas.md`).
 
@@ -14,15 +14,17 @@ Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7, x8
 
 **State.** Each frame passes a zod schema, every field optional, and folds into `SpotifyState`: `loggedIn`, `deviceName`, `active`, `status`, `track` (`uri`, `type`, `name`, `artists`, `album`, cover, `durationMs`), `context`, `position` (Soloist's anchor `ms`, `atMs`, `speed`; `positionMs(state, now)` moves it on, not clamped), `volume`, `shuffle`, `repeat`, `upNext` (from `queue_changed`, plus one `get_queue` with `limit: 10` per socket; an unanswered one is quiet, as an empty queue may send nothing). An empty item `uri` is nothing loaded: no `track`. Unknown frame types are skipped. The library adds `aside` while its own `duck`, `interrupt` or stall repair runs, and `stalled`. Odd readings pass through into `anomaly`: an unknown status or repeat, a volume outside 0–100, a negative speed, a position past the track's end, a frame the schema rejects (which leaves the state as it was).
 
-**Writes**, on the integration: `play(linkOrUri?)`, `pause`, `resume`, `next`, `prev`, `seek(ms)`, `setVolume(0–100)`, `queue(track)`, `setShuffle(on)`, `setRepeat("off" | "context" | "track")`. A link is an `open.spotify.com` URL or a `spotify:` URI; `spotify.link` short links are refused.
+**Writes**, on the integration: `activate()`, `play(linkOrUri?)`, `pause`, `resume`, `next`, `prev`, `seek(ms)`, `setVolume(0–100)`, `queue(track)`, `setShuffle(on)`, `setRepeat("off" | "context" | "track")`. A link is an `open.spotify.com` URL or a `spotify:` URI; `spotify.link` short links are refused.
 
 - Each resolves `{ state, confirmed }`: after Soloist accepts (`command_result`), it waits up to 2 s for the event that shows _this caller's_ change (the volume sent, `paused` or `playing`, a new track URI, the context or track played, a position near the seek, the shuffle or repeat set, the track in `upNext`), then gives the state. No such event: `confirmed: false`, the state as it stands. A write merged into a later one confirms only if its own change shows; a write of what is already so confirms at once; a drop ends the wait. `next` also confirms on idle (end of queue) or a restart, `prev` on a restart from 5 s or more in.
-- Errors are `ConnectorError` with `code`: `offline`, `waiting`, `refused` (Soloist's `error`), `timeout` (3 s), `invalid` (bad input, nothing sent).
+- A volume reported within 1 of the request confirms, since Soloist rounds it (phone steps are sixteenths).
+- **While inactive** (`state.active: false`), Soloist accepts `set_volume` and drops it, three times live. `setVolume` is refused unsent with code `inactive`; `duck` runs `fn` over the music with `music: "untouched"`. `activate()` fixes it, but makes a new audio stream, so the volume can jump to the level last saved (62 to 40, live). `play` while inactive goes active first (a `play` alone didn't take live; going active first is untested). `resume` doesn't: it worked inactive, and `interrupt` relies on that.
+- Errors are `ConnectorError` with `code`: `offline`, `waiting`, `inactive`, `refused` (Soloist's `error`), `timeout` (3 s), `invalid` (bad input, nothing sent).
 - One write lane, 100 ms apart (a guess). `volume`, `seek`, `shuffle`, `repeat` merge to the last; `play`, `pause`, `resume` share a slot, so the last wins; each `next`, `prev`, `queue` is its own. Queries go through the lane too, at most 1 s each, since Soloist's `error` names no command.
-- `setRepeat` is two commands in the docs' order (clear the other mode, then set this one); if the second is refused, repeat may be left off.
+- `setRepeat` is two commands in the docs' order (clear the other mode, then set this one), 600 ms apart: back to back, `off` from `track` stayed on `track` live, and 600 ms apart worked. If the second is refused, repeat may be left off.
 - A failed write the library made itself stays in `detail` until a write works or the socket reconnects.
 
-**`maxVolume`** holds requests (rounded to a whole percent). Within 10 s of a start from idle (to playing or buffering, or the first such status after a sign-in; a start through buffering opens the window again at `playing`), a reported volume above it is lowered once and `anomaly` says so until the speaker goes idle: [#23](https://github.com/spotify/soloist/issues/23), the first play on PipeWire starts at 100%. `--initial-volume` is ignored there. Not on resuming from pause, not on connecting to a song already playing, and a person turning it up again keeps it.
+**`maxVolume`** holds requests (rounded to a whole percent). For 10 s after a start signal, a reported volume above it is lowered: a start from idle (to playing or buffering), the first such status after a sign-in, `playing` after a start through buffering, or the speaker going active. Event order differs between runs, so no one pattern is relied on. It waits until the speaker is active, retries until Soloist reports the lower volume, and only then says so in `anomaly`, until the speaker goes idle; if it never shows or Soloist refuses it, `detail` says so. A reported volume within 1 of the cap is left alone. Not on resuming from pause while active, not on connecting to a song already playing, and a person turning it up after the lowering keeps it (before Soloist has reported the lowering, a person's raise looks like the start's own jump and is lowered too). `--initial-volume` is ignored on PipeWire ([#23](https://github.com/spotify/soloist/issues/23)).
 
 **`duck(fn, { to })` and `interrupt(fn)`** turn the music down, or pause it, around `fn`, then put it back. Both resolve `{ value, music, why? }`, `music` one of:
 
@@ -33,7 +35,7 @@ Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7, x8
 
 The restore runs even if `fn` throws: the error is `fn`'s, and a failed restore goes to `detail`. `duck` restores the earlier volume even above `maxVolume`. One aside at a time: never call one inside another's `fn` (it waits forever), and put two announcements in one `fn`. With Cast: `speaker.duck(() => cast.announce("Kitchen", clip), { to: 20 })`. Cast's own `announce` restores what a Cast device was playing; these are for Soloist's output.
 
-**Reading it.** `speakerState` takes the Part; `spotifyText` and `positionMs` take its `state`. `speakerState(part)`: `offline`, `connecting`, `waiting`, then Soloist's status (`idle`, `playing`, `paused`, `buffering`, or its own string); signed in with no status yet is `idle`. `spotifyChanges(before, after)`, for `onChange`, gives events in this order: `offline`, `online`, `waiting`, `picked`, `started` (from idle), `resumed` (from paused), `paused`, `stopped`, `track`, `stalled`, `recovered`. Buffering counts as playing. Nothing on the first report, so a restart announces nothing; no volume or queue events. Playback events during an aside carry `own: true`; connection, sign-in and stall events never do.
+**Reading it.** `speakerState` takes the Part; `spotifyText` and `positionMs` take its `state`. `speakerState(part)`: `offline`, `connecting`, `waiting`, then Soloist's status (`idle`, `playing`, `paused`, `buffering`, or its own string); signed in with no status yet is `idle`. `spotifyChanges(before, after)`, for `onChange`, gives events in this order: `offline`, `online`, `waiting`, `picked`, `started` (from idle), `resumed` (from paused), `paused`, `stopped`, `track`, `stalled`, `recovered`. Buffering counts as playing. Nothing on the first report, so a restart announces nothing; no volume or queue events. Playback events during an aside carry `own: true`; connection, sign-in and stall events never do. `track` waits for the track's name, which Soloist can send a few seconds after the track (seen live); one that never gets a name never fires. One press on a phone can fire track, resumed, stopped, started and track over 3 s, sometimes with a 0.8 s `waiting`, and the order varies: anything announcing these should wait a few seconds. `state.volume` isn't the level that will play until `active` (it reads `--initial-volume`).
 
 **Stalls** ([#5](https://github.com/spotify/soloist/issues/5): playback stops mid-track, often the first after idle, while Soloist still says `playing`). While playing, one `get_state` every 20 s (`stallCheckMs`, code only; 0 turns it off).
 
@@ -52,7 +54,7 @@ JSON text frames on a plain WebSocket: no path, subprotocol, auth, TLS or origin
 - On connect: `auth_state`, then `playback_state` only if signed in. A later sign-in is promised only `auth_state`, so the connector asks `get_state`.
 - If `--ws` can't bind, Soloist runs without it and only logs a warning: `disconnected` while the daemon looks healthy. `--ws ADDR:0` writes the port to the data dir; this connector takes a fixed `url`.
 
-Not built: `activate`/`deactivate`, `available_actions`. An ad (`entity_type: "ad"`) shows as a `track`.
+Not built: `deactivate`, `available_actions`. An ad (`entity_type: "ad"`) shows as a `track`.
 
 ## Unverified
 
@@ -60,10 +62,20 @@ Writes through this connector, and what a live read hasn't shown. In particular:
 
 - **Stalls:** whether the reported position freezes in one (if not, only an overrun is caught), whether `get_state` re-anchors the position, and whether a seek or a pause and play restarts it.
 - **Writes:** that each confirming event arrives within 2 s; which events a `play` of an album or playlist sends; `play` of a new URI with no phone around; seek on playback a phone started.
-- **The cap:** the order of statuses at a start. Soloist's docs list `buffering` but not when it comes; #23 reports the 100% about 100 ms after `playing`, on the first play after the process starts.
+- **The cap in 0.1.2:** on a real start, and whether a real burst is audible before it lands.
+- **`activate`:** whether `play(uri)` with no phone around works after it.
 - **The rest:** `get_queue` answered by `queue_changed`; `play` with nothing loaded; whole-number volumes; the order of `auth_state` and `playback_state`; the 100% first play and its lowering; Family-plan members picking the speaker; whether the session survives a Soloist restart; a USB speaker's standby dropping it mid-play.
 
 ## Live findings
+
+**2026-11-09, Raspberry Pi 5, Bun 1.4.4, Soloist 1.3.10.51, PipeWire and WirePlumber 0.5.8, on 0.1.1** (chota-bot's session; writes with KO's OK).
+
+- Confirmed: pause, resume, next, prev, seek, shuffle, repeat to context and track, queue, all under 900 ms. `interrupt` restored the music.
+- `set_volume` while inactive: `command_result`, no `volume_changed`, every time. After `activate`, at once. The docs say `command_result` only means accepted.
+- **Why the first volume is what it is:** WirePlumber saves each stream's level by role and restores it, and Soloist adopts it (100 and 56 in two runs, each the last level). Config can't force a fixed start: with `restore-props` off, the default volume is skipped too (`state-stream.lua`). So the cap is the way.
+- A Music-role stream played at a set level (`pw-play --volume 0.38`) leaves that level saved for Spotify's next stream. `pw-play -P '{ state.restore-props = false }'` avoids it.
+- A session survives a Soloist restart: same track, paused, signed in. `deactivate` while already inactive changed nothing visible.
+- Setup that works: speaker knob and sink at 100, Spotify's level only through Soloist, other sounds at their own unsaved levels.
 
 **2026-11-09, Raspberry Pi 5, Bun 1.4.4, through this connector** (chota-bot's session, reads only). `home spotify` took 140 ms. In code: connected at 11 ms, second report at 55 ms, 51 MB RSS, a clean exit after abort. Track, volume and `paused` read correctly, with no anomaly. `spotifyChanges` gave nothing on the first report.
 

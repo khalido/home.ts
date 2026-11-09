@@ -101,6 +101,7 @@ const PUBLIC: Record<string, string[]> = {
   "./cast": [
     "cast",
     "castDevices",
+    "castForm",
     "castText",
     "configSchema",
     "manifest",

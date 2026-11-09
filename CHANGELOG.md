@@ -4,6 +4,30 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+From chota-bot's live writes on a Raspberry Pi.
+
+### Added
+
+- **spotify:** `activate()`.
+- **cast:** `announceAll(targets, clip, options)`, one result per target, and repeated `--to` on `home cast announce`.
+- **cast:** `form` on each device (`speaker`, `display`, `tv`, from `castForm(model)`), so "all speakers" can skip TVs. The address cache keeps the model.
+- **up:** the integration has `client`, for a consumer's writes.
+
+### Changed
+
+- **spotify:** `setVolume` while the speaker isn't the active device rejects with code `inactive`, instead of `confirmed: false`: Soloist accepts it and drops it. `duck` then runs `fn` with `music: "untouched"`.
+- **spotify:** `play` while inactive goes active first.
+- **spotify:** the `track` event waits for the track's name.
+- **cast:** a clip that doesn't start playing fails after 15 s, naming its type. An error the receiver reports sooner gives its reason and code.
+
+### Fixed
+
+- **spotify:** `maxVolume` waits until the speaker is active, retries until Soloist reports the lower volume, and says "lowered it" only then; if it never shows, `detail` says so. It said "lowered it" at 56 with a cap of 40. The window also opens when the speaker goes active.
+- **spotify:** `setRepeat("off")` from `track` stayed on `track`: the two commands now go 600 ms apart.
+- **spotify:** a volume within 1 of the request confirms, since Soloist rounds it.
+- **spotify:** a stall repair can run again when a track is played again.
+- **`home cast announce`** exits 1 when a clip didn't play.
+
 ## [0.1.1] - 2026-11-09
 
 Fixes from chota-bot's first live reads, on a Raspberry Pi and a Mac. No breaking changes.

@@ -1,5 +1,15 @@
 import type { CastPayload } from "./schemas.ts";
 
+/** What a device is for, read from its model name; a model it doesn't know has none. A group is `kind: "group"`. */
+export type CastForm = "speaker" | "display" | "tv";
+export function castForm(model?: string): CastForm | undefined {
+  if (!model) return undefined;
+  if (/hub|tablet|display/i.test(model)) return "display";
+  if (/audio|speaker|mini|google home/i.test(model)) return "speaker";
+  if (/chromecast|streamer|\btv\b/i.test(model)) return "tv";
+  return undefined;
+}
+
 /** A Cast device or group as found by discovery: what `resolve` returns for each. */
 export type Resolved = {
   id: string;
@@ -18,6 +28,7 @@ export type CastDevice = {
   id: string;
   name: string;
   model?: string;
+  form?: CastForm; // devices: speaker, display or tv, when the model is one it knows
   kind: "device" | "group";
   host?: string;
   port?: number;
@@ -63,6 +74,7 @@ export function found(
       id,
       name: e.name,
       model: e.model,
+      form: kind === "device" ? castForm(e.model) : undefined,
       kind,
       host: e.host,
       port: e.port,

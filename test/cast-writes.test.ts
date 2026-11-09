@@ -58,7 +58,7 @@ type Fake = {
 };
 type Script = {
   launch?: "ignore";
-  load?: "finish" | "silent" | "ignore" | "error";
+  load?: "finish" | "silent" | "ignore" | "error" | "stuck" | "unplayable";
   reload?: "error";
   durationS?: number;
 };
@@ -200,6 +200,16 @@ function fakeHome(list: Fake[], script: Script = {}) {
             if (script.load === "error")
               return reply({ type: "LOAD_FAILED", requestId: p.requestId });
             media([{ ...playing, playerState: "BUFFERING" }], p.requestId);
+            if (script.load === "stuck") return;
+            if (script.load === "unplayable")
+              return media([
+                {
+                  mediaSessionId: s,
+                  playerState: "IDLE",
+                  idleReason: "ERROR",
+                  detailedErrorCode: 301,
+                },
+              ]);
             media([
               {
                 mediaSessionId: s - 1,
@@ -634,6 +644,46 @@ describe("announce timeouts and failures, always restored", () => {
       });
       await h.done();
     }
+  });
+
+  test("a clip that never starts fails in 15 s, and everything is put back", async () => {
+    const { h, advance } = await timed({ load: "stuck" });
+    const r = h.c.announce("Kitchen", { url: CLIP });
+    await Bun.sleep(5);
+    await advance(15_000);
+    expect(await r).toEqual({
+      played: false,
+      why: "no start of the clip (audio/mpeg, which this device may not play) in 15 s",
+      restored: ["Kitchen: idle"],
+      notRestored: [],
+    });
+    await h.done();
+  });
+
+  test("a clip the device can't play says so, with the receiver's code and the type", async () => {
+    const { h } = await timed({ load: "unplayable" });
+    const r = await h.c.announce("Kitchen", { url: CLIP, type: "audio/wav" });
+    expect(r.played).toBe(false);
+    expect(r.why).toBe(
+      "the clip stopped: ERROR (detailed error 301); this device may not play audio/wav",
+    );
+    await h.done();
+  });
+
+  test("announceAll: one result per device, an unknown target its own failure, a bad volume one error", async () => {
+    const { h } = await timed({});
+    await expect(
+      h.c.announceAll(["Kitchen"], { url: CLIP }, { volume: 50 }),
+    ).rejects.toThrow();
+    const r = await h.c.announceAll(["Kitchen", "Nowhere", "kitchen"], {
+      url: CLIP,
+    });
+    expect(r.map((x) => [x.target, x.played])).toEqual([
+      ["Kitchen", true],
+      ["Nowhere", false],
+    ]);
+    expect(r[1]!.why).toContain("Nowhere");
+    await h.done();
   });
 
   test("a clip that never finishes: the wait is 60 s plus the clip's own length, then STOP", async () => {

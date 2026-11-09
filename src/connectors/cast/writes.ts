@@ -19,6 +19,8 @@ export const DEFAULT_MEDIA_RECEIVER = "CC1AD845";
 export const ANSWER_MS = 10_000;
 /** How long an announcement waits for its clip to finish, beyond the clip's own length when the device reports it. */
 export const PLAY_MS = 60_000;
+/** How long a clip gets to start playing. A clip a speaker can't play took 35–44 s to say so (live, 2026-11-09); good ones start within a few seconds. A stated guess. */
+export const START_MS = 15_000;
 
 const RECEIVER = "receiver-0";
 /** Level writes, and mute writes, per device or group in any minute; more wait their turn, the newest winning. A guess: Cast publishes no limit. */
@@ -64,6 +66,12 @@ export type CastActions = {
     clip: CastClip,
     options?: { volume?: number; timeoutMs?: number },
   ): Promise<AnnounceResult>;
+  /** `announce` to several targets at once, one result per device, in the order given. A target that can't be reached is its own `played: false`. A group and one of its own members are not told apart. */
+  announceAll(
+    targets: string[],
+    clip: CastClip,
+    options?: { volume?: number; timeoutMs?: number },
+  ): Promise<(AnnounceResult & { target: string })[]>;
 };
 
 /** A payload as it came, before any schema. */
@@ -115,10 +123,11 @@ function waitFor<T>(
   clock: Clock,
   s: CastSession,
   ms: number | (() => number),
-  what: string,
+  what: string | (() => string),
   pick: (raw: RawPayload) => T | undefined,
   signal?: AbortSignal,
 ): Promise<T> {
+  const name = () => (typeof what === "string" ? what : what());
   return new Promise<T>((resolve, reject) => {
     const done = new AbortController();
     const finish = (settle: () => void) =>
@@ -128,11 +137,11 @@ function waitFor<T>(
       done.abort(),
       settle());
     const cancel = () =>
-      finish(() => reject(new Error(`stopped waiting for ${what}`)));
+      finish(() => reject(new Error(`stopped waiting for ${name()}`)));
     const off = s.listen((raw) => {
       if (raw === undefined)
         return finish(() =>
-          reject(new Error(`the socket closed waiting for ${what}`)),
+          reject(new Error(`the socket closed waiting for ${name()}`)),
         );
       try {
         const value = pick(raw);
@@ -152,7 +161,7 @@ function waitFor<T>(
       )
         await clock.sleep(left, done.signal);
       finish(() =>
-        reject(new Error(`no ${what} in ${Math.round(limit() / 1000)} s`)),
+        reject(new Error(`no ${name()} in ${Math.round(limit() / 1000)} s`)),
       );
     })();
   });
@@ -318,18 +327,22 @@ export function castActions(ctx: WriteContext): CastActions {
   const play = async (
     s: CastSession,
     transport: string,
-    media: object,
+    media: { contentId: string; contentType: string; streamType: string },
     timeoutMs?: number,
   ): Promise<boolean> => {
     const loadId = s.nextId();
     let session: number | "any" | undefined;
     let durationS = 0;
+    let started = false; // it has reached PLAYING: BUFFERING is where a clip it can't play sits
     const cancel = new AbortController();
     const finished = waitFor(
       clock,
       s,
-      () => timeoutMs ?? PLAY_MS + durationS * 1000,
-      "end of the clip",
+      () => timeoutMs ?? (started ? PLAY_MS + durationS * 1000 : START_MS),
+      () =>
+        started
+          ? "end of the clip"
+          : `start of the clip (${media.contentType}, which this device may not play)`,
       (raw) => {
         const r = MediaStatus.safeParse(raw);
         if (!r.success) return undefined;
@@ -345,9 +358,12 @@ export function castActions(ctx: WriteContext): CastActions {
             continue;
           if (typeof m.media?.duration === "number")
             durationS = m.media.duration;
+          if (m.playerState === "PLAYING") started = true;
           if (m.playerState !== "IDLE" || !m.idleReason) continue;
           if (m.idleReason === "FINISHED") return true;
-          throw new Error(`the clip stopped: ${m.idleReason}`);
+          throw new Error(
+            `the clip stopped: ${m.idleReason}${m.detailedErrorCode === undefined ? "" : ` (detailed error ${m.detailedErrorCode})`}${m.idleReason === "ERROR" ? `; this device may not play ${media.contentType}` : ""}`,
+          );
         }
         return undefined;
       },
@@ -390,7 +406,7 @@ export function castActions(ctx: WriteContext): CastActions {
       );
   };
 
-  return {
+  const actions: CastActions = {
     async setVolume(target, level) {
       checkLevel(level);
       await setVolume(target, { level });
@@ -568,5 +584,38 @@ export function castActions(ctx: WriteContext): CastActions {
         }
       }
     },
+
+    async announceAll(targets, clip, options = {}) {
+      // A caller's mistake is one error, not a failure per speaker.
+      if (options.volume !== undefined) checkLevel(options.volume);
+      if (!("url" in clip) && !ctx.serve)
+        throw new Error(
+          "a clip of bytes needs serve: serveClip from @khalido/home/cast/serve",
+        );
+      const id = (t: string) => {
+        try {
+          return find(t).id;
+        } catch {
+          return t; // unknown: announce says so, as this target's own failure
+        }
+      };
+      const once = targets.filter(
+        (t, i) => targets.findIndex((o) => id(o) === id(t)) === i,
+      ); // one device twice would save the first's volume as the one to restore
+      return Promise.all(
+        once.map(async (target) => ({
+          target,
+          ...(await actions
+            .announce(target, clip, options)
+            .catch((error): AnnounceResult => ({
+              played: false,
+              why: errorText(error),
+              restored: [],
+              notRestored: [],
+            }))),
+        })),
+      );
+    },
   };
+  return actions;
 }

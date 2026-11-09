@@ -241,13 +241,16 @@ export function toSnapshot(
   };
 }
 
-/** Up as a home integration: two months of transactions now, then every 15 minutes. Reads only; it never writes. */
-export function up(config: UpConfig): Integration<UpSnapshot, "up"> {
+/** Up as a home integration: two months of transactions now, then every 15 minutes. The integration only reads; `client` is there for a consumer's writes. */
+export function up(config: UpConfig): Integration<UpSnapshot, "up"> & {
+  client: UpClient;
+} {
   const client = upClient(config);
   const clock = config.clock ?? realClock;
   const poll = poller(clock);
   return {
     name: "up",
+    client,
     refresh: poll.nudge,
     async run(signal, update) {
       let last: UpSnapshot | undefined;

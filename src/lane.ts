@@ -54,28 +54,31 @@ export function writeLane(options: LaneOptions) {
 
   async function run() {
     running = true;
-    while (queue.length) {
-      const now = clock.now();
-      const next = queue.find((p) => readyAt(p.slot) <= now);
-      if (!next) {
-        wake = new AbortController();
-        await clock.sleep(
-          Math.min(...queue.map((p) => readyAt(p.slot))) - now,
-          wake.signal,
-        );
-        continue;
+    try {
+      while (queue.length) {
+        const now = clock.now();
+        const next = queue.find((p) => readyAt(p.slot) <= now);
+        if (!next) {
+          wake = new AbortController();
+          await clock.sleep(
+            Math.min(...queue.map((p) => readyAt(p.slot))) - now,
+            wake.signal,
+          );
+          continue;
+        }
+        queue.splice(queue.indexOf(next), 1);
+        lastAt = now;
+        sent.set(next.slot, [...recent(next.slot), now]);
+        try {
+          const result = await next.write(next.body);
+          for (const w of next.waiters) w.resolve(result);
+        } catch (error) {
+          for (const w of next.waiters) w.reject(error);
+        }
       }
-      queue.splice(queue.indexOf(next), 1);
-      lastAt = now;
-      sent.set(next.slot, [...recent(next.slot), now]);
-      try {
-        const result = await next.write(next.body);
-        for (const w of next.waiters) w.resolve(result);
-      } catch (error) {
-        for (const w of next.waiters) w.reject(error);
-      }
+    } finally {
+      running = false; // a throw here must not leave the lane stuck
     }
-    running = false;
   }
 
   return {

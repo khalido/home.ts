@@ -185,7 +185,7 @@ export type SpotifyState = {
   /** The playlist, album or show playing from. */
   context?: { uri: string; type?: string; name?: string };
   position?: PositionAnchor;
-  /** 0–100, as Soloist reports it. */
+  /** 0–100, as Soloist reports it, rounded. Until `active` it isn't the level that will play (it reads `--initial-volume`, seen live). */
   volume?: number;
   shuffle?: boolean;
   /** off, context or track. */

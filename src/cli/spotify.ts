@@ -31,7 +31,7 @@ export const spotifyFromEnv = () =>
   });
 
 export const SPOTIFY_USAGE =
-  "usage: home spotify pause | play [link] | next | volume <0-100>";
+  "usage: home spotify activate | pause | play [link] | next | volume <0-100>";
 
 async function withSpotify<T>(
   act: (s: ReturnType<typeof spotify>) => Promise<T>,
@@ -64,6 +64,7 @@ const said = ({ state, confirmed }: Applied) =>
   );
 
 export const spotifyVerbs: Verbs = {
+  activate: () => withSpotify((s) => s.activate()).then(said),
   pause: () => withSpotify((s) => s.pause()).then(said),
   next: () => withSpotify((s) => s.next()).then(said),
   play: ([link]) => withSpotify((s) => s.play(link)).then(said),

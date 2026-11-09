@@ -99,9 +99,11 @@ export type Aside<T> = { value: T; music: Music; why?: string };
 /**
  * The writes, on the object `spotify()` returns. Each resolves once Soloist reports the change it asked for, with the state
  * then (`confirmed: true`), or after `CONFIRM_MS` with the state as it stands (`confirmed: false`). Each rejects with a
- * `ConnectorError` whose `code` is `offline`, `waiting` (nobody has picked the speaker), `refused`, `timeout` or `invalid`.
+ * `ConnectorError` whose `code` is `offline`, `waiting` (nobody has picked the speaker), `inactive` (`setVolume` on a speaker that isn't the active device: `activate()` first), `refused`, `timeout` or `invalid`.
  */
 export type SpotifyActions = {
+  /** Make this the account's active Spotify device. Soloist drops volume changes until it is. It makes a new audio stream, so the volume can jump to the level last saved. */
+  activate(): Promise<Applied>;
   /** Play a Spotify link or URI (track, album, playlist, artist, episode, show), or resume what is loaded when none is given. */
   play(linkOrUri?: string): Promise<Applied>;
   pause(): Promise<Applied>;
@@ -137,10 +139,12 @@ const COMMAND_TIMEOUT_MS = 3000;
 const QUERY_TIMEOUT_MS = 1000;
 /** A socket that has said nothing this long after opening is closed: Soloist sends `auth_state` at once on connect. */
 const HELLO_MS = 10_000;
-/** After an idle → playing change, a volume above the cap is lowered for this long: the volume can come before or after the status (issue #23). */
+/** After a start signal, a volume above the cap is lowered for this long: the volume can come before or after the status (issue #23). */
 const CAP_WINDOW_MS = 10_000;
 /** How long a write waits for Soloist to report the change it asked for. Loopback events arrive in milliseconds; a stated guess. */
 const CONFIRM_MS = 2000;
+/** Between the two halves of `setRepeat`: back to back left repeat on `track`, 600 ms apart worked (live, 2026-11-09). */
+const REPEAT_GAP_MS = 600;
 /** Between two commands. Soloist publishes no limit; it is on loopback; a stated guess. */
 const WRITE_GAP_MS = 100;
 /** While playing, a stall check this often: one `get_state`. Soloist issue #5 reports stalls 71–150 s into a track; a stated guess. */
@@ -149,6 +153,8 @@ const STALL_CHECK_MS = 20_000;
 const OVERRUN_MS = 15_000;
 /** After a repair's seek, how long before looking whether the position moves again. */
 const REPAIR_WAIT_MS = 5000;
+/** A reported volume is rounded (phone steps are sixteenths: 43.75 shows as 44), so "it took" allows this much. */
+const VOLUME_SLACK = 1;
 const MIN_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60_000;
 
@@ -190,15 +196,16 @@ export function spotify(
 
   let state: SpotifyState = { asOf: asOf(clock) };
   let socket: SocketLike | undefined;
-  let open = false;
-  let heard = false; // an auth_state on this socket: until then the part stays connecting
-  let whole = false; // signed in, the first playback_state has come too (or HELLO_MS passed): a one-shot read sees the track
+  // This socket's progress. "heard": signed in, the first playback_state still to come. "whole": a one-shot read sees the track (or HELLO_MS passed).
+  let link: "down" | "open" | "heard" | "whole" = "down";
+  const isOpen = () => link !== "down";
   let down: string | undefined; // why the last socket ended, while there is none open
   let statusKnown = false; // Soloist has told this socket its status: only then is idle → playing an edge
   let queueAsked = false; // get_queue sent on this socket
   let signedIn = false; // signed out → in on this socket: the first status after it counts as a start if it is playing
   let capUntil = -Infinity;
-  let capped = false; // the cap has been sent in this window
+  let capped = false; // the cap took in this window
+  let capping = false; // a lowering is on its way
   let startBuffering = false; // a start from idle is still buffering
   let capNote: string | undefined; // the last first-play lowering, in `anomaly` until the speaker goes idle
   let frameNote: string | undefined; // a frame the schema rejected, or an error nothing was waiting for
@@ -214,11 +221,10 @@ export function spotify(
   const publish = () => {
     let status: Status;
     let detail: string | undefined;
-    if (!open)
+    if (link === "down")
       ((status = reported || down ? "disconnected" : "connecting"),
         (detail = down));
-    else if (!heard || (state.loggedIn === true && !whole))
-      status = "connecting";
+    else if (link !== "whole") status = "connecting";
     else
       ((status = "connected"),
         (detail = state.loggedIn === false ? WAITING : note));
@@ -251,7 +257,7 @@ export function spotify(
   ) =>
     new Promise<void>((resolve, reject) => {
       const s = socket;
-      if (!s || !open || s.readyState !== OPEN) return reject(offline());
+      if (!s || !isOpen() || s.readyState !== OPEN) return reject(offline());
       if (state.loggedIn === false && !answers)
         return reject(new ConnectorError(WAITING, { code: "waiting" }));
       const stop = new AbortController();
@@ -291,12 +297,20 @@ export function spotify(
     answers?: string;
     then?: { command: string; fields: Record<string, unknown> };
     took?: (now: SpotifyState, before: SpotifyState, at: number) => boolean;
+    activeFirst?: boolean; // an inactive speaker goes active before this, in this write's own turn so the last transport write still wins
   };
   const send = async (body: Body) => {
+    if (body.activeFirst && inactive()) {
+      await command("activate").catch(() => {}); // best effort: the write itself says how it went
+      await waitFor(() => state.active === true || !isOpen(), CONFIRM_MS);
+    }
     const before = state;
     const at = clock.now();
     await command(body.command, body.fields, body.answers);
-    if (body.then) await command(body.then.command, body.then.fields); // repeat's second half, still this write's turn
+    if (body.then) {
+      await clock.sleep(REPEAT_GAP_MS);
+      await command(body.then.command, body.then.fields); // repeat's second half, still this write's turn
+    }
     return { before, at };
   };
   let once = 0; // skips and queued tracks never merge: two nexts are two skips
@@ -309,7 +323,7 @@ export function spotify(
   const change = async (slot: string, body: Body): Promise<Applied> => {
     const sent = await write(slot, body);
     const took = () => body.took?.(state, sent.before, sent.at) ?? true;
-    await waitFor(() => took() || !open, CONFIRM_MS);
+    await waitFor(() => took() || !isOpen(), CONFIRM_MS);
     return { state, confirmed: took() };
   };
   /** The track restarted: a new anchor near 0 when it had been 5 s or more in (a prev past the first seconds, a next on repeat-track). */
@@ -321,12 +335,17 @@ export function spotify(
     !!s.track && s.track.uri !== b.track?.uri;
   const invalid = (message: string) =>
     new ConnectorError(message, { code: "invalid" });
+  const near = (volume: number | undefined, v: number) =>
+    volume !== undefined && Math.abs(volume - v) <= VOLUME_SLACK;
   const volumeTo = (v: number) =>
     change("volume", {
       command: "set_volume",
       fields: { volume: v },
-      took: (s) => s.volume === v,
+      took: (s) => near(s.volume, v),
     });
+  /** Soloist accepts a `set_volume` while it isn't the active device and drops it (three times live, 2026-11-09). */
+  const inactive = () =>
+    isOpen() && state.loggedIn !== false && state.active === false;
   /** Ask Soloist for something, through the lane; the same query twice merges. A refusal is an anomaly, a drop is the status's to say. */
   const ANSWERS = {
     get_state: "playback_state",
@@ -353,27 +372,49 @@ export function spotify(
       publish();
     });
 
-  /** Within the window after a start from idle, a volume above the cap is lowered to it, once (issue #23). */
+  /**
+   * Within the window after a start signal, a volume above the cap is lowered to it (issue #23). Only while active, since
+   * Soloist drops it otherwise, and retried until Soloist reports it. A volume raised after that is someone's choice;
+   * one raised before it is reported can't be told from the start's own jump, so it is lowered too.
+   */
   const applyCap = () => {
     if (
       cap === undefined ||
       capped ||
+      capping ||
       state.volume === undefined ||
-      clock.now() > capUntil ||
-      state.volume <= cap
+      state.volume <= cap + VOLUME_SLACK ||
+      state.active === false ||
+      clock.now() > capUntil
     )
       return;
-    capped = true;
-    capNote = `started at volume ${state.volume}, above maxVolume ${cap}; lowered it (Soloist issue #23)`;
-    change("volume", {
-      command: "set_volume",
-      fields: { volume: cap },
-      took: (s) => s.volume === cap,
-    }).catch(
-      (error) => (
-        (note = `lowering the volume to ${cap} failed: ${errorText(error)}`),
-        publish()
-      ),
+    capping = true;
+    const from = state.volume;
+    const window = capUntil;
+    volumeTo(cap).then(
+      ({ confirmed }) => {
+        capping = false;
+        if (capUntil !== window) return applyCap(); // a new start while it went: this lowering doesn't speak for that one
+        if (confirmed) {
+          capped = true;
+          if (state.status === "idle") return;
+          capNote = `started at volume ${from}, above maxVolume ${cap}; lowered it (Soloist issue #23)`;
+          note = undefined;
+          return publish();
+        }
+        if (clock.now() > capUntil) {
+          note = `could not lower the volume to ${cap}: Soloist has not reported it`;
+          return publish();
+        }
+        applyCap();
+      },
+      (error) => {
+        capping = false;
+        if (error instanceof ConnectorError && error.code === "offline") return; // the status says it
+        capped = true; // refused or unanswered: not again this window
+        note = `lowering the volume to ${cap} failed: ${errorText(error)}`;
+        publish();
+      },
     );
   };
 
@@ -411,11 +452,16 @@ export function spotify(
     }
     const before = state.status;
     const wasSignedIn = state.loggedIn;
+    const wasActive = link === "open" ? undefined : state.active; // the first frames on a socket are not a change
     state = fold(state, f, asOf(clock));
+    if (state.track?.uri !== repairedFor) repairedFor = undefined; // one repair per play of a track
+    // Going active makes a new stream, at WirePlumber's saved level (live, 2026-11-09): the likeliest moment for a loud start.
+    if (wasActive === false && state.active === true)
+      ((capUntil = clock.now() + CAP_WINDOW_MS), (capped = false));
     if (f.type === "auth_state") {
       // Signed out there is no playback_state to wait for, and a later sign-in must not send the part back to connecting.
-      if (!heard && f.logged_in !== true) whole = true;
-      heard = true;
+      if (link === "open" || (link === "heard" && f.logged_in === false))
+        link = f.logged_in === true ? "heard" : "whole";
       if (f.logged_in === false) statusKnown = false;
       // A first sign-in (someone picked the speaker) sends only auth_state; the docs don't promise a playback_state after it.
       else if (f.logged_in === true && wasSignedIn === false)
@@ -423,15 +469,15 @@ export function spotify(
     }
     if (f.type === "playback_state") {
       if (!queueAsked) ((queueAsked = true), query("get_queue", { limit: 10 })); // queue_changed pushes changes only, so ask once per socket
-      whole = true;
+      link = "whole";
     }
     if (pending?.answers === f.type) pending.finish();
     if (
       (f.type === "playback_state" || f.type === "playback_changed") &&
       f.status !== undefined
     ) {
-      // A start is idle → playing or buffering, or a sign-in whose first status is either: a phone picked the speaker and played (issue #23).
-      // Soloist's jump to 100 comes about 100 ms after `playing` (issue #23), so a start through buffering opens the window again then.
+      // A start is idle → playing or buffering, or a sign-in whose first status is either: a phone picked the speaker and played.
+      // The volume can land just after `playing` (issue #23), so a start through buffering opens the window again then.
       const started =
         ((f.status === "playing" || f.status === "buffering") &&
           (statusKnown ? before === "idle" : signedIn)) ||
@@ -470,10 +516,8 @@ export function spotify(
         quiet.abort();
         signal.removeEventListener("abort", stop);
         if (socket === s) socket = undefined;
-        const was = open;
-        open = false;
-        heard = false;
-        whole = false;
+        const was = isOpen();
+        link = "down";
         queueAsked = false;
         statusKnown = false;
         signedIn = false;
@@ -488,17 +532,17 @@ export function spotify(
       // An ended socket's late events belong to no session: they must not touch the next socket's state.
       s.onopen = () => {
         if (ended) return;
-        open = true;
+        link = "open";
         down = undefined;
         note = undefined; // a new socket: what failed on the last one is history
         void clock.sleep(HELLO_MS, quiet.signal).then(() => {
           if (quiet.signal.aborted) return;
-          if (!heard)
+          if (link === "open")
             return (
               end(`Soloist said nothing in ${HELLO_MS / 1000} s`),
               s.close()
             );
-          if (!whole) ((whole = true), publish()); // signed in, no playback_state: connected with what there is
+          if (link === "heard") ((link = "whole"), publish()); // signed in, no playback_state: connected with what there is
         });
       };
       s.onmessage = (ev) => void (ended || handle(ev.data));
@@ -518,7 +562,7 @@ export function spotify(
 
   /** Not connected or not playing: the reason `duck` and `interrupt` just run `fn`. */
   const notPlaying = () =>
-    !open
+    !isOpen()
       ? "Soloist is not connected"
       : state.status === "playing" || state.status === "buffering"
         ? undefined
@@ -544,7 +588,7 @@ export function spotify(
     leave: () => Promise<Left>,
   ) => {
     const run = async (): Promise<Aside<T>> => {
-      if (open) marked(kind);
+      if (isOpen()) marked(kind);
       try {
         return await within();
       } finally {
@@ -578,10 +622,20 @@ export function spotify(
         };
 
   const actions: SpotifyActions = {
+    async activate() {
+      if (isOpen() && state.loggedIn !== false && state.active === true)
+        return { state, confirmed: true }; // a second activate might make a new stream
+      return change("activate", {
+        command: "activate",
+        took: (s) => s.active === true,
+      });
+    },
+    // A `play` while inactive didn't take live; going active first is untested for this. `resume` worked inactive, so it doesn't.
     async play(linkOrUri) {
       if (linkOrUri === undefined)
         return change("transport", {
           command: "play",
+          activeFirst: true,
           took: (s) => s.status === "playing",
         });
       const uri = toSpotifyUri(linkOrUri);
@@ -589,6 +643,7 @@ export function spotify(
       return change("transport", {
         command: "play",
         fields: { uri },
+        activeFirst: true,
         took: (s) =>
           s.status === "playing" &&
           (s.track?.uri === uri || s.context?.uri === uri),
@@ -632,6 +687,11 @@ export function spotify(
     async setVolume(volume) {
       if (!Number.isFinite(volume) || volume < 0 || volume > 100)
         throw invalid(`volume is 0–100, not ${volume}`);
+      if (inactive())
+        throw new ConnectorError(
+          "the speaker is not the active Spotify device, so Soloist would drop this; activate it first (`home spotify activate`; its volume may jump to the level last saved)",
+          { code: "inactive" },
+        );
       return volumeTo(
         Math.round(cap === undefined ? volume : Math.min(volume, cap)),
       );
@@ -712,6 +772,8 @@ export function spotify(
         async () => {
           const no = notPlaying();
           if (no) return no;
+          if (inactive())
+            return "it is not the active device, so its volume can't be changed";
           if (state.volume === undefined) return "its volume is not known";
           if (state.volume <= to) return `it was already at ${state.volume}`;
           earlier = state.volume;
@@ -724,7 +786,7 @@ export function spotify(
           }
         },
         async () => {
-          if (state.volume !== Math.round(to))
+          if (!near(state.volume, Math.round(to)))
             return {
               music: "kept",
               why: shown
@@ -766,7 +828,7 @@ export function spotify(
     state = rest;
   }
   let seen: { track: string; ms: number; atMs: number } | undefined; // the last check's reported position
-  let repairedFor: string | undefined; // at most one repair per track
+  let repairedFor: string | undefined; // at most one repair per play of a track
   /** Ask Soloist where it is, waiting for the answer (or the query's timeout). */
   const fresh = () =>
     write("query-get_state", {
@@ -793,7 +855,7 @@ export function spotify(
     a.track === b.track &&
     b.atMs - a.atMs >= gap &&
     Math.abs(b.ms - a.ms) < 1000;
-  const playing = () => open && state.status === "playing" && !state.aside;
+  const playing = () => isOpen() && state.status === "playing" && !state.aside;
 
   /** One look while playing: a fresh position, then frozen, overrun, recovered or fine (Soloist issue #5). */
   const checkStall = async () => {
@@ -837,7 +899,7 @@ export function spotify(
       state.stalled && stallAs({ ...state.stalled, tried: what });
     // Still ours to fix: playing this track, stalled, and no duck, interrupt or person in between.
     const ours = () =>
-      open &&
+      isOpen() &&
       state.status === "playing" &&
       state.track?.uri === track &&
       state.stalled?.track === track &&
@@ -875,9 +937,11 @@ export function spotify(
     /** Ask Soloist for its state again (`get_state`, or `get_auth_state` without a session); while it is unreachable, reconnect now. */
     refresh() {
       const s = socket;
-      if (s && open && s.readyState === OPEN)
+      if (s && isOpen() && s.readyState === OPEN)
         return query(
-          state.loggedIn === false || !heard ? "get_auth_state" : "get_state",
+          state.loggedIn === false || link === "open"
+            ? "get_auth_state"
+            : "get_state",
         );
       wake?.abort();
     },

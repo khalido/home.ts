@@ -509,7 +509,9 @@ export function loadHome(
         {
           castId: x.castId,
           name: x.name,
-          ...(c?.port === undefined ? {} : { host: c.host, port: c.port }),
+          ...(c?.port === undefined
+            ? {}
+            : { host: c.host, port: c.port, model: c.model }),
         },
       ];
     });

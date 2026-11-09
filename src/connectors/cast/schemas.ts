@@ -43,6 +43,7 @@ export const MediaStatus = z.looseObject({
         mediaSessionId: z.number().optional(),
         playerState: z.string().optional(), // "PLAYING" | "PAUSED" | "BUFFERING" | "IDLE"
         idleReason: z.string().optional(), // "FINISHED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
+        detailedErrorCode: z.number().optional(),
         currentTime: z.number().optional(), // seconds into the media
         media: z
           .looseObject({

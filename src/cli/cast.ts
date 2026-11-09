@@ -34,6 +34,7 @@ export function castNow() {
           {
             castId: key.slice(5),
             name: c.name ?? key.slice(5),
+            model: c.model,
             host: c.host,
             port: c.port,
           },
@@ -71,7 +72,7 @@ async function withCast<T>(
 }
 
 export const CAST_USAGE =
-  'usage: home cast announce --to <name> (--say "<text>" | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name>';
+  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name>';
 
 /** A 0–100 argument as the 0–1 a Cast device takes. */
 function percentLevel(value: string | undefined): number {
@@ -96,7 +97,7 @@ const AUDIO_TYPES: Record<string, string> = {
 export const CAST_OPTIONS: [string, string, { type: unknown[] }?][] = [
   [
     "--to <name>",
-    "announce: the device or group, by name or castId",
+    "announce: the device or group, by name or castId; repeat for several",
     { type: [String] },
   ],
   ["--say <text>", "announce: words spoken by macOS `say`", { type: [String] }],
@@ -119,7 +120,8 @@ export const castVerbs: Verbs = {
     await withCast((c) => c.stop(name!));
   },
   async announce(_, o) {
-    const [to, say, file] = [text(o.to), text(o.say), text(o.file)];
+    const [say, file] = [text(o.say), text(o.file)];
+    const to = [o.to].flat().filter(Boolean).map(String); // --to can repeat
     // cac gives "true" for a flag with no value: `--say` alone must not speak the word "true", so each flag needs a value after it.
     const bare = ["--to", "--say", "--file"].some((f) =>
       process.argv.some(
@@ -130,7 +132,7 @@ export const castVerbs: Verbs = {
       ),
     );
     if (bare) usage(CAST_USAGE);
-    if (!to || !say === !file) usage(CAST_USAGE);
+    if (!to.length || !say === !file) usage(CAST_USAGE);
     const volume =
       o.volume === undefined ? undefined : percentLevel(text(o.volume));
     let type: string;
@@ -160,13 +162,19 @@ export const castVerbs: Verbs = {
       }
       type = "audio/mp4";
     }
-    const r = await withCast((c) =>
-      c.announce(to!, { bytes, type }, { volume }),
+    const results = await withCast((c) =>
+      c.announceAll(to, { bytes, type }, { volume }),
     );
-    if (o.json) return printJson(r);
-    console.log(r.played ? "played" : `not played: ${r.why}`);
-    if (r.restored.length) console.log(`restored: ${r.restored.join(", ")}`);
-    for (const n of r.notRestored)
-      console.log(`not restored: ${n.name}: ${n.why}`);
+    if (results.some((r) => !r.played)) process.exitCode = 1; // docs/cli.md: 1 is a failure, so a script can tell
+    if (o.json) return printJson(to.length === 1 ? results[0] : results);
+    const named = results.length > 1;
+    for (const r of results) {
+      const who = named ? `${r.target}: ` : "";
+      console.log(`${who}${r.played ? "played" : `not played: ${r.why}`}`);
+      if (r.restored.length)
+        console.log(`${who}restored: ${r.restored.join(", ")}`);
+      for (const n of r.notRestored)
+        console.log(`${who}not restored: ${n.name}: ${n.why}`);
+    }
   },
 };

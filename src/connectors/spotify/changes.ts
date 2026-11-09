@@ -62,7 +62,7 @@ const PLAYING = new Set(["playing", "buffering"]);
 /**
  * The events between two reports, for `onChange`'s `before` and `after`: `offline` and `online`; `waiting` (signed out) and
  * `picked` (someone picked the speaker); `started` (from idle), `resumed` (from paused), `paused`, `stopped` (to idle), then
- * `track` for a new track, so "started" and the track come as a pair, then `stalled` and `recovered` (Soloist issue #5). Buffering counts as playing. No `before`, or one
+ * `track` for a new track, once it has a name, then `stalled` and `recovered` (Soloist issue #5). Buffering counts as playing. No `before`, or one
  * with no state (createHome's placeholder before the first report, as at a restart): nothing, since nothing was seen to change. No volume or queue events: read the state.
  */
 export function spotifyChanges(
@@ -96,7 +96,9 @@ export function spotifyChanges(
   if (to === "paused" && from !== "paused") add({ type: "paused" });
   if (to === "idle" && from !== undefined && from !== "idle")
     add({ type: "stopped" });
-  if (a?.track && a.track.uri !== b?.track?.uri)
+  // Soloist's first report of a new track can have no name yet (seen live): the event waits for it.
+  const named = (p?: SpotifyState) => !!p?.track?.name;
+  if (a?.track && named(a) && (a.track.uri !== b?.track?.uri || !named(b)))
     add({ type: "track", track: a.track });
   if (a?.stalled && !b?.stalled)
     events.push({ type: "stalled", stall: a.stalled });
