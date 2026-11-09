@@ -9,7 +9,7 @@ export const envName = z
     /^[A-Z_][A-Z0-9_]*$/,
     "an environment variable name (e.g. AMBER_KEY), not the secret itself",
   );
-/** A file a connector needs (a CA, a token), relative to the config file. The caller reads it; the library reads no files. */
+/** A file a connector needs (a CA, a token), relative to the config file or from `~/`. The caller reads it, and expands `~/`; the library reads no files. */
 export const filePath = z.string().min(1);
 
 /** How an integration is doing. "unavailable" means it stopped and will not retry by itself. */
@@ -94,12 +94,16 @@ export function createHome<I extends Integration<any, string>>(
     integrations.map((i) => [i.name, { status: "connecting" }]),
   ) as HomeSnapshot<I>;
   const waiting = new Map<string, (() => void)[]>(); // refresh() callers, resolved by the integration's next report
-  const finished = new Set<string>(); // integrations whose run has ended: a refresh of one resolves at once, nothing will report
+  const finished = new Set<string>(integrations.map((i) => i.name)); // not running, before start or after its run ended: a refresh of one resolves at once, nothing will report
   const set = (name: Name, reported: Part) => {
     const before = (snapshot as Record<string, Part>)[name]!;
     const part = stamped(reported, before, asOf(clock));
     snapshot = { ...snapshot, [name]: part };
-    onChange?.(snapshot, { name, before, after: part } as Change<I>);
+    Promise.try(() =>
+      onChange?.(snapshot, { name, before, after: part } as Change<I>),
+    ).catch((error) =>
+      console.error(`onChange threw on ${name}: ${errorText(error)}`),
+    ); // the caller's bug, thrown or async, not the device's: the integration keeps running
     const w = waiting.get(name);
     if (w) {
       waiting.delete(name);
@@ -119,7 +123,7 @@ export function createHome<I extends Integration<any, string>>(
         Extract<I, { name: N }> | undefined,
     /**
      * Read now: one integration by name, or every one. Results arrive through the snapshot and `onChange` as usual; the
-     * promise resolves once each target has reported (its next update, good or bad), or at once for one whose run has ended.
+     * promise resolves once each target has reported (its next update, good or bad), or at once for one that isn't running.
      */
     refresh(name?: Name): Promise<void> {
       const targets =
@@ -154,10 +158,13 @@ export function createHome<I extends Integration<any, string>>(
       ) as HomeSnapshot<I>;
       await Promise.all(
         integrations.map((i) =>
-          i
-            .run(signal, (part) => set(i.name, part))
+          Promise.try(() => i.run(signal, (part) => set(i.name, part)))
             .catch((error) =>
-              set(i.name, { status: "unavailable", detail: errorText(error) }),
+              set(i.name, {
+                status: "unavailable",
+                detail: errorText(error),
+                state: (snapshot as Record<string, Part>)[i.name]!.state, // the last good state stays, as it does through a failed read
+              }),
             )
             .finally(() => {
               finished.add(i.name);

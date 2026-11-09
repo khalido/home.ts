@@ -4,6 +4,16 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+
+- **`createHome`:** an `onChange` that throws or rejects no longer marks the integration `unavailable`; the error goes to `console.error` and the integration keeps running.
+- **`createHome`:** `refresh()` before `start()` resolves at once instead of never.
+- **`createHome`:** an integration whose `run` fails after a good report keeps its last `state`.
+- **`createHome`:** a `run` that throws synchronously marks that integration `unavailable`; the others still start.
+- **`home <connector> --config`** needs only that connector's keys, and runs only that connector.
+- **`realClock.sleep`** resolves at once on an already-aborted signal.
+- **Docs:** the `readFile` in `docs/config.md` expands `~/`, which `home discover --write` puts in Enphase's `token`. The README says the package is ESM only.
+
 ## [0.1.2] - 2026-11-09
 
 From chota-bot's live writes on a Raspberry Pi. `setVolume` on an inactive speaker now rejects, and `track` events can come later than before.

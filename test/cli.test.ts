@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // The output contract in docs/cli.md: errors as JSON on stderr under --json, exit 2 for usage, 1 for a connector that is down.
 const home = (args: string[], env: Record<string, string> = {}) => {
@@ -17,6 +20,34 @@ const home = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("home output contract", () => {
+  describe("home <connector> --config needs only that connector", () => {
+    const config = join(mkdtempSync(join(tmpdir(), "home-")), "home.jsonc");
+    writeFileSync(
+      config,
+      JSON.stringify({
+        location: { latitude: -33.9, longitude: 151.2 },
+        weather: { googleKey: "GOOGLE_WEATHER_KEY" },
+        devices: [
+          { id: "daikin", connector: "daikin", host: "127.0.0.1:1" },
+          { id: "up", connector: "up", token: "UP_TOKEN" },
+        ],
+      }),
+    );
+
+    test("another connector's unset key, or the weather's, doesn't stop it", () => {
+      const r = home(["daikin", "--config", config, "--json"]);
+      expect(r.err).toBe("");
+      expect(JSON.parse(r.out).status).toBe("disconnected");
+      expect(r.code).toBe(1);
+    });
+
+    test("a connector the config doesn't have says so", () => {
+      const r = home(["amber", "--config", config]);
+      expect(r.err).toContain("no amber in");
+      expect(r.code).toBe(1);
+    });
+  });
+
   test("a wrong command is a usage error: exit 2, one line on stderr, nothing on stdout", () => {
     expect(home(["nope"])).toEqual({
       out: "",

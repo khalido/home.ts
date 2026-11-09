@@ -13,7 +13,7 @@ Small, typed home automation for TypeScript, starting with the devices in my hou
 bun add @khalido/home     # or: npm install @khalido/home
 ```
 
-The library runs on Bun 1.4+ and Node 24+. The `home` command needs Bun.
+The library runs on Bun 1.4+ and Node 24+, and is ESM only. The `home` command needs Bun.
 
 ## Try it
 

@@ -136,6 +136,18 @@ async function statusFromEnv(
   return rows;
 }
 
+/** The config with only this connector's devices, and the weather only for `home weather`, so `home amber` doesn't need Up's key. A malformed one passes through for `loadHome` to report. */
+function narrowed(input: unknown, only: string): unknown {
+  const config = input as { devices?: unknown } | null;
+  if (!Array.isArray(config?.devices)) return input;
+  const { location, weather, ...rest } = config as Record<string, unknown>;
+  return {
+    ...rest,
+    ...(only === "weather" ? { location, weather } : {}),
+    devices: config.devices.filter((d) => d?.connector === only),
+  };
+}
+
 /** The rows from a config: its integrations (or the one named) run until each has answered (weather: every source), at most 15 s. */
 async function statusFromConfig(
   path: string,
@@ -150,9 +162,11 @@ async function statusFromConfig(
     cache: addresses.cache,
     configAt: statSync(path).mtimeMs,
   };
-  const all = loadHome(readConfig(path), options);
-  const integrations =
-    only === undefined ? all : all.filter((i) => i.name === only);
+  const input = readConfig(path);
+  const integrations = loadHome(
+    only === undefined ? input : narrowed(input, only),
+    options,
+  );
   if (!integrations.length) fail(`no ${only} in ${path}`);
   return Object.fromEntries(
     Object.entries(await settle(integrations)).map(([name, p]) => [

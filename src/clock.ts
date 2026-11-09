@@ -9,6 +9,7 @@ export const realClock: Clock = {
   now: () => Date.now(),
   sleep: (ms, signal) =>
     new Promise((resolve) => {
+      if (signal?.aborted) return resolve();
       const done = () => (
         clearTimeout(timer),
         signal?.removeEventListener("abort", done),

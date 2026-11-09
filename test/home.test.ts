@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { realClock } from "../src/clock.ts";
 import { createHome, type Integration, settle } from "../src/home.ts";
 import { manualClock } from "./clock.ts";
 
@@ -66,6 +67,72 @@ describe("createHome.refresh", () => {
     await home.refresh("a"); // would hang if it waited for a report
     expect(home.snapshot().a?.status).toBe("connecting"); // never reported, never flipped
   });
+
+  test("a refresh before start resolves at once", async () => {
+    await createHome([fake("a")]).refresh("a"); // would hang if it waited for a report
+  });
+});
+
+describe("createHome failures", () => {
+  test("an onChange that throws is logged, and the integration keeps running", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    const a = fake("a");
+    const home = createHome([a], () => {
+      throw new Error("consumer bug");
+    });
+    const ac = new AbortController();
+    const running = home.start(ac.signal);
+    a.report();
+    ac.abort();
+    await running;
+    expect(home.snapshot().a?.status).toBe("connected");
+    expect(logged.mock.calls[0]?.[0]).toContain("consumer bug");
+    logged.mockRestore();
+  });
+
+  test("a run that fails after a good report keeps its state", async () => {
+    const a: Integration<number> = {
+      name: "a",
+      run: async (_, update) => {
+        update({ status: "connected", state: 7 });
+        throw new Error("broke");
+      },
+      refresh: () => {},
+    };
+    const home = createHome([a]);
+    await home.start(new AbortController().signal);
+    expect(home.snapshot().a).toMatchObject({
+      status: "unavailable",
+      detail: "broke",
+      state: 7,
+    });
+  });
+
+  test("a run that throws synchronously fails alone", async () => {
+    const bad: Integration<number> = {
+      name: "bad",
+      run: () => {
+        throw new Error("no promise");
+      },
+      refresh: () => {},
+    };
+    const ran: string[] = [];
+    const good: Integration<number> = {
+      name: "good",
+      run: async () => void ran.push("good"),
+      refresh: () => {},
+    };
+    const home = createHome([bad, good]);
+    await home.start(new AbortController().signal);
+    expect(home.snapshot().bad?.status).toBe("unavailable");
+    expect(ran).toEqual(["good"]);
+  });
+});
+
+test("realClock.sleep resolves at once on an aborted signal", async () => {
+  const start = Date.now();
+  await realClock.sleep(5_000, AbortSignal.abort());
+  expect(Date.now() - start).toBeLessThan(1_000);
 });
 
 describe("createHome.start", () => {

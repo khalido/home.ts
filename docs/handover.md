@@ -5,6 +5,7 @@
 ## Where things stand
 
 - **0.1.2 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
+- **Unreleased, for 0.1.3:** OpenCode's review (`createHome` failure handling, `home <connector> --config` needing only that connector, `realClock.sleep`), in `CHANGELOG.md`. Release it with what chota's live tests turn up.
 - **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1 and 0.1.2.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. Writes that have reached a device: `setPower(true)` on the Daikin; spotify's and Cast's announce (0.1.1, chota-bot's Pi, 2026-11-09; the connector READMEs have the results).
 
@@ -53,7 +54,7 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 5. **Leftovers**: TS 5.6 and older fail on `Uint8Array<…>` in `printers/codec.d.ts` with `skipLibCheck: false`; `exports.test.ts` imports `src`, not `dist`; `FROM_ENV` and `loadHome` build integrations two ways; `withSpotify` and `withCast` in the CLI are near-copies (two, under the rule of three).
 6. **A docs site** later: GitHub Pages from an Actions build (not a `gh-pages` branch or a committed folder), serving `llms.txt`.
 
-Later: a Cast `play(target, url)` for streams. For a 0.2.0: writes in one shape across connectors, Cast's volume 0–1 against spotify's 0–100. Open: going active uses the volume reported while inactive, which isn't always the real level; the cap only ever lowers to the cap, so the worst case is a raise to it.
+Later: a Cast `play(target, url)` for streams. For a 0.2.0: a machine-readable reason on `Part`, so an admin page needn't match `detail`; writes in one shape across connectors, Cast's volume 0–1 against spotify's 0–100. Open: going active uses the volume reported while inactive, which isn't always the real level; the cap only ever lowers to the cap, so the worst case is a raise to it.
 
 ## To see the current state
 
