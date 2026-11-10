@@ -16,20 +16,18 @@ Four read-only subagent tracks plus my own reads, each checked against the code.
 
 **To do, in order. KO has not agreed these yet:**
 
-1. **`Part.reason` is decided and built** (KO, 2026-11-10): `auth`, `config`, `crashed`. Weather sets one, and `state.sources.<name>.reason` shows a dead key while the part is still `connected`. Google's key is in the `X-Goog-Api-Key` header, and a bad key is told from a bad location by the error body (both HTTP 400), checked live.
-2. **Release 0.1.3** with `Part.reason`, the cap fix and the Google key change, before chota runs its cap test. chota started on 0.1.2 on 2026-11-10; basics work.
-3. **Auth consistency.** One `isAuthStatus` (401 or 403) in `connector.ts`: Hue and now Google take either, Enphase, Amber and Up take 401 only. One wording for the detail, naming the env var. Say in `docs/using.md` and `use-home` that `auth` is terminal: a re-key needs the consumer restarted (`refresh()` can't revive a `run` that returned). `home pair` prints the Hue key to stdout (`cli/hue.ts:120`), against the rule here: write it privately or note the exception.
-4. **`fx.yml`.** The gate is who triggers, not whose text is read: `/fx` from KO on a stranger's issue puts their text in front of a shell that can read the gateway key (the action's own `SECURITY.md`). Put a spend cap on the key; consider `mode: answer` with `contents: read`.
-5. **Doc drift.** `AGENTS.md` says "going public"; the README says jaldi and chota-bot use it; `cast/README.md:3` and `docs/cast.md:106` say writes ran only on a fake socket (they played live 2026-11-09); `spotify/README.md` lines 3, 61 and 80 disagree on live writes; `decisions.md:94` says the manifest drives the README table (it is hand-written).
-6. **Small code tidy:** one `withRunning(i, ms, act)` in `cli/context.ts` for `withSpotify`, `withCast` and the coming printers verb; infer `HomeIntegration` from a lifted `buildDevice` switch; a test that `FROM_ENV`'s keys equal the `MANIFESTS` names; tests for Up's `createWebhook`, `deleteWebhook`, `pingWebhook` (none today); no CLI write verb has a test.
+1. **Auth consistency.** One `isAuthStatus` (401 or 403) in `connector.ts`: Hue and now Google take either, Enphase, Amber and Up take 401 only. One wording for the detail, naming the env var. Say in `docs/using.md` and `use-home` that `auth` is terminal: a re-key needs the consumer restarted (`refresh()` can't revive a `run` that returned). `home pair` prints the Hue key to stdout (`cli/hue.ts:120`), against the rule here: write it privately or note the exception.
+2. **`fx.yml`.** The gate is who triggers, not whose text is read: `/fx` from KO on a stranger's issue puts their text in front of a shell that can read the gateway key (the action's own `SECURITY.md`). Put a spend cap on the key; consider `mode: answer` with `contents: read`.
+3. **Doc drift.** `AGENTS.md` says "going public"; the README says jaldi and chota-bot use it; `cast/README.md:3` and `docs/cast.md:106` say writes ran only on a fake socket (they played live 2026-11-09); `spotify/README.md` lines 3, 61 and 80 disagree on live writes; `decisions.md:94` says the manifest drives the README table (it is hand-written).
+4. **Small code tidy:** one `withRunning(i, ms, act)` in `cli/context.ts` for `withSpotify`, `withCast` and the coming printers verb; infer `HomeIntegration` from a lifted `buildDevice` switch; a test that `FROM_ENV`'s keys equal the `MANIFESTS` names; tests for Up's `createWebhook`, `deleteWebhook`, `pingWebhook` (none today); no CLI write verb has a test.
 
 **Unverified:** a wrong Hue CA retrying forever as `disconnected`.
 
 **Untried on a device, for chota's tests:** every Daikin write but `setPower(true)`, and that predates the write lane's rewrite; Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
 
-## 0.1.3 is staged on npm, waiting for KO's 2FA (2026-11-10)
+## 0.1.3 is on npm (2026-11-10)
 
-Tagged `v0.1.3` and pushed; `publish.yml` staged it. KO approves it (Staged Packages on npmjs.com, or `npm stage list @khalido/home` then `npm stage approve <id>`), then check `npm view @khalido/home version` and a clean `bun add @khalido/home --no-cache`. chota-bot has been told it is staged; tell it again when it is live.
+Live as `latest`, approved by KO; chota-bot has been told. jaldi has not (no session open).
 
 In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `Part.reason` (`auth`, `config`, `crashed`), `ConnectorCode`, Google's key in a header, and fixes to spotify's cap and `interrupt`, a Cast group's level after an announce, and `createHome`.
 
@@ -39,9 +37,8 @@ The four cap flags in spotify (`capping`, `capped`, `capUntil`, `startBuffering`
 
 ## Where things stand
 
-- **0.1.2 is on npm** (2026-11-09); 0.1.3 is staged (above), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
-- **Unreleased, for 0.1.3** (the first part committed): OpenCode's review (`createHome` failure handling, `home <connector> --config` needing only that connector, `realClock.sleep`) and `Part.reason`, in `CHANGELOG.md`. Release it with what chota's live tests turn up.
-- **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1 and 0.1.2.
+- **0.1.3 is on npm** (2026-11-10), with provenance. A clean `bun add @khalido/home` of 0.1.2 imported on Bun 1.4.4 and Node 26.11.1 and gave the `home` command; not repeated for 0.1.3. `khalido/home.ts` is public.
+- **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1, 0.1.2 and 0.1.3.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. Writes that have reached a device: `setPower(true)` on the Daikin; spotify's and Cast's announce (0.1.1, chota-bot's Pi, 2026-11-09; the connector READMEs have the results).
 
 ## spotify (Soloist)
