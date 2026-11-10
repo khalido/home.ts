@@ -86,10 +86,20 @@ describe("health", () => {
   test("unavailable is down at once; a push connector is never stale, down after PUSH_DOWN_MS", () => {
     expect(
       health(
-        { amber: { status: "unavailable", detail: "Amber rejected the key" } },
+        {
+          amber: {
+            status: "unavailable",
+            reason: "auth",
+            detail: "Amber rejected the key",
+          },
+        },
         0,
       ).amber,
-    ).toMatchObject({ level: "down", detail: "Amber rejected the key" });
+    ).toMatchObject({
+      level: "down",
+      reason: "auth",
+      detail: "Amber rejected the key",
+    });
     expect(
       health({ hue: { status: "connected", lastGoodAt: at(0) } }, 60 * MIN).hue,
     ).toMatchObject({ level: "ok", staleAfterMs: undefined });

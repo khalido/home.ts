@@ -697,6 +697,7 @@ describe("the integration", () => {
     await bad.done;
     expect(bad.parts[0]).toMatchObject({
       status: "unavailable",
+      reason: "auth",
       detail: "Up rejected the token",
     });
     const snap = toSnapshot([], categories, {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type ConnectorError, getJson } from "../../connector.ts";
+import { ConnectorError, fetchTimeout } from "../../connector.ts";
 import { RAIN_INTENSITIES } from "./rain.ts";
 import { sunDisagrees } from "./sun.ts";
 import {
@@ -325,6 +325,22 @@ export const MIN_POLL_MINUTES = 15;
 export const CURRENT_MINUTES = 30;
 
 /**
+ * Why Google refused: the `reason` of its error body's ErrorInfo ("API_KEY_INVALID"), since the status alone doesn't say.
+ * A bad key and a bad latitude are both HTTP 400 INVALID_ARGUMENT; only the key's carries a reason (live, 2026-11-10).
+ */
+async function refusal(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as {
+      error?: { details?: { reason?: unknown }[] };
+    };
+    const reason = body.error?.details?.find((d) => d.reason)?.reason;
+    return typeof reason === "string" ? reason : undefined;
+  } catch {
+    return undefined; // not JSON: the status is all there is
+  }
+}
+
+/**
  * Google Weather as a source: modelled `now`, `forecast` (10 days available, 2 read), `sky` without radiation, and `rain` from the
  * minute forecast (Experimental at Google, so its failure is a `problem` on `rain` and never stops the other slices).
  */
@@ -353,12 +369,27 @@ export function google(options: GoogleOptions): WeatherSource {
       signal,
     }): Promise<SourceReading> {
       const q = (extra: string) =>
-        `key=${encodeURIComponent(options.key)}&location.latitude=${place.latitude}&location.longitude=${place.longitude}${extra}`;
-      const json = (path: string) =>
-        getJson(fetcher, `${base}/${path}`, {
-          init: { headers: { "user-agent": USER_AGENT } },
-          signal,
-        });
+        `location.latitude=${place.latitude}&location.longitude=${place.longitude}${extra}`;
+      // The key goes in a header, never the URL, so no error, log or proxy that shows a URL can show it (all four lookups answered 200 this way, live 2026-11-10).
+      const json = async (path: string): Promise<unknown> => {
+        const res = await fetchTimeout(
+          fetcher,
+          `${base}/${path}`,
+          {
+            headers: {
+              "user-agent": USER_AGENT,
+              "x-goog-api-key": options.key,
+            },
+          },
+          { signal },
+        );
+        if (res.ok) return res.json();
+        const why = await refusal(res);
+        throw new ConnectorError(
+          `HTTP ${res.status}${why ? ` ${why}` : ""} on GET /${path.split("?")[0]}`,
+          { status: res.status, code: why },
+        );
+      };
       // Started first and never throws: a failed minute forecast must not sink the rest.
       const minutes = json(`forecast/minutes:lookup?${q("")}`).then(
         (value) => ({ value }),
@@ -385,10 +416,23 @@ export function google(options: GoogleOptions): WeatherSource {
           slowDue = nextPoll(at, Math.max(pollMinutes, CURRENT_MINUTES));
         }
       } catch (error) {
-        const status = (error as ConnectorError).status;
-        if (status === 400 || status === 401 || status === 403)
+        // Only a ConnectorError is Google's answer; a timeout or an abort is a DOMException, whose `code` is a number.
+        const { status, code } =
+          error instanceof ConnectorError
+            ? error
+            : ({} as { status?: number; code?: string });
+        const said = `HTTP ${status}${code ? ` ${code}` : ""}`;
+        if (status === 401 || status === 403 || code?.startsWith("API_KEY_"))
           return {
-            stop: `google: key rejected or request refused (HTTP ${status})`,
+            stop: `google: the key was rejected (${said})`,
+            stopReason: "auth",
+            nextAt: Infinity,
+          };
+        // A 400 with a good key is the request itself, and here that is the location: asking again won't change it.
+        if (status === 400)
+          return {
+            stop: `google: the request was refused (${said}); check the latitude and longitude`,
+            stopReason: "config",
             nextAt: Infinity,
           };
         problem = `google: ${(error as Error).message}`; // the old slices stay; the minute forecast below is still used

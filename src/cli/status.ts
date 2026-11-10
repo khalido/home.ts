@@ -116,6 +116,7 @@ async function statusFromEnv(
       try {
         return [await from.build()];
       } catch (error) {
+        const code = error instanceof CliError ? error.code : undefined;
         const fix =
           error instanceof CliError && error.fix
             ? ` (run \`${error.fix}\`)`
@@ -123,6 +124,13 @@ async function statusFromEnv(
         rows[m.name] = {
           status: "unavailable",
           needs,
+          // A build reads settings and files, so a failure is config unless it was a key (auth) or the network (nothing to fix here).
+          reason:
+            code === "auth"
+              ? "auth"
+              : code === "network"
+                ? undefined
+                : "config",
           detail: `${(error as Error).message}${fix}`,
         };
         return [];
@@ -184,6 +192,7 @@ function rowRecord(name: string, r: Row): Record<string, unknown> {
     needs: r.needs,
     access: m?.access ?? "",
     detail: r.detail,
+    reason: r.reason,
     anomaly: r.anomaly,
     ...(m?.record && r.state ? m.record(r as Part) : (r.state as object)),
   };

@@ -284,6 +284,7 @@ export function bom(options: BomOptions = {}): WeatherSource {
       if (!options.fetch && base.startsWith("ftp:"))
         return {
           stop: "bom: plain fetch cannot read ftp://; pass fetch: ftpFetch() from @khalido/home/weather/ftp",
+          stopReason: "config",
           nextAt: Infinity,
         };
       if (force || at >= obsDue) {

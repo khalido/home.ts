@@ -247,6 +247,7 @@ describe("bom source", () => {
   test("without an ftp:// fetch the source stops at once and names the fix; nothing is fetched", async () => {
     expect(await bom({ forecastLocation: "Sydney" }).read(req(at))).toEqual({
       stop: "bom: plain fetch cannot read ftp://; pass fetch: ftpFetch() from @khalido/home/weather/ftp",
+      stopReason: "config",
       nextAt: Infinity,
     });
   });
@@ -753,9 +754,67 @@ describe("Google (the docs' examples; checked live 2026-10-13)", () => {
     const f = (async () =>
       new Response("denied", { status: 403 })) as unknown as typeof fetch;
     expect(await google({ key: "k", fetch: f }).read(req(fetchedAt))).toEqual({
-      stop: "google: key rejected or request refused (HTTP 403)",
+      stop: "google: the key was rejected (HTTP 403)",
+      stopReason: "auth",
       nextAt: Infinity,
     });
+  });
+
+  // Google's two 400s, as it answered them live 2026-11-10: only the bad key's body carries a reason.
+  const refused = (details?: unknown[]) =>
+    (async () =>
+      new Response(
+        JSON.stringify({
+          error: { code: 400, status: "INVALID_ARGUMENT", details },
+        }),
+        { status: 400 },
+      )) as unknown as typeof fetch;
+
+  test("a 400 naming the key is the key: auth", async () => {
+    const f = refused([
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        reason: "API_KEY_INVALID",
+      },
+    ]);
+    expect(await google({ key: "k", fetch: f }).read(req(fetchedAt))).toEqual({
+      stop: "google: the key was rejected (HTTP 400 API_KEY_INVALID)",
+      stopReason: "auth",
+      nextAt: Infinity,
+    });
+  });
+
+  test("a 400 that doesn't is the request: config, naming the location", async () => {
+    expect(
+      await google({ key: "k", fetch: refused() }).read(req(fetchedAt)),
+    ).toEqual({
+      stop: "google: the request was refused (HTTP 400); check the latitude and longitude",
+      stopReason: "config",
+      nextAt: Infinity,
+    });
+  });
+
+  test("a fetch that rejects (a timeout, an abort) is a problem, not a stop or a throw", async () => {
+    const f = (async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    }) as unknown as typeof fetch;
+    const r = await google({ key: "k", fetch: f }).read(req(fetchedAt));
+    expect(r.stop).toBeUndefined();
+    expect(r.problem).toContain("google: The operation timed out.");
+  });
+
+  test("the key travels in a header, never in the URL", async () => {
+    const urls: string[] = [];
+    const keys: (string | null)[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      urls.push(String(url));
+      keys.push(new Headers(init?.headers).get("x-goog-api-key"));
+      return new Response("{}");
+    }) as unknown as typeof fetch;
+    await google({ key: "s3cret", fetch: f }).read(req(fetchedAt));
+    expect(urls.length).toBe(4);
+    expect(urls.filter((u) => /key=|s3cret/.test(u))).toEqual([]);
+    expect(keys).toEqual(["s3cret", "s3cret", "s3cret", "s3cret"]);
   });
 });
 
@@ -1059,12 +1118,17 @@ describe("weather integration", () => {
     const dead: WeatherSource = {
       name: "google",
       owns: { now: 1 },
-      read: async () => ({ stop: "google: key rejected", nextAt: Infinity }),
+      read: async () => ({
+        stop: "google: key rejected",
+        stopReason: "auth",
+        nextAt: Infinity,
+      }),
     };
     const home = createHome([weather({ ...sydney, sources: [dead], clock })]);
     await home.start(stop.signal);
     expect(home.snapshot().weather).toMatchObject({
       status: "unavailable",
+      reason: "auth",
       detail: "google: key rejected",
     });
   });
@@ -1090,6 +1154,11 @@ describe("weather integration", () => {
       weather({ ...sydney, sources: [dead, live], clock }),
     ]);
     await home.start(stop.signal);
+    expect(home.snapshot().weather?.reason).toBeUndefined(); // connected: the stopped source's reason is in its own row
+    expect(home.snapshot().weather?.state?.sources.bom).toMatchObject({
+      stopped: "bom: plain fetch cannot read ftp://",
+      reason: "config",
+    });
     expect(home.snapshot().weather).toMatchObject({
       status: "connected",
       detail: "bom: plain fetch cannot read ftp://",

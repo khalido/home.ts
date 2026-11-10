@@ -23,7 +23,11 @@ export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
     const { token } = JSON.parse(text) as { token: string };
     return { token, expiresAt: tokenExpiry(token) };
   } catch (error) {
-    return fail(`${TOKEN_FILE}: ${(error as Error).message}`);
+    return fail(
+      `${TOKEN_FILE}: ${(error as Error).message}`,
+      "auth",
+      "home enphase login",
+    );
   }
 }
 

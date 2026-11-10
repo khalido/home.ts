@@ -65,6 +65,7 @@ export function amber(
           if (error instanceof AmberError && error.status === 401)
             return update({
               status: "unavailable",
+              reason: "auth",
               detail: "Amber rejected the key",
               state: last,
             });

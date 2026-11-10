@@ -16,8 +16,11 @@ export const filePath = z.string().min(1);
 export type Status =
   "connecting" | "connected" | "disconnected" | "unavailable";
 
+/** Why a part is `unavailable`, for code to switch on; `detail` is the text for people. `auth`: a key or token was rejected or is unusable, so a person must re-key. `config`: a setting or a file is wrong. `crashed`: its `run` threw. */
+export type Reason = "auth" | "config" | "crashed";
+
 /**
- * One integration's slice of the home: its status, a human detail, anything odd the device reported, and its state.
+ * One integration's slice of the home: its status, a human detail, `reason` (why it is `unavailable`, for code to switch on), anything odd the device reported, and its state.
  * `createHome` stamps the times (UTC ISO). `lastGoodAt`: its last report while connected, or the read time a connected report
  * gives when it repeats an older read (weather's 5-minute sun tick). `downSince`: when it stopped being connected (or started,
  * if it never has); none while connected. Any other time an integration sets is ignored.
@@ -25,6 +28,7 @@ export type Status =
 export type Part<S = unknown> = {
   status: Status;
   detail?: string;
+  reason?: Reason;
   anomaly?: string;
   state?: S;
   lastGoodAt?: string;
@@ -162,6 +166,7 @@ export function createHome<I extends Integration<any, string>>(
             .catch((error) =>
               set(i.name, {
                 status: "unavailable",
+                reason: "crashed",
                 detail: errorText(error),
                 state: (snapshot as Record<string, Part>)[i.name]!.state, // the last good state stays, as it does through a failed read
               }),

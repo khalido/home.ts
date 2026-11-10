@@ -411,6 +411,7 @@ export function spotify(
       (error) => {
         capping = false;
         if (error instanceof ConnectorError && error.code === "offline") return; // the status says it
+        if (capUntil !== window) return applyCap(); // a new start while it went: this failure doesn't speak for that one
         capped = true; // refused or unanswered: not again this window
         note = `lowering the volume to ${cap} failed: ${errorText(error)}`;
         publish();

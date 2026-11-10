@@ -291,6 +291,7 @@ export function up(config: UpConfig): Integration<UpSnapshot, "up"> & {
           if (error instanceof UpError && error.status === 401)
             return update({
               status: "unavailable",
+              reason: "auth",
               detail: "Up rejected the token",
               state: last,
             });

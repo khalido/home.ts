@@ -1,5 +1,5 @@
 import { type Clock, localTime, realClock } from "../../clock.ts";
-import type { Integration, Status } from "../../home.ts";
+import type { Integration, Reason, Status } from "../../home.ts";
 import { field, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import {
@@ -88,7 +88,13 @@ export type WeatherState = Slices & {
   timeZone?: string; // the config's, which the blocks and the text use
   sources: Record<
     string,
-    { read: boolean; problem?: string; stopped?: string; anomaly?: string }
+    {
+      read: boolean;
+      problem?: string;
+      stopped?: string; // it will not be read again, and why
+      reason?: Exclude<Reason, "crashed">; // with `stopped`, for code: a dead key shows here even while another source keeps the part connected
+      anomaly?: string;
+    }
   >;
 };
 
@@ -149,6 +155,7 @@ export function weather(
                 read: r !== undefined,
                 problem: r?.problem,
                 stopped: r?.stop,
+                reason: r?.stop ? (r.stopReason ?? "config") : undefined,
                 anomaly: r?.anomaly,
               },
             ];
@@ -174,6 +181,13 @@ export function weather(
             : undefined;
         update({
           status,
+          // Every source has stopped: a rejected key outranks a wrong setting, since it needs a person.
+          reason:
+            status !== "unavailable"
+              ? undefined
+              : Object.values(report).some((r) => r.reason === "auth")
+                ? "auth"
+                : "config",
           detail,
           anomaly: notes("anomaly"),
           lastGoodAt,

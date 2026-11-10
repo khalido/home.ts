@@ -189,6 +189,7 @@ export function hue(
           if (isRejectedKey(error))
             return update({
               status: "unavailable",
+              reason: "auth",
               detail: "the bridge rejected the key; pair again",
               state: snapshot,
             });

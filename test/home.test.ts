@@ -1,6 +1,11 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { realClock } from "../src/clock.ts";
-import { createHome, type Integration, settle } from "../src/home.ts";
+import {
+  createHome,
+  type Integration,
+  type Part,
+  settle,
+} from "../src/home.ts";
 import { manualClock } from "./clock.ts";
 
 /** A fake integration: reports when poked, ends when its signal aborts. */
@@ -103,9 +108,28 @@ describe("createHome failures", () => {
     await home.start(new AbortController().signal);
     expect(home.snapshot().a).toMatchObject({
       status: "unavailable",
+      reason: "crashed",
       detail: "broke",
       state: 7,
     });
+  });
+
+  test("a connected report after a crash carries no reason", async () => {
+    let report!: (p: Part<number>) => void;
+    const a: Integration<number> = {
+      name: "a",
+      run: async (_, update) => {
+        report = update;
+        throw new Error("broke");
+      },
+      refresh: () => {},
+    };
+    const home = createHome([a]);
+    await home.start(new AbortController().signal);
+    expect(home.snapshot().a?.reason).toBe("crashed");
+    report({ status: "connected", state: 8 });
+    expect(home.snapshot().a?.status).toBe("connected");
+    expect(home.snapshot().a?.reason).toBeUndefined();
   });
 
   test("a run that throws synchronously fails alone", async () => {
@@ -124,7 +148,10 @@ describe("createHome failures", () => {
     };
     const home = createHome([bad, good]);
     await home.start(new AbortController().signal);
-    expect(home.snapshot().bad?.status).toBe("unavailable");
+    expect(home.snapshot().bad).toMatchObject({
+      status: "unavailable",
+      reason: "crashed",
+    });
     expect(ran).toEqual(["good"]);
   });
 });

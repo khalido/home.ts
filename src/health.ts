@@ -1,4 +1,4 @@
-import type { Part, Status } from "./home.ts";
+import type { Part, Reason, Status } from "./home.ts";
 import { MANIFESTS } from "./manifests.ts";
 
 /**
@@ -14,6 +14,7 @@ export type Health = {
   staleAfterMs?: number;
   downAfterMs: number;
   detail?: string;
+  reason?: Reason;
 };
 
 /** A polling connector is stale after this many polls with no good read: two missed, plus half of one so a slow read that ends in a timeout does not flap it, */
@@ -61,7 +62,7 @@ function healthOf(
     (part.status !== "connected" && (age(part.downSince) ?? 0) >= downAfterMs);
   const goodAge = age(part.lastGoodAt) ?? age(part.downSince); // never good: as old as the wait for it
   const stale = staleAfterMs !== undefined && (goodAge ?? 0) >= staleAfterMs;
-  const { status, lastGoodAt, downSince, detail } = part;
+  const { status, lastGoodAt, downSince, detail, reason } = part;
   return {
     level: down ? "down" : stale ? "stale" : "ok",
     status,
@@ -70,5 +71,6 @@ function healthOf(
     staleAfterMs,
     downAfterMs,
     detail,
+    reason,
   };
 }

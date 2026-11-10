@@ -4,8 +4,20 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+
+- **`Part.reason`:** why a part is `unavailable`, for code to switch on: `auth` (a key or token was rejected or unusable, so a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw). `health()` and `home --json` carry it. It can be absent. An Enphase token that does not parse is now `unavailable` with `auth`, not `crashed`.
+
+- **weather:** `reason` on an `unavailable` weather part (`auth` if a stopped source's key was rejected, else `config`), and `state.sources.<name>.reason` beside `stopped`, so code can see a dead Google key while another source keeps the part `connected`. A custom `WeatherSource` can return `stopReason` with `stop`.
+
+### Changed
+
+- **weather:** Google's key is sent in the `X-Goog-Api-Key` header, no longer in the URL.
+- **weather:** Google's stop text says which it was: `google: the key was rejected (HTTP 400 API_KEY_INVALID)` or `google: the request was refused (HTTP 400); check the latitude and longitude`. Before, both read `key rejected or request refused`.
+
 ### Fixed
 
+- **spotify:** `maxVolume` gave up when a lowering was refused or unanswered after a second start signal (buffering, then playing) had opened a new window, leaving the volume above the cap. The new window now lowers again.
 - **`createHome`:** an `onChange` that throws or rejects no longer marks the integration `unavailable`; the error goes to `console.error` and the integration keeps running.
 - **`createHome`:** `refresh()` before `start()` resolves at once instead of never.
 - **`createHome`:** an integration whose `run` fails after a good report keeps its last `state`.

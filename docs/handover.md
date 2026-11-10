@@ -1,11 +1,42 @@
 # Handover
 
-2026-11-09. Read `AGENTS.md` first, then this.
+2026-11-10. Read `AGENTS.md` first, then this.
+
+## The big-picture review is done (Fable 5.2, 2026-11-10)
+
+Four read-only subagent tracks plus my own reads, each checked against the code. No device was written to.
+
+**Direction.** Right library, but ahead of its consumers: no source file in jaldi or chota-bot imported it on 2026-11-10. chota-bot is now integrating it (KO, 2026-11-10), which is the work that matters most. New surface waits until chota is on it.
+
+**Decided, don't reopen:**
+
+- The four poll loops (Daikin, Amber, Up, Enphase) stay separate. The shared part is about 12 lines each and a helper nets about zero lines once it carries the relocator, auth and Enphase's extras. Weather and printers are a different shape. Revisit if a fifth single-device poller appears.
+- No `build()` on `Manifest`. It loses the typed snapshot (`Integration<State, "name">`), three of nine connectors don't fit one device to one integration, and it can't replace `FROM_ENV`, which reads env and files. `loadHome` and `FROM_ENV` are two input modes; `envFromConfig` builds nothing (it feeds `probe`).
+- The doc set (about 2,200 lines) is a fair size.
+
+**To do, in order. KO has not agreed these yet:**
+
+1. **`Part.reason` is decided and built** (KO, 2026-11-10): `auth`, `config`, `crashed`. Weather sets one, and `state.sources.<name>.reason` shows a dead key while the part is still `connected`. Google's key is in the `X-Goog-Api-Key` header, and a bad key is told from a bad location by the error body (both HTTP 400), checked live.
+2. **Release 0.1.3** with `Part.reason`, the cap fix and the Google key change, before chota runs its cap test. chota started on 0.1.2 on 2026-11-10; basics work.
+3. **Auth consistency.** One `isAuthStatus` (401 or 403) in `connector.ts`: Hue and now Google take either, Enphase, Amber and Up take 401 only. One wording for the detail, naming the env var. Say in `docs/using.md` and `use-home` that `auth` is terminal: a re-key needs the consumer restarted (`refresh()` can't revive a `run` that returned). `home pair` prints the Hue key to stdout (`cli/hue.ts:120`), against the rule here: write it privately or note the exception.
+4. **`fx.yml`.** The gate is who triggers, not whose text is read: `/fx` from KO on a stranger's issue puts their text in front of a shell that can read the gateway key (the action's own `SECURITY.md`). Put a spend cap on the key; consider `mode: answer` with `contents: read`.
+5. **Doc drift.** `AGENTS.md` says "going public"; the README says jaldi and chota-bot use it; `cast/README.md:3` and `docs/cast.md:106` say writes ran only on a fake socket (they played live 2026-11-09); `spotify/README.md` lines 3, 61 and 80 disagree on live writes; `decisions.md:94` says the manifest drives the README table (it is hand-written).
+6. **Small code tidy:** one `withRunning(i, ms, act)` in `cli/context.ts` for `withSpotify`, `withCast` and the coming printers verb; infer `HomeIntegration` from a lifted `buildDevice` switch; a test that `FROM_ENV`'s keys equal the `MANIFESTS` names; tests for Up's `createWebhook`, `deleteWebhook`, `pingWebhook` (none today); no CLI write verb has a test.
+
+**Unverified:** a wrong Hue CA retrying forever as `disconnected`.
+
+**Untried on a device, for chota's tests:** every Daikin write but `setPower(true)`, and that predates the write lane's rewrite; Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
+
+## Committed 2026-11-10, not pushed or released
+
+`Part.reason` (`auth`, `config`, `crashed`), weather's reasons, Google's key in a header and the spotify cap fix, all through `/ko-review`. `bun run check` and 492 tests pass (Bun 1.4.4). `main` is 3 commits ahead of `origin`.
+
+The four cap flags (`capping`, `capped`, `capUntil`, `startBuffering`) are a state machine in all but name; one explicit phase would have made the hole visible. Not done.
 
 ## Where things stand
 
 - **0.1.2 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
-- **Unreleased, for 0.1.3:** OpenCode's review (`createHome` failure handling, `home <connector> --config` needing only that connector, `realClock.sleep`), in `CHANGELOG.md`. Release it with what chota's live tests turn up.
+- **Unreleased, for 0.1.3** (the first part committed): OpenCode's review (`createHome` failure handling, `home <connector> --config` needing only that connector, `realClock.sleep`) and `Part.reason`, in `CHANGELOG.md`. Release it with what chota's live tests turn up.
 - **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1 and 0.1.2.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. Writes that have reached a device: `setPower(true)` on the Daikin; spotify's and Cast's announce (0.1.1, chota-bot's Pi, 2026-11-09; the connector READMEs have the results).
 
@@ -50,11 +81,11 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
 3. **Printers: print a PDF on the Brother** over IPP Print-Job, through the lane: a live read, Identify-Printer, then Print-Job, each with KO's say-so.
-4. **Weather**: BOM warnings; Google's hourly as a second source; compare with chota's weather tool first.
+4. **Weather, proposed to KO and not yet agreed.** The Google key works (a public Sydney point, 2026-11-09). All three add to the API, so they can go in 0.1.3: Google hourly as a fallback, up to 48 hours (`forecast/hours:lookup` gives 24 a page; about 720 more calls a month), so hourly and the day blocks survive without Open-Meteo; alerts from `publicAlerts:lookup` (answered 200 with no active alerts, so parsing would be from Google's docs and unverified; about 720 calls a month if hourly); and the fix in item 1 for a failed minute forecast. BOM warnings are more authoritative but more work. chota's headline rules stay in chota; it can drop its own Google parsing once it moves to the library.
 5. **Leftovers**: TS 5.6 and older fail on `Uint8Array<…>` in `printers/codec.d.ts` with `skipLibCheck: false`; `exports.test.ts` imports `src`, not `dist`; `FROM_ENV` and `loadHome` build integrations two ways; `withSpotify` and `withCast` in the CLI are near-copies (two, under the rule of three).
 6. **A docs site** later: GitHub Pages from an Actions build (not a `gh-pages` branch or a committed folder), serving `llms.txt`.
 
-Later: a Cast `play(target, url)` for streams. For a 0.2.0: a machine-readable reason on `Part`, so an admin page needn't match `detail`; writes in one shape across connectors, Cast's volume 0–1 against spotify's 0–100. Open: going active uses the volume reported while inactive, which isn't always the real level; the cap only ever lowers to the cap, so the worst case is a raise to it.
+Later: a Cast `play(target, url)` for streams. For a 0.2.0: writes in one shape across connectors, Cast's volume 0–1 against spotify's 0–100. Open: going active uses the volume reported while inactive, which isn't always the real level; the cap only ever lowers to the cap, so the worst case is a raise to it.
 
 ## To see the current state
 

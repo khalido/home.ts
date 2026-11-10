@@ -1069,6 +1069,24 @@ describe("the first play's volume (Soloist issue #23)", () => {
     await h.stop();
   });
 
+  test("a new start while a lowering is on its way, and that lowering refused: the new window still lowers", async () => {
+    const h = setup({ maxVolume: 40 });
+    const sock = await h.online({ volume: 100 });
+    sock.push({ type: "playback_changed", status: "buffering" });
+    await h.advance(100);
+    sock.push({ type: "playback_changed", status: "playing" }); // opens a new window with the write still out
+    sock.push({ type: "error", message: "no" }); // the first window's write, refused
+    await tick();
+    await h.advance(100);
+    expect(sock.commands()).toEqual(["set_volume", "set_volume"]);
+    sock.ack();
+    await tick();
+    sock.push({ type: "volume_changed", volume: 40 });
+    await tick();
+    expect(h.last().detail).toBeUndefined();
+    await h.stop();
+  });
+
   test("41 with a cap of 40 is within rounding: left alone", async () => {
     const h = setup({ maxVolume: 40 });
     const sock = await h.online({ volume: 41 });

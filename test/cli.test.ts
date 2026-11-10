@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,6 +45,36 @@ describe("home output contract", () => {
       const r = home(["amber", "--config", config]);
       expect(r.err).toContain("no amber in");
       expect(r.code).toBe(1);
+    });
+  });
+
+  test("a corrupt Enphase token file is reason auth", () => {
+    const fakeHome = mkdtempSync(join(tmpdir(), "home-"));
+    mkdirSync(join(fakeHome, ".config", "home"), { recursive: true });
+    writeFileSync(
+      join(fakeHome, ".config", "home", "enphase-token.json"),
+      "not json",
+    );
+    const r = home(["enphase", "--json"], {
+      HOME: fakeHome,
+      IQ_GATEWAY_HOST: "127.0.0.1:1",
+    });
+    expect(JSON.parse(r.out)).toMatchObject({
+      status: "unavailable",
+      reason: "auth",
+    });
+  });
+
+  test("a build that fails on a setting is reason config", () => {
+    const r = home(["hue", "--json"], {
+      HUE_APPLICATION_KEY: "k",
+      HUE_BRIDGE_HOST: "127.0.0.1:1",
+      HUE_BRIDGE_ID: "id",
+      HUE_CA_FILE: "/nonexistent/ca.pem",
+    });
+    expect(JSON.parse(r.out)).toMatchObject({
+      status: "unavailable",
+      reason: "config",
     });
   });
 

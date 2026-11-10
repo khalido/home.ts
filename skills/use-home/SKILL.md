@@ -29,13 +29,13 @@ The contract (in `docs/cli.md`): stdout is data, stderr everything else. `--json
 
 What a status means:
 
-| Status         | Meaning                                                                            | What to do                                        |
-| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `connected`    | read and current                                                                   | use it                                            |
-| `connecting`   | still starting (a 15 s cap in the CLI)                                             | wait, or run again                                |
-| `disconnected` | the device or service did not answer; the last good state is kept, with its `asOf` | say so; check the device is on and at its address |
-| `unavailable`  | stopped for good: a key rejected, a setting wrong                                  | the `detail` names it; fix the key or setting     |
-| `not set up`   | env names or a file missing (`needs` lists them)                                   | set them, or say what is needed                   |
+| Status         | Meaning                                                                                                                                                         | What to do                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `connected`    | read and current                                                                                                                                                | use it                                            |
+| `connecting`   | still starting (a 15 s cap in the CLI)                                                                                                                          | wait, or run again                                |
+| `disconnected` | the device or service did not answer; the last good state is kept, with its `asOf`                                                                              | say so; check the device is on and at its address |
+| `unavailable`  | stopped for good: a key rejected, a setting wrong; `reason`, when present, is `auth` (a person must re-key), `config` (a setting or file is wrong) or `crashed` | the `detail` names it; fix the key or setting     |
+| `not set up`   | env names or a file missing (`needs` lists them)                                                                                                                | set them, or say what is needed                   |
 
 Weather: `blocks` holds morning, afternoon and evening for today and tomorrow in the home's time zone; `rainSoon` says when rain starts in the next two hours (needs the Google key). Energy: `now` in `home --json` is the one owner of solar, use, grid flow and cost per hour; never recompute it.
 

@@ -392,6 +392,7 @@ describe("home", () => {
     await home.start(new AbortController().signal);
     expect(home.snapshot().hue).toMatchObject({
       status: "unavailable",
+      reason: "auth",
       detail: "the bridge rejected the key; pair again",
     });
   });

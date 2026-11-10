@@ -331,7 +331,10 @@ describe("client and home", () => {
       enphase({ host: "h", token: "nope", fetch: gateway().f }),
     ]);
     await home.start(new AbortController().signal);
-    expect(home.snapshot().enphase).toMatchObject({ status: "unavailable" });
+    expect(home.snapshot().enphase).toMatchObject({
+      status: "unavailable",
+      reason: "auth",
+    });
   });
 
   test("a rejected token marks Enphase unavailable and stops polling", async () => {
@@ -339,6 +342,9 @@ describe("client and home", () => {
       enphase({ host: "h", token: jwt(4_000_000_000), fetch: gateway(401).f }),
     ]);
     await home.start(new AbortController().signal);
-    expect(home.snapshot().enphase).toMatchObject({ status: "unavailable" });
+    expect(home.snapshot().enphase).toMatchObject({
+      status: "unavailable",
+      reason: "auth",
+    });
   });
 });

@@ -102,7 +102,16 @@ export function enphase(
     name: "enphase",
     refresh: () => (where.reset(), poll.nudge()),
     async run(signal, update) {
-      const expiresAt = tokenExpiry(config.token); // a bad token fails this integration only
+      let expiresAt: Date;
+      try {
+        expiresAt = tokenExpiry(config.token); // a bad token fails this integration only
+      } catch {
+        return update({
+          status: "unavailable",
+          reason: "auth",
+          detail: "the token is unreadable; run `home enphase login`",
+        });
+      }
       let last: EnphaseSnapshot | undefined;
       let day:
         | {
@@ -168,6 +177,7 @@ export function enphase(
           if (error instanceof EnphaseError && error.status === 401)
             return update({
               status: "unavailable",
+              reason: "auth",
               detail:
                 "the gateway rejected the token; run `home enphase login`",
               state: last,

@@ -9,6 +9,7 @@ export {
   type HomeSnapshot,
   type Integration,
   type Part,
+  type Reason,
   type StateOf,
   type Status,
 } from "./home.ts";

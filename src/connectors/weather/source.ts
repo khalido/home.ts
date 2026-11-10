@@ -1,4 +1,5 @@
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
+import type { Reason } from "../../home.ts";
 
 // The one place a weather provider plugs in: a `WeatherSource` returns slices, and `mergeWeather` picks one per slice.
 
@@ -142,6 +143,7 @@ export type SourceReading = Slices & {
   problem?: string; // a failed product, a missing option; the source keeps going
   anomaly?: string; // a value the source sent that could not be read as given
   stop?: string; // a terminal problem (a rejected key): the integration stops calling this source
+  stopReason?: Exclude<Reason, "crashed">; // with `stop`: a person must re-key, or fix a setting (the default)
 };
 
 /**
