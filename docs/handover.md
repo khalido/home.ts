@@ -27,12 +27,11 @@ Four read-only subagent tracks plus my own reads, each checked against the code.
 
 **Untried on a device, for chota's tests:** every Daikin write but `setPower(true)`, and that predates the write lane's rewrite; Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
 
-## Committed 2026-11-10, not pushed or released
+## 0.1.3 is staged on npm, waiting for KO's 2FA (2026-11-10)
 
-All through `/ko-review`; `bun run check` and 511 tests pass (Bun 1.4.4). `main` is 4 commits ahead of `origin`.
+Tagged `v0.1.3` and pushed; `publish.yml` staged it. KO approves it (Staged Packages on npmjs.com, or `npm stage list @khalido/home` then `npm stage approve <id>`), then check `npm view @khalido/home version` and a clean `bun add @khalido/home --no-cache`. chota-bot has been told it is staged; tell it again when it is live.
 
-- `61eee56`: `Part.reason` (`auth`, `config`, `crashed`), weather's reasons, Google's key in a header, the spotify cap fix.
-- The commit after it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `ConnectorCode`, spotify's `interrupt` leaving an inactive speaker alone, and chota's live results in the READMEs.
+In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `Part.reason` (`auth`, `config`, `crashed`), `ConnectorCode`, Google's key in a header, and fixes to spotify's cap and `interrupt`, a Cast group's level after an announce, and `createHome`.
 
 Hue's device records are from the docs' shapes, like the rest of Hue. Not built: a `home devices` command (status keeps rows, not parts, so it needs a small change there). From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
 
@@ -40,7 +39,7 @@ The four cap flags in spotify (`capping`, `capped`, `capUntil`, `startBuffering`
 
 ## Where things stand
 
-- **0.1.2 is on npm** (2026-11-09), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
+- **0.1.2 is on npm** (2026-11-09); 0.1.3 is staged (above), with provenance. A clean `bun add @khalido/home` imports on Bun 1.4.4 and Node 26.11.1 and gives the `home` command. `khalido/home.ts` is public.
 - **Unreleased, for 0.1.3** (the first part committed): OpenCode's review (`createHome` failure handling, `home <connector> --config` needing only that connector, `realClock.sleep`) and `Part.reason`, in `CHANGELOG.md`. Release it with what chota's live tests turn up.
 - **Releases stage:** a GitHub release runs `publish.yml`, KO approves with 2FA (`docs/publishing.md`, the `release` skill). It has worked for 0.1.1 and 0.1.2.
 - **Live:** Amber and weather read 2026-10-28; the Enphase gateway refused connections. Writes that have reached a device: `setPower(true)` on the Daikin; spotify's and Cast's announce (0.1.1, chota-bot's Pi, 2026-11-09; the connector READMEs have the results).
