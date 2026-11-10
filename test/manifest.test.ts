@@ -80,7 +80,7 @@ describe("lines", () => {
     expect(hue.lines({ status: "connected", state })).toEqual([
       "1 lights on",
       "Living: on · 60%",
-      "Reading: off",
+      "Reading", // a zone with no grouped light: on or off isn't known, so it isn't said
     ]);
     expect(hue.record!({ status: "connected", state })).toEqual({
       lightsOn: 1,

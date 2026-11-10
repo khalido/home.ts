@@ -18,7 +18,7 @@ Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7, x8
 
 - Each resolves `{ state, confirmed }`: after Soloist accepts (`command_result`), it waits up to 2 s for the event that shows _this caller's_ change (the volume sent, `paused` or `playing`, a new track URI, the context or track played, a position near the seek, the shuffle or repeat set, the track in `upNext`), then gives the state. No such event: `confirmed: false`, the state as it stands. A write merged into a later one confirms only if its own change shows; a write of what is already so confirms at once; a drop ends the wait. `next` also confirms on idle (end of queue) or a restart, `prev` on a restart from 5 s or more in.
 - A volume reported within 1 of the request confirms, since Soloist rounds it (phone steps are sixteenths).
-- **While inactive** (`state.active: false`), Soloist accepts `set_volume` and drops it, three times live. `setVolume` is refused unsent with code `inactive`; `duck` runs `fn` over the music with `music: "untouched"`. `activate()` fixes it, but makes a new audio stream, so the volume can jump to the level last saved (62 to 40, live). `play` while inactive goes active first (a `play` alone didn't take live; going active first is untested). `resume` doesn't: it worked inactive, and `interrupt` relies on that.
+- **While inactive** (`state.active: false`), Soloist accepts `set_volume` and drops it, three times live. `setVolume` is refused unsent with code `inactive`; `duck` and `interrupt` run `fn` over the music with `music: "untouched"`: "playing" while inactive is the account playing on another speaker, which a pause would stop. `activate()` fixes it, but makes a new audio stream, so the volume can jump to the level last saved (62 to 40, live). `play` while inactive goes active first (a `play` alone didn't take live; going active first is untested). `resume` doesn't: it worked inactive, and `interrupt` relies on that.
 - Errors are `ConnectorError` with `code`: `offline`, `waiting`, `inactive`, `refused` (Soloist's `error`), `timeout` (3 s), `invalid` (bad input, nothing sent).
 - One write lane, 100 ms apart (a guess). `volume`, `seek`, `shuffle`, `repeat` merge to the last; `play`, `pause`, `resume` share a slot, so the last wins; each `next`, `prev`, `queue` is its own. Queries go through the lane too, at most 1 s each, since Soloist's `error` names no command.
 - `setRepeat` is two commands in the docs' order (clear the other mode, then set this one), 600 ms apart: back to back, `off` from `track` stayed on `track` live, and 600 ms apart worked. If the second is refused, repeat may be left off.
@@ -28,7 +28,7 @@ Soloist is Spotify's own headless Spotify Connect client (Linux arm64, armv7, x8
 
 **`duck(fn, { to })` and `interrupt(fn)`** turn the music down, or pause it, around `fn`, then put it back. Both resolve `{ value, music, why? }`, `music` one of:
 
-- `untouched`: not playing or buffering, not connected, (duck) the volume unknown or already at `to` or below, or the lowering or pause failed, so `fn` ran over it.
+- `untouched`: not playing or buffering, not connected, not the active device, (duck) the volume unknown or already at `to` or below, or the lowering or pause failed, so `fn` ran over it.
 - `restored`: put back as it was.
 - `kept`: someone changed it meanwhile (resumed, skipped, set the volume), or the pause or lower volume never showed. Theirs stays.
 - `failed`: the restore failed or was never reported; it may be left quiet or paused.
@@ -67,6 +67,17 @@ Writes through this connector, and what a live read hasn't shown. In particular:
 - **The rest:** `get_queue` answered by `queue_changed`; `play` with nothing loaded; whole-number volumes; the order of `auth_state` and `playback_state`; the 100% first play and its lowering; Family-plan members picking the speaker; whether the session survives a Soloist restart; a USB speaker's standby dropping it mid-play.
 
 ## Live findings
+
+**2026-11-10, Raspberry Pi 5, Bun 1.4.4, on 0.1.2, through this connector** (chota-bot's session, KO listening).
+
+- Confirmed with `maxVolume: 60`, the speaker active and playing: `activate`, `setVolume(50)`, `setVolume(90)` (came back 60), `seek`, `setShuffle`, `setRepeat("context")` and `("off")` (about 2.1 s each), `queue` (first in `upNext`), `play` of a playlist URI. `duck(fn, { to: 20 })` around a Cast announce: 20 inside, `music: "restored"`, 60 after, 5.2 s in all.
+- **The level can jump above the cap on a pause, not only on a start.** One-shot CLI, cap 60: `volume 45` read 45, `play` 45, then `pause` read 62 and the next `play` 62 (62 was the level before the test). Nothing lowered it: a pause is not a start signal, and each CLI command is a new process.
+- **`active: false` with `status: "playing"`:** the account playing on another speaker. `speakerState` says `playing`, `spotifyText` prints it as this speaker's, and `spotifyChanges` fired `resumed`, with the box silent.
+- Through chota-bot's wrapper, later the same day: `play` of a playlist confirmed in 241 ms, `next` in 134 ms, `pause` in 17 ms; `duck` to 15 and `interrupt`, 2.5 s each, both `restored`. `play()` with the music paused on a Cast speaker: confirmed in 1.3 s, playing on the box at the same position.
+- **`interrupt` paused music that was on another speaker** (found in chota's switch): it checked `playing` and not `active`. Fixed after 0.1.2.
+- `positionMs` around a duck and an interrupt read 2 s, 2 s, 3 s, 5 s, then 4 s after a pause: it can step back a second.
+- A consumer's test with a fake socket: a write goes out behind the connector's own queries (`get_state`, `get_queue`), up to about 1 s on a fresh socket, so "the command was sent" can't be checked straight after the call.
+- Not run: the first-play cap from idle (the box never went active), stall events.
 
 **2026-11-09, Raspberry Pi 5, Bun 1.4.4, Soloist 1.3.10.51, PipeWire and WirePlumber 0.5.8, on 0.1.1** (chota-bot's session; writes with KO's OK).
 

@@ -3,7 +3,13 @@ import { asOf, type Clock, realClock } from "../../clock.ts";
 import { errorText } from "../../connector.ts";
 import { type Found, HOUR, lostDetail, rescanDelay } from "../../discover.ts";
 import { poller } from "../../poll.ts";
-import type { Integration, Part, Status } from "../../home.ts";
+import {
+  type DeviceRecord,
+  deviceRecords,
+  type Integration,
+  type Part,
+  type Status,
+} from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { type CastChannel, type CastConnect, NS } from "./codec.ts";
 import { CastPayload, KNOWN_TYPES } from "./schemas.ts";
@@ -16,6 +22,10 @@ import {
   mediaApp,
   reduce,
   type Resolved,
+  castDevices,
+  type CastForm,
+  type CastStatus,
+  castStatus,
 } from "./state.ts";
 import {
   type CastActions,
@@ -27,8 +37,15 @@ import {
 } from "./writes.ts";
 
 export type { CastConnect } from "./codec.ts";
-export { castForm } from "./state.ts";
-export type { CastDevice, CastForm, CastSnapshot, Resolved } from "./state.ts";
+export { castDevices, castForm, castFree, castStatus } from "./state.ts";
+export type {
+  CastDevice,
+  CastForm,
+  CastSkipped,
+  CastSnapshot,
+  CastStatus,
+  Resolved,
+} from "./state.ts";
 export type {
   AnnounceResult,
   CastActions,
@@ -536,11 +553,46 @@ export function castText(d: CastDevice, s: CastSnapshot): string {
   return `${d.name}: ${parts.filter(Boolean).join(" · ")}`;
 }
 
-/** Devices first, then groups, each by name. */
-export const castDevices = (s: CastSnapshot) =>
-  Object.values(s.devices).sort(
-    (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
+/** A Cast device or group as a home device: `kind` is its form (`cast` for a model it doesn't know) or `group`; `detail` its `CastStatus`. */
+export type CastHomeDevice = DeviceRecord<
+  "cast",
+  CastForm | "cast" | "group",
+  CastStatus["state"],
+  CastStatus
+>;
+
+/** Every Cast device and group as a home device, devices first, each by name. */
+export function castHomeDevices(
+  part: Part<CastSnapshot> | undefined,
+): CastHomeDevice[] {
+  const s = part?.state;
+  if (!s) return [];
+  return deviceRecords(
+    part,
+    castStatus(s).map((detail): CastHomeDevice => {
+      const d = s.devices[detail.id]!;
+      // Connected and heard from: available. Connecting, or connected with no status yet: not known.
+      const available =
+        d.status === "disconnected"
+          ? false
+          : d.status === "connected" && detail.state !== "offline"
+            ? true
+            : undefined;
+      return {
+        connector: "cast",
+        id: d.id,
+        name: d.name,
+        kind: d.kind === "group" ? "group" : (d.form ?? "cast"),
+        ...(available === undefined ? {} : { available }),
+        ...(d.asOf ? { asOf: d.asOf } : {}), // never answered: no time to give
+        state: detail.state,
+        text: castText(d, s),
+        ...(d.members ? { members: d.members } : {}),
+        detail,
+      };
+    }),
   );
+}
 
 /** How many entries have an address, and one line per device and group. */
 const castView = (s: CastSnapshot) => ({

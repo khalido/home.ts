@@ -1,10 +1,21 @@
 import { z } from "zod";
 import { asOf, type Clock, realClock } from "../../clock.ts";
 import { ConnectorError, errorText } from "../../connector.ts";
-import type { Integration, Part, Status } from "../../home.ts";
+import {
+  type DeviceRecord,
+  deviceRecords,
+  type Integration,
+  type Part,
+  type Status,
+} from "../../home.ts";
 import { writeLane } from "../../lane.ts";
 import type { Manifest } from "../../manifest.ts";
-import { spotifyText, stallText } from "./changes.ts";
+import {
+  type SpeakerState,
+  speakerState,
+  spotifyText,
+  stallText,
+} from "./changes.ts";
 import {
   commandFrame,
   fold,
@@ -734,6 +745,9 @@ export function spotify(
         async () => {
           const no = notPlaying();
           if (no) return no;
+          // "playing" while inactive is the account playing on another speaker (live, 2026-11-10): a pause would stop that one.
+          if (inactive())
+            return "it is not the active device, so the music playing is on another speaker";
           track = state.track?.uri;
           try {
             shown = (await actions.pause()).confirmed; // a pause that never shows still runs fn: what interrupts matters more
@@ -1000,3 +1014,32 @@ export const manifest: Manifest<SpotifyState> = {
       ? [spotifyText(state)]
       : [],
 };
+
+/** The Soloist speaker as a home device: `state` is `speakerState`'s word; `detail` its `SpotifyState`. */
+export type SpotifyHomeDevice = DeviceRecord<
+  "spotify",
+  "speaker",
+  SpeakerState,
+  SpotifyState
+>;
+
+/** The one speaker, once Soloist has said something. Its name is Soloist's `--device-name`, the one phones show. */
+export function spotifyHomeDevices(
+  part: Part<SpotifyState> | undefined,
+): SpotifyHomeDevice[] {
+  const s = part?.state;
+  if (!s || (s.loggedIn === undefined && s.status === undefined)) return [];
+  return deviceRecords<SpotifyHomeDevice>(part, [
+    {
+      connector: "spotify",
+      id: "spotify",
+      name: s.deviceName ?? "Soloist",
+      kind: "speaker",
+      available: true,
+      state: speakerState(part),
+      asOf: s.asOf,
+      text: spotifyText(s),
+      detail: s,
+    },
+  ]);
+}

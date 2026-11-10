@@ -17,13 +17,29 @@ export function errorText(error: unknown): string {
     : error.message;
 }
 
+/**
+ * Every `code` a `ConnectorError` from this library carries, so a consumer's table of messages fails to compile when one is added.
+ * The spotify connector's writes: `offline` (not connected), `waiting` (nobody signed in), `inactive` (not the active device), `refused`
+ * (the device said no), `timeout` (no answer), `invalid` (bad input, nothing sent). `link_button`: Hue wants its button
+ * pressed. `ipp`: a printer answered with an IPP error, its code in `status`.
+ */
+export type ConnectorCode =
+  | "offline"
+  | "waiting"
+  | "inactive"
+  | "refused"
+  | "timeout"
+  | "invalid"
+  | "link_button"
+  | "ipp";
+
 /** A failed device or service call. `status` is the HTTP status (or a device's own code); `code` a connector's own reason. */
 export class ConnectorError extends Error {
   readonly status?: number;
-  readonly code?: string;
+  readonly code?: ConnectorCode;
   constructor(
     message: string,
-    options: { status?: number; code?: string; cause?: unknown } = {},
+    options: { status?: number; code?: ConnectorCode; cause?: unknown } = {},
   ) {
     super(
       message,

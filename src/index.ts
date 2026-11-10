@@ -3,6 +3,8 @@
 export {
   type Change,
   createHome,
+  type DeviceRecord,
+  deviceRecords,
   envName,
   filePath,
   settle,
@@ -20,8 +22,9 @@ export {
   PUSH_DOWN_MS,
   STALE_POLLS,
 } from "./health.ts";
+export { type HomeDevice, homeDevices } from "./devices.ts";
 export { asOf, type Clock, realClock } from "./clock.ts";
-export { ConnectorError } from "./connector.ts";
+export { type ConnectorCode, ConnectorError } from "./connector.ts";
 export {
   bestWindow,
   type EnergyNow,

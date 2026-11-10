@@ -37,6 +37,23 @@ health(home.snapshot(), Date.now()); // per integration: ok, stale or down, with
 
 `createHome` stamps each part with `lastGoodAt` (its last good read) and `downSince` (when it stopped being connected). `health` judges from those: a polling connector is stale after 2½ polls with no good read and down after 3 polls not connected; Hue and Cast are down after 2 minutes not connected. Health takes each connector's interval from its manifest; a home that changes one (the weather's `pollMinutes`) passes it: `health(snapshot, now, { pollSeconds: { weather: 60 * 60 } })`. For a one-shot read (a script, a printed brief), `settle(integrations, { ms })` runs them until each has answered and returns the snapshot.
 
+## Every device, the same way
+
+`homeDevices(home.snapshot(), config)` lists every device the home has: each Hue light, room and zone, the Daikin, the Enphase gateway, each Cast device and group, each printer and the Soloist speaker. Each answers the same questions in the same words: `connector`, `id`, `name`, `kind` (light, group, speaker, display, tv, ac, printer, solar; `cast` for a Cast model the library doesn't know), `available` (and when it is false, `reason`: `offline`, `auth`, `config` or `crashed`), `asOf` (when the device last reported or was last read; a quiet light can be hours old and current), `state` (one word: on, off, idle, busy, cool, printing), `text` (one line for people), `room` and, for a group, `members`. A field the device hasn't reported is absent. The config is optional: with it a device takes its entry's `room`, and a device with no name of its own (the Daikin, the gateway) its entry's `name`; a device's own name is never replaced. While a connector isn't connected none of its devices is `available`, and each keeps its last values.
+
+To drill down, `detail` is the connector's own typed row, and `connector` (with `kind` for Hue) tells TypeScript which:
+
+```ts
+for (const d of homeDevices(home.snapshot(), config)) {
+  console.log(d.text); // "Kitchen: on · 60%"
+  if (d.connector === "cast") d.detail.volume; // CastStatus
+  if (d.connector === "hue" && d.kind === "light") d.detail.brightness; // LightView
+  if (d.connector === "printers") d.detail.markers; // Printer
+}
+```
+
+Below that is the connector's snapshot, exactly as the device sent it (`home.part("hue")?.state`). One connector alone: `castHomeDevices(home.part("cast"))`, and likewise `hueHomeDevices`, `daikinHomeDevices`, `enphaseHomeDevices`, `printersHomeDevices`, `spotifyHomeDevices`. The list is for reading; a write goes to the device's connector, with `d.id` where it takes one.
+
 ## Writes
 
 Writes hang off the integration: `home.integration("daikin")?.client.write(setMode("cool"))`, `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`, `home.integration("spotify")?.play(link)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands. Spotify's writes resolve with `{ state, confirmed }`, the state once Soloist reported the change, and `duck(fn, { to })` and `interrupt(fn)` turn the music down or pause it around an announcement, returning what happened to it (`music`: `untouched`, `restored`, `kept` or `failed`). `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, stalled, recovered, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.

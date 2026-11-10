@@ -8,13 +8,16 @@ import {
   MultizoneStatus,
   ReceiverStatus,
 } from "./schemas.ts";
-import { type CastDevice, castKey } from "./state.ts";
+import {
+  type CastDevice,
+  castKey,
+  DEFAULT_MEDIA_RECEIVER,
+  findCast,
+} from "./state.ts";
 
 // Writes over the sockets `cast()` already holds: volume, mute, stop, and an announcement that plays a clip and puts
-// the device back as it was. Never called by the integration itself; tried on a scripted fake socket, not yet live.
+// the device back as it was. Never called by the integration itself; announce, volume and mute have run on real devices (the README has the dates).
 
-/** Google's own player for a URL of audio or video. */
-export const DEFAULT_MEDIA_RECEIVER = "CC1AD845";
 /** Each request (a status, a volume, LAUNCH, LOAD, STOP) gets this long to answer. */
 export const ANSWER_MS = 10_000;
 /** How long an announcement waits for its clip to finish, beyond the clip's own length when the device reports it. */
@@ -200,9 +203,7 @@ export function castActions(ctx: WriteContext): CastActions {
 
   const find = (target: string): CastDevice => {
     const all = Object.values(ctx.devices());
-    const d =
-      all.find((x) => x.id === castKey(target)) ??
-      all.find((x) => x.name.toLowerCase() === target.toLowerCase());
+    const d = findCast(ctx.devices(), target);
     if (!d)
       throw new Error(
         `no Cast device or group "${target}"; have: ${

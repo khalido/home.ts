@@ -340,6 +340,17 @@ async function refusal(res: Response): Promise<string | undefined> {
   }
 }
 
+/** Google's refusal: the HTTP status, and `why`, the reason its error body gave. */
+class GoogleError extends ConnectorError {
+  constructor(
+    message: string,
+    status: number,
+    readonly why?: string,
+  ) {
+    super(message, { status });
+  }
+}
+
 /**
  * Google Weather as a source: modelled `now`, `forecast` (10 days available, 2 read), `sky` without radiation, and `rain` from the
  * minute forecast (Experimental at Google, so its failure is a `problem` on `rain` and never stops the other slices).
@@ -385,9 +396,10 @@ export function google(options: GoogleOptions): WeatherSource {
         );
         if (res.ok) return res.json();
         const why = await refusal(res);
-        throw new ConnectorError(
+        throw new GoogleError(
           `HTTP ${res.status}${why ? ` ${why}` : ""} on GET /${path.split("?")[0]}`,
-          { status: res.status, code: why },
+          res.status,
+          why,
         );
       };
       // Started first and never throws: a failed minute forecast must not sink the rest.
@@ -416,13 +428,13 @@ export function google(options: GoogleOptions): WeatherSource {
           slowDue = nextPoll(at, Math.max(pollMinutes, CURRENT_MINUTES));
         }
       } catch (error) {
-        // Only a ConnectorError is Google's answer; a timeout or an abort is a DOMException, whose `code` is a number.
-        const { status, code } =
-          error instanceof ConnectorError
+        // Only a GoogleError is Google's answer; a timeout or an abort is a DOMException, with fields of its own.
+        const { status, why } =
+          error instanceof GoogleError
             ? error
-            : ({} as { status?: number; code?: string });
-        const said = `HTTP ${status}${code ? ` ${code}` : ""}`;
-        if (status === 401 || status === 403 || code?.startsWith("API_KEY_"))
+            : ({} as { status?: number; why?: string });
+        const said = `HTTP ${status}${why ? ` ${why}` : ""}`;
+        if (status === 401 || status === 403 || why?.startsWith("API_KEY_"))
           return {
             stop: `google: the key was rejected (${said})`,
             stopReason: "auth",

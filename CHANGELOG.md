@@ -8,15 +8,23 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 - **`Part.reason`:** why a part is `unavailable`, for code to switch on: `auth` (a key or token was rejected or unusable, so a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw). `health()` and `home --json` carry it. It can be absent. An Enphase token that does not parse is now `unavailable` with `auth`, not `crashed`.
 
+- **`homeDevices(snapshot, config?)`:** every device in the home in one list, each answering the same questions (`connector`, `id`, `name`, `kind`, `available`, `reason`, `asOf`, `state`, `text`, `room`, `members`), with the connector's own typed row in `detail` and `connector` narrowing its type. Each device connector also exports its own: `hueHomeDevices`, `daikinHomeDevices`, `enphaseHomeDevices`, `castHomeDevices`, `printersHomeDevices`, `spotifyHomeDevices`.
+- **`ConnectorCode`:** the type of `ConnectorError.code`, every code the library sets, so a consumer's table of messages fails to compile when one is added.
+- **cast:** `castStatus(snapshot)` says what each device and group is doing (`idle`, `restorable`, `busy` or `offline`, with the app, title and volume), and `castFree(snapshot, targets)` gives the targets an announcement would not disturb, with the ones it `skipped` and why. For announcing only where nothing is playing.
 - **weather:** `reason` on an `unavailable` weather part (`auth` if a stopped source's key was rejected, else `config`), and `state.sources.<name>.reason` beside `stopped`, so code can see a dead Google key while another source keeps the part `connected`. A custom `WeatherSource` can return `stopReason` with `stop`.
 
 ### Changed
+
+- **`ConnectorError.code`** is typed `ConnectorCode`, no longer `string`: code that builds a `ConnectorError` with a code of its own stops compiling.
+
+- **hue:** a room or zone the bridge gives no on or off for prints its name alone in `home hue`, no longer "off".
 
 - **weather:** Google's key is sent in the `X-Goog-Api-Key` header, no longer in the URL.
 - **weather:** Google's stop text says which it was: `google: the key was rejected (HTTP 400 API_KEY_INVALID)` or `google: the request was refused (HTTP 400); check the latitude and longitude`. Before, both read `key rejected or request refused`.
 
 ### Fixed
 
+- **spotify:** `interrupt` paused the music when the account was playing on another speaker (the box reports `playing` while not the active device). It now leaves it alone and returns `music: "untouched"`, as `duck` does.
 - **spotify:** `maxVolume` gave up when a lowering was refused or unanswered after a second start signal (buffering, then playing) had opened a new window, leaving the volume above the cap. The new window now lowers again.
 - **`createHome`:** an `onChange` that throws or rejects no longer marks the integration `unavailable`; the error goes to `console.error` and the integration keeps running.
 - **`createHome`:** `refresh()` before `start()` resolves at once instead of never.

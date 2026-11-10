@@ -5,6 +5,8 @@ import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import {
   envName,
   filePath,
+  type DeviceRecord,
+  deviceRecords,
   type Integration,
   type Part,
   type Status,
@@ -14,8 +16,10 @@ import { bunPinnedFetch, type HueClient, hueClient } from "./client.ts";
 import { hueEvents, isRejectedKey } from "./events.ts";
 import type { HueEvent } from "./schemas.ts";
 import {
+  type GroupView,
   groups,
   type HueSnapshot,
+  type LightView,
   lights,
   reduce,
   snapshotFrom,
@@ -216,6 +220,56 @@ const view = (s: HueSnapshot) => ({
   })),
 });
 
+/** "Kitchen: on · 40%", "Kitchen: off", or the name alone when the bridge hasn't said. */
+const onText = (v: {
+  name?: string;
+  id: string;
+  on?: boolean;
+  brightness?: number;
+}) =>
+  `${v.name ?? v.id}${v.on === undefined ? "" : `: ${v.on ? `on${v.brightness === undefined ? "" : ` · ${Math.round(v.brightness)}%`}` : "off"}`}`;
+
+/** A Hue light, or a room or zone, as a home device: `detail` is its `LightView` or `GroupView`. */
+export type HueHomeDevice =
+  | DeviceRecord<"hue", "light", "on" | "off", LightView>
+  | DeviceRecord<"hue", "group", "on" | "off", GroupView>;
+
+/** Every light, then every room and zone. A light's `available` is its Zigbee link; a group's `members` are its lights. */
+export function hueHomeDevices(
+  part: Part<HueSnapshot> | undefined,
+): HueHomeDevice[] {
+  const s = part?.state;
+  if (!s) return [];
+  const on = (v: { on?: boolean }) =>
+    v.on === undefined
+      ? {}
+      : { state: v.on ? ("on" as const) : ("off" as const) };
+  return deviceRecords<HueHomeDevice>(part, [
+    ...lights(s).map((l): HueHomeDevice => ({
+      connector: "hue",
+      id: l.id,
+      name: l.name ?? l.id,
+      kind: "light",
+      ...(l.reachable === undefined ? {} : { available: l.reachable }),
+      ...on(l),
+      asOf: s.asOf,
+      text: onText(l),
+      detail: l,
+    })),
+    ...groups(s).map((g): HueHomeDevice => ({
+      connector: "hue",
+      id: g.id,
+      name: g.name ?? g.id,
+      kind: "group",
+      ...on(g),
+      asOf: s.asOf,
+      text: onText(g),
+      members: g.lightIds,
+      detail: g,
+    })),
+  ]);
+}
+
 export const manifest: Manifest<HueSnapshot> = {
   name: "hue",
   title: "Philips Hue",
@@ -249,14 +303,8 @@ export const manifest: Manifest<HueSnapshot> = {
   /** "3 lights on", then "Kitchen: on · 40%" per room and zone. */
   lines({ state }) {
     if (!state) return [];
-    const { lightsOn, rooms } = view(state);
-    return [
-      `${lightsOn} lights on`,
-      ...rooms.map(
-        (r) =>
-          `${r.name}: ${r.on ? `on${r.brightness === undefined ? "" : ` · ${Math.round(r.brightness)}%`}` : "off"}`,
-      ),
-    ];
+    const { lightsOn } = view(state);
+    return [`${lightsOn} lights on`, ...groups(state).map(onText)];
   },
   record: ({ state }) => (state ? view(state) : {}),
 };

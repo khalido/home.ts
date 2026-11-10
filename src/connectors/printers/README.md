@@ -1,6 +1,6 @@
 # Printers
 
-AirPrint printers, found by mDNS and read over IPP on the local network. `iot_class`: **local_polling** (one Get-Printer-Attributes per printer every 120 s). Built read-only; **untried on a live printer** (the Brother KO has did not answer mDNS on 2026-10-14, see Live findings).
+AirPrint printers, found by mDNS and read over IPP on the local network. `iot_class`: **local_polling** (one Get-Printer-Attributes per printer every 120 s). Built read-only; first read of a live printer 2026-11-10 (see Live findings).
 
 Try it: `home printers`
 
@@ -34,7 +34,9 @@ Everything, until a real printer answers: the request bytes (the codec is checke
 
 ## Live findings
 
-None yet. 2026-10-14 (Bun 1.4.3): `home discover` (two passes) and `home printers` found no `_ipp._tcp` or `_ipps._tcp` instance on the network, so the Brother was not advertising (off, asleep, or on another network).
+**2026-11-10, from a Pi (Bun 1.4.4, 0.1.2; chota-bot's session).** `home discover` found the Brother by mDNS and `home printers` read it: "Brother HL-L2350DW series: idle · BK 80% · A4 ready". So discovery, the request, the default path, a real `marker-levels` and `media-ready` work on this model. Still unverified from the list above: `printer-uuid` against TXT `UUID`, a sleeping printer waking, `printer-alert`, and the macOS local-network prompt.
+
+2026-10-14 (Bun 1.4.3): `home discover` (two passes) and `home printers` found no `_ipp._tcp` or `_ipps._tcp` instance on the network, so the Brother was not advertising (off, asleep, or on another network).
 
 ## Sources
 

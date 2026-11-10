@@ -1,6 +1,12 @@
 import { type Clock, localDay, realClock } from "../../clock.ts";
 import { z } from "zod";
-import { filePath, type Integration } from "../../home.ts";
+import {
+  type DeviceRecord,
+  deviceRecords,
+  filePath,
+  type Integration,
+  type Part,
+} from "../../home.ts";
 import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import { kw, type Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
@@ -249,3 +255,34 @@ export const manifest: Manifest<EnphaseSnapshot> = {
   files: ["token"],
   lines: ({ state }) => (state ? [enphaseText(state)] : []),
 };
+
+/** The gateway as a home device: `state` is `producing` while the solar makes power, else `idle`; `detail` its snapshot. */
+export type EnphaseHomeDevice = DeviceRecord<
+  "enphase",
+  "solar",
+  "producing" | "idle",
+  EnphaseSnapshot
+>;
+
+/** The one gateway, once it has been read. */
+export function enphaseHomeDevices(
+  part: Part<EnphaseSnapshot> | undefined,
+): EnphaseHomeDevice[] {
+  const s = part?.state;
+  if (!s) return [];
+  return deviceRecords<EnphaseHomeDevice>(part, [
+    {
+      connector: "enphase",
+      id: "enphase",
+      name: manifest.title,
+      kind: "solar",
+      available: true,
+      ...(s.productionW === undefined
+        ? {}
+        : { state: s.productionW > 0 ? "producing" : "idle" }),
+      asOf: s.asOf,
+      text: `${manifest.title}: ${enphaseText(s)}`,
+      detail: s,
+    },
+  ]);
+}

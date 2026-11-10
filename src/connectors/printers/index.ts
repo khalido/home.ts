@@ -11,7 +11,13 @@ import {
   lostDetail,
   rescanDelay,
 } from "../../discover.ts";
-import type { Integration, Part, Status } from "../../home.ts";
+import {
+  type DeviceRecord,
+  deviceRecords,
+  type Integration,
+  type Part,
+  type Status,
+} from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
 import { getPrinterAttributes, printerUrl } from "./client.ts";
@@ -19,6 +25,7 @@ import { attributesOf } from "./codec.ts";
 import {
   type Printer,
   printerKey,
+  type PrinterStatus,
   printerText,
   type PrintersState,
   type Reading,
@@ -383,3 +390,38 @@ export const manifest: Manifest<PrintersState> = {
     ];
   },
 };
+
+/** A printer as a home device: `state` is the printer's own (`idle`, `printing`, `stopped`, `offline`); `detail` its `Printer`. */
+export type PrinterHomeDevice = DeviceRecord<
+  "printers",
+  "printer",
+  PrinterStatus,
+  Printer
+>;
+
+/** Every printer, by name. One that has stopped answering is not `available`, and keeps its last values. */
+export function printersHomeDevices(
+  part: Part<PrintersState> | undefined,
+): PrinterHomeDevice[] {
+  if (!part?.state) return [];
+  return deviceRecords(
+    part,
+    printerList(part.state).map((p): PrinterHomeDevice => ({
+      connector: "printers",
+      id: p.uuid,
+      name: p.name,
+      kind: "printer",
+      ...(p.state === undefined ? {} : { available: p.state !== "offline" }),
+      ...(p.state === undefined ? {} : { state: p.state }),
+      // An offline printer's values are from when it last answered, not from this check.
+      ...(p.state === "offline"
+        ? p.lastSeen === undefined
+          ? {}
+          : { asOf: p.lastSeen }
+        : { asOf: p.asOf }),
+      text: printerText(p),
+      ...(p.room ? { room: p.room } : {}),
+      detail: p,
+    })),
+  );
+}

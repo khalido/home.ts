@@ -1,10 +1,20 @@
 import { asOf, type Clock, realClock } from "../../clock.ts";
 import { z } from "zod";
-import type { Integration } from "../../home.ts";
+import {
+  type DeviceRecord,
+  deviceRecords,
+  type Integration,
+  type Part,
+} from "../../home.ts";
 import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
-import { daikinClient, DaikinError, type DaikinState } from "./client.ts";
+import {
+  daikinClient,
+  DaikinError,
+  type DaikinState,
+  type Mode,
+} from "./client.ts";
 
 export {
   DaikinError,
@@ -143,3 +153,32 @@ export const manifest: Manifest<DaikinSnapshot> = {
   ],
   lines: ({ state }) => (state ? [acText(state)] : []),
 };
+
+/** The AC as a home device: `state` is `off`, its mode while on, or `on` when it hasn't said which; `detail` its snapshot. */
+export type DaikinHomeDevice = DeviceRecord<
+  "daikin",
+  "ac",
+  "off" | "on" | Mode,
+  DaikinSnapshot
+>;
+
+/** The one unit, once it has been read. It reports no name or id of its own: a home config's entry names and places it. */
+export function daikinHomeDevices(
+  part: Part<DaikinSnapshot> | undefined,
+): DaikinHomeDevice[] {
+  const s = part?.state;
+  if (!s) return [];
+  return deviceRecords<DaikinHomeDevice>(part, [
+    {
+      connector: "daikin",
+      id: "daikin",
+      name: manifest.title,
+      kind: "ac",
+      available: true,
+      ...(s.on === undefined ? {} : { state: s.on ? (s.mode ?? "on") : "off" }),
+      asOf: s.asOf,
+      text: `${manifest.title}: ${acText(s)}`,
+      detail: s,
+    },
+  ]);
+}

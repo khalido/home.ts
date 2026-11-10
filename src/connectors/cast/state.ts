@@ -213,3 +213,180 @@ function link(s: CastSnapshot): CastSnapshot {
     if (d.playingVia === undefined) delete d.playingVia;
   return { devices, asOf: s.asOf };
 }
+
+/** Google's own player for a URL of audio or video: what `announce` plays a clip with, and can put back. */
+export const DEFAULT_MEDIA_RECEIVER = "CC1AD845";
+
+/** Devices first, then groups, each by name. */
+export const castDevices = (s: CastSnapshot) =>
+  Object.values(s.devices).sort(
+    (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
+  );
+
+/** A target is a castId, else a name in any case. `announce` and `castFree` find it the same way. */
+export const findCast = (
+  devices: Record<string, CastDevice>,
+  target: string,
+): CastDevice | undefined => {
+  const all = Object.values(devices);
+  return (
+    all.find((x) => x.id === castKey(target)) ??
+    all.find((x) => x.name.toLowerCase() === target.toLowerCase())
+  );
+};
+
+/**
+ * What a device or group is doing, for a caller choosing where to play something. `state`:
+ * - `idle`: no app, or the idle screen.
+ * - `restorable`: the Default Media Receiver, whose clip `announce` puts back at its position.
+ * - `busy`: another app, playing or paused. An announce ends it and nothing here can resume it.
+ * - `offline`: not connected, or connected and not heard from yet.
+ * A member playing its group's media takes the group's state, with `via` naming the group and `app` the group's. A group
+ * is as free as its least free connected member. `standby` is a TV that is off or on another input: `idle` by its app,
+ * but a clip may wake it.
+ */
+export type CastStatus = {
+  id: string;
+  name: string;
+  kind: "device" | "group";
+  state: "idle" | "restorable" | "busy" | "offline";
+  app?: string;
+  playerState?: string;
+  title?: string;
+  artist?: string;
+  via?: string;
+  volume?: number;
+  muted?: boolean;
+  standby?: boolean;
+  members?: CastStatus[]; // groups: each member the snapshot has
+};
+
+const RANK = { idle: 0, restorable: 1, busy: 2, offline: 3 } as const;
+
+/** By its own app alone: not its group's media, not its members. */
+const ownState = (d: CastDevice): CastStatus["state"] =>
+  d.status !== "connected" || d.idle === undefined
+    ? "offline"
+    : d.idle
+      ? "idle"
+      : d.appId === DEFAULT_MEDIA_RECEIVER
+        ? "restorable"
+        : "busy";
+
+/** Every device and group in the snapshot as a `CastStatus`, devices first, each by name. */
+export function castStatus(s: CastSnapshot): CastStatus[] {
+  const one = (d: CastDevice): CastStatus => {
+    const group = d.playingVia ? s.devices[d.playingVia] : undefined;
+    const own = ownState(d);
+    // Its group's media is playing on it: the group's app decides, and an unknown one counts as busy.
+    const self =
+      own === "offline" || !d.playingVia
+        ? own
+        : group && ownState(group) === "restorable"
+          ? "restorable"
+          : "busy";
+    const members =
+      d.kind === "group"
+        ? (d.members ?? []).flatMap((id) =>
+            s.devices[id] ? [one(s.devices[id])] : [],
+          )
+        : undefined;
+    const state =
+      self === "offline"
+        ? self
+        : (members ?? [])
+            .map((m) => m.state)
+            .filter((m) => m !== "offline")
+            .reduce((a, b) => (RANK[b] > RANK[a] ? b : a), self);
+    const status: CastStatus = {
+      id: d.id,
+      name: d.name,
+      kind: d.kind,
+      state,
+      app:
+        d.idle === false
+          ? d.app
+          : group?.idle === false
+            ? group.app
+            : undefined,
+      playerState: d.playerState,
+      title: d.title,
+      artist: d.artist,
+      via: d.playingVia && (group?.name ?? d.playingVia),
+      volume: d.volume,
+      muted: d.muted,
+      standby: d.standby,
+      members,
+    };
+    for (const k of Object.keys(status) as (keyof CastStatus)[])
+      if (status[k] === undefined) delete status[k];
+    return status;
+  };
+  return castDevices(s).map(one);
+}
+
+/** A target `castFree` left out: `standby` is a TV that is off, which a clip may wake. */
+export type CastSkipped = {
+  name: string;
+  why: "busy" | "offline" | "standby" | "unknown";
+  app?: string;
+};
+
+/**
+ * Of these targets (names in any case, or ids), the ones an announcement would not disturb: `idle` or `restorable`, and
+ * not a TV in standby. `free` is names, for `announceAll`; `skipped` says which were left out and why.
+ * - A group stays a group while every connected member is free. An offline member doesn't split it: the group plays without it.
+ * - A group playing another app is skipped whole. Otherwise a group with a busy member, or one whose own socket is down,
+ *   becomes its free members, named one by one (they then play out of step with each other).
+ * - A device is never named beside a free group that holds it, nor two groups that share a member: the second becomes its
+ *   members not yet covered.
+ */
+export function castFree(
+  s: CastSnapshot,
+  targets: string[],
+): { free: string[]; skipped: CastSkipped[] } {
+  const status = new Map(castStatus(s).map((c) => [c.id, c]));
+  const free = new Map<string, CastStatus>();
+  const covered = new Set<string>(); // members of the groups in `free`
+  const skipped = new Map<string, CastSkipped>();
+  const ok = (c: CastStatus) =>
+    (c.state === "idle" || c.state === "restorable") && !c.standby;
+  const skip = (c: CastStatus) =>
+    skipped.set(c.id, {
+      name: c.name,
+      why:
+        c.state === "offline"
+          ? "offline"
+          : c.standby && c.state !== "busy"
+            ? "standby"
+            : "busy",
+      ...(c.app ? { app: c.app } : {}),
+    });
+  const device = (c: CastStatus) => (ok(c) ? free.set(c.id, c) : skip(c));
+  for (const target of targets) {
+    const d = findCast(s.devices, target);
+    const c = d && status.get(d.id);
+    if (!d || !c) skipped.set(target, { name: target, why: "unknown" });
+    else if (c.kind === "device") device(c);
+    else {
+      const members = c.members ?? [];
+      const own = ownState(d);
+      const up = members.filter((m) => m.state !== "offline");
+      if (own === "busy" || (own === "offline" && !members.length)) skip(c);
+      else if (
+        own !== "offline" &&
+        up.every(ok) &&
+        !members.some((m) => covered.has(m.id))
+      ) {
+        free.set(c.id, c);
+        for (const m of members) covered.add(m.id);
+      } else for (const m of members) device(m);
+    }
+  }
+  return {
+    free: [...free.values()]
+      .filter((c) => c.kind === "group" || !covered.has(c.id))
+      .map((c) => c.name),
+    skipped: [...skipped.values()],
+  };
+}

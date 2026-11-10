@@ -36,6 +36,61 @@ export type Part<S = unknown> = {
 };
 
 /**
+ * The few things every device answers, whatever it is, in the same words; a connector's `<name>HomeDevices(part)` returns
+ * these and `homeDevices(snapshot)` collects them. Everything particular to its kind is in `detail`, the connector's own
+ * typed row, and `connector` (with `kind`) says which type that is. Unknown stays absent, never guessed.
+ * - `id`: the device's own stable id (a Hue light id, a castId, a printer's UUID), or the connector's name when it has one device.
+ * - `kind`: light, group, speaker, display, tv, ac, printer, solar (and `cast` for a Cast model this library doesn't know).
+ * - `available`: it answered and can be used now. When it is false, `reason` says why in one word: `offline`, or the
+ *   connector's own reason for being `unavailable` (`auth`, `config`, `crashed`).
+ * - `asOf`: when the device last reported (a push connector) or was last read (a polled one). A quiet light can be hours
+ *   old and current: `available` says whether it is.
+ * - `state`: one short word in that kind's vocabulary: on, off, idle, busy, cool, printing.
+ * - `text`: one line for people, "Kitchen: on · 60%".
+ * - `room`: a room id from the home config, when one places it.
+ * - `members`: a group's device ids.
+ */
+export type DeviceRecord<
+  C extends string = string,
+  K extends string = string,
+  S extends string = string,
+  D = unknown,
+> = {
+  connector: C;
+  id: string;
+  name: string;
+  kind: K;
+  available?: boolean;
+  reason?: Reason | "offline";
+  asOf?: string;
+  state?: S;
+  text: string;
+  room?: string;
+  members?: string[];
+  detail: D;
+};
+
+/**
+ * A connector's device records from its part. While the connector isn't connected none is `available`, and each keeps its
+ * last values, as the part's state does. A device that isn't available gets its `reason`: the part's when it stopped for
+ * good, else `offline`.
+ */
+export const deviceRecords = <R extends DeviceRecord>(
+  part: Part | undefined,
+  records: R[],
+): R[] => {
+  const up = part?.status === "connected";
+  // A part that stopped for good without saying why is a custom integration's: `config` is the nearest true word, since it won't come back by itself.
+  const why =
+    part?.status === "unavailable" ? (part.reason ?? "config") : "offline";
+  return records.map((r) =>
+    up && r.available !== false
+      ? r
+      : { ...r, available: false, reason: up ? "offline" : why },
+  );
+};
+
+/**
  * An integration is a folder in `src/` that exports a factory returning this.
  * `run` keeps its state current until `signal` aborts, reporting each change through `update`.
  * `refresh` asks for a fresh read now, ahead of the integration's schedule; it returns at once and the read reports through `update`.

@@ -1531,6 +1531,16 @@ describe("while the speaker is not active", () => {
     await h.stop();
   });
 
+  test("interrupt runs fn and sends no pause: the music is on another speaker", async () => {
+    const { h, sock } = await inactive({ status: "playing", volume: 62 });
+    const r = await h.s.interrupt(() => "said");
+    expect(r).toMatchObject({ value: "said", music: "untouched" });
+    expect(r.why).toContain("not the active device");
+    await h.advance(100);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
   test("play goes active first, then plays", async () => {
     const { h, sock } = await inactive({ status: "paused" });
     const p = h.s.play();

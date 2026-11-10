@@ -3,7 +3,10 @@ import type { Clock, Part } from "../src/index.ts";
 import { idleClock, manualClock } from "./clock.ts";
 import {
   cast,
+  type CastDevice,
   castForm,
+  castFree,
+  castStatus,
   type CastConnect,
   type CastSnapshot,
 } from "../src/connectors/cast/index.ts";
@@ -796,5 +799,173 @@ describe("castForm", () => {
       undefined,
     ]);
     expect(castForm(undefined)).toBeUndefined();
+  });
+});
+
+describe("castStatus and castFree", () => {
+  const dev = (id: string, name: string, extra: Partial<CastDevice> = {}) =>
+    ({
+      id,
+      name,
+      kind: "device",
+      status: "connected",
+      idle: true,
+      volume: 0.5,
+      ...extra,
+    }) as CastDevice;
+  const spotifyOn = { idle: false, app: "Spotify", appId: "CC32E753" };
+  const home = (over: Record<string, Partial<CastDevice>> = {}) => {
+    const devices: Record<string, CastDevice> = {
+      a: dev("a", "Kitchen", over.a),
+      b: dev("b", "Bedroom", over.b),
+      c: dev("c", "Front room", over.c),
+      g: dev("g", "Everywhere", {
+        kind: "group",
+        members: ["a", "b", "c"],
+        ...over.g,
+      }),
+    };
+    return { devices, asOf: AT } as CastSnapshot;
+  };
+  const states = (s: CastSnapshot) =>
+    Object.fromEntries(castStatus(s).map((c) => [c.name, c.state]));
+
+  test("idle, the Default Media Receiver, another app, offline; devices first, each by name", () => {
+    const s = home({
+      a: { idle: false, app: "Default Media Receiver", appId: "CC1AD845" },
+      b: { ...spotifyOn, playerState: "PAUSED", title: "Song", artist: "X" },
+      c: { status: "disconnected" },
+    });
+    expect(castStatus(s).map((c) => c.name)).toEqual([
+      "Bedroom",
+      "Front room",
+      "Kitchen",
+      "Everywhere",
+    ]);
+    expect(states(s)).toEqual({
+      Bedroom: "busy", // paused counts: an announce would end the app
+      "Front room": "offline",
+      Kitchen: "restorable",
+      Everywhere: "busy", // as free as its least free connected member
+    });
+    expect(castStatus(s)[0]).toEqual({
+      id: "b",
+      name: "Bedroom",
+      kind: "device",
+      state: "busy",
+      app: "Spotify",
+      playerState: "PAUSED",
+      title: "Song",
+      artist: "X",
+      volume: 0.5,
+    });
+  });
+
+  test("a member playing its group's media is busy, via the group; a standby TV is idle and says so", () => {
+    const s = home({
+      a: { playerState: "PLAYING", playingVia: "g", standby: true },
+      g: { ...spotifyOn, playerState: "PLAYING" },
+    });
+    expect(castStatus(s).find((c) => c.name === "Kitchen")).toMatchObject({
+      state: "busy",
+      via: "Everywhere",
+      standby: true,
+    });
+    expect(
+      castStatus(s)
+        .at(-1)
+        ?.members?.map((m) => m.name),
+    ).toEqual(["Kitchen", "Bedroom", "Front room"]);
+  });
+
+  const dmr = {
+    idle: false,
+    app: "Default Media Receiver",
+    appId: "CC1AD845",
+  };
+
+  test("castFree: a free group stays a group, and a member named beside it is not named twice; names in any case, and ids", () => {
+    expect(castFree(home(), ["a", "everywhere"])).toEqual({
+      free: ["Everywhere"],
+      skipped: [],
+    });
+    expect(castFree(home(), ["b", "KITCHEN"]).free).toEqual([
+      "Bedroom",
+      "Kitchen",
+    ]);
+  });
+
+  test("castFree: a group with a busy member becomes its free members, and says who was skipped", () => {
+    const s = home({ b: spotifyOn, c: { standby: true } });
+    expect(castFree(s, ["Everywhere", "Kitchen", "Hallway"])).toEqual({
+      free: ["Kitchen"],
+      skipped: [
+        { name: "Bedroom", why: "busy", app: "Spotify" },
+        { name: "Front room", why: "standby" },
+        { name: "Hallway", why: "unknown" },
+      ],
+    });
+  });
+
+  test("castFree: an offline member doesn't split the group; a group whose own socket is down becomes its members", () => {
+    expect(
+      castFree(home({ c: { status: "disconnected" } }), ["Everywhere"]),
+    ).toEqual({ free: ["Everywhere"], skipped: [] });
+    expect(
+      castFree(home({ g: { status: "disconnected" } }), ["Everywhere"]).free,
+    ).toEqual(["Kitchen", "Bedroom", "Front room"]);
+  });
+
+  test("castFree: a group playing another app is skipped whole, whatever its members say", () => {
+    const via = { playerState: "PLAYING", playingVia: "g" };
+    const playing = home({ a: via, b: via, c: via, g: spotifyOn });
+    const loaded = home({ g: spotifyOn }); // the app is up, no media status yet: the members still read idle
+    for (const s of [playing, loaded])
+      expect(castFree(s, ["Everywhere"])).toEqual({
+        free: [],
+        skipped: [{ name: "Everywhere", why: "busy", app: "Spotify" }],
+      });
+    expect(castStatus(playing).find((c) => c.name === "Kitchen")).toMatchObject(
+      { state: "busy", via: "Everywhere", app: "Spotify" },
+    );
+  });
+
+  test("castFree: a group playing the Default Media Receiver is restorable, members and all, and stays a group", () => {
+    const via = { playerState: "PLAYING", playingVia: "g" };
+    const s = home({ a: via, b: via, c: via, g: dmr });
+    expect(states(s)).toEqual({
+      Kitchen: "restorable",
+      Bedroom: "restorable",
+      "Front room": "restorable",
+      Everywhere: "restorable",
+    });
+    expect(castFree(s, ["Everywhere"]).free).toEqual(["Everywhere"]);
+    expect(castFree(home({ a: dmr }), ["Kitchen"]).free).toEqual(["Kitchen"]);
+  });
+
+  test("castFree: a device not heard from yet is offline, not idle; a group with no members known is judged by itself, never lost", () => {
+    const s = home({ a: { idle: undefined }, g: { members: [] } });
+    expect(castFree(s, ["Kitchen", "Everywhere"])).toEqual({
+      free: ["Everywhere"],
+      skipped: [{ name: "Kitchen", why: "offline" }],
+    });
+    const down = home({ g: { members: [], status: "disconnected" } });
+    expect(castFree(down, ["Everywhere"])).toEqual({
+      free: [],
+      skipped: [{ name: "Everywhere", why: "offline" }],
+    });
+  });
+
+  test("castFree: two groups that share a member: the second becomes its members not yet covered", () => {
+    const s = home();
+    s.devices.h = dev("h", "Downstairs", {
+      kind: "group",
+      members: ["a", "d"],
+    });
+    s.devices.d = dev("d", "Hall");
+    expect(castFree(s, ["Everywhere", "Downstairs"]).free).toEqual([
+      "Everywhere",
+      "Hall",
+    ]);
   });
 });

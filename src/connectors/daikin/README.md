@@ -63,6 +63,10 @@ All setpoint and fan fields, read from `e_3001` with `md` (setpoint is one byte,
 
 Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, `mi FA`, `mx 00`), and the `p_05`–`p_08`, `p_20`–`p_25` fields (3- and 4-byte values, mostly `0F…`, likely schedules or limits). Meaning unknown.
 
+## Read from a Pi (2026-11-10)
+
+`home daikin` on 0.1.2 (Bun 1.4.4; chota-bot's session): "connected · off · dry · room 26 °C · outdoor unit 28 °C". `home discover` found the unit by UDP. No write was sent.
+
 ## Sources
 
 Both Daikin protocol sources are GPL-3.0, so they are read for facts only (endpoints, field paths, value maps) and no code is copied; that keeps this package MIT.

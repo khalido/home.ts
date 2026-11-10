@@ -29,9 +29,14 @@ Four read-only subagent tracks plus my own reads, each checked against the code.
 
 ## Committed 2026-11-10, not pushed or released
 
-`Part.reason` (`auth`, `config`, `crashed`), weather's reasons, Google's key in a header and the spotify cap fix, all through `/ko-review`. `bun run check` and 492 tests pass (Bun 1.4.4). `main` is 3 commits ahead of `origin`.
+All through `/ko-review`; `bun run check` and 511 tests pass (Bun 1.4.4). `main` is 4 commits ahead of `origin`.
 
-The four cap flags (`capping`, `capped`, `capUntil`, `startBuffering`) are a state machine in all but name; one explicit phase would have made the hole visible. Not done.
+- `61eee56`: `Part.reason` (`auth`, `config`, `crashed`), weather's reasons, Google's key in a header, the spotify cap fix.
+- The commit after it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `ConnectorCode`, spotify's `interrupt` leaving an inactive speaker alone, and chota's live results in the READMEs.
+
+Hue's device records are from the docs' shapes, like the rest of Hue. Not built: a `home devices` command (status keeps rows, not parts, so it needs a small change there). From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
+
+The four cap flags in spotify (`capping`, `capped`, `capUntil`, `startBuffering`) are a state machine in all but name. Not done.
 
 ## Where things stand
 
@@ -76,7 +81,16 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 
 ## Next, in order
 
-0. **chota-bot's live tests of 0.1.2** (it has the list; results come back here for the READMEs): the first-play cap at full volume, `activate` then `play(uri)` with no phone open, `setRepeat("off")`, `duck` around an announce, announce over playback, to a group, `announceAll`, `home cast volume`, `mute`, `stop`. Each with KO's OK. Open: one speaker read 50 before a failed announce and 56 after; the restore path is the same as a played clip's, and KO was editing the group then. Not built on purpose: a settle window for events, `available_actions`. 0.1.2's inactive refusal is by the release skill's rule a minor; KO kept the patch number.
+0. **From chota-bot's live tests of 0.1.2** (2026-11-10; the cast and spotify READMEs have the results). Most of the list worked. To fix, none started, each KO's call:
+   - **Cast: a group's own level isn't restored after an announce** (`restoreVolume` in `cast/writes.ts` restores members only). Restore the group's level after the members; chota saw that setting it then did not move them.
+   - **spotify: what KO wants from the volume is not a cap** (2026-11-10): the speaker may go to 100; a start should come back at the level he was playing at. Proposed, not agreed: hold the level. Remember the last level set through the library or reported while steadily playing, and set it back when it moves during a start, a resume or going active; a change while playing sticks. `maxVolume` becomes the level to start at when nothing is remembered, and chota saves the last level across restarts. The hard cap is dropped. The 62 on pause was one observation from one-shot CLI commands, with the cap not running, and did not repeat in the long-running integration.
+   - **spotify: `playing` while `active: false`** is the account playing elsewhere. Proposed: `speakerState` gives `elsewhere`, `spotifyText` says so, and `spotifyChanges` doesn't fire playback events for it.
+   - **`home cast volume | mute | stop` print nothing**; print the device's line, as the spotify verbs do.
+   - **Announcing over Spotify on a Cast speaker: no resume** (KO, 2026-11-10, in chota's session: "regular annoucements go to chota, and free cast spkrs. only important ones interrurpt and those are ok to disrupt the stream"). Important ones keep today's behaviour. For regular ones chota leaves busy Cast speakers alone with `castStatus` and `castFree` (built 2026-11-10, pure, over the snapshot): `castFree(snapshot, targets).free` goes to `announceAll`. To check live: what a group's members report while the group plays Spotify (the code takes `playingVia` or the member's own app as busy).
+   - Small, from chota's switch to the spotify connector (it runs on 0.1.2 in chota's working tree, not deployed): `home probe` says Hue "needs HUE_CA_FILE" though probe is documented as needing no keys; `positionMs` can step back a second around an aside; Google's `forecast/hours` pages at 24 with a `nextPageToken`, which matters if the source ever asks for more than 24 (it asks for 6). Read on the Pi, 2026-11-10: `home discover` found the Hue bridge, the gateway, 8 Cast devices, the Brother and the Daikin; `home printers` and `home daikin` read their devices.
+   - Still to run: the first-play cap from idle, stall events, `home cast stop`, an announce over a Default Media Receiver stream, `announceAll`. Open: one speaker read 50 before a failed announce and 56 after.
+
+   - **chota's ranked wishlist** (2026-11-10, KO has the same list; my triage, not agreed). Small and real, for 0.1.3: the group's level after an announce, the Cast verbs printing the device's line, a "Breaking" heading in the CHANGELOG when there is one. Next: a fake Soloist socket exported for consumers' tests (chota has written two, this repo one), `{ state, confirmed }` on Hue and Daikin writes, a tested table of clip formats per Cast device kind (needs chota's live tests), `castChanges`. Already there: `pair()` from `@khalido/home/hue` is one call that throws `link_button` until the button is pressed. Not now: writes described in the manifest with schemas so chota generates agent tools (one consumer, and Hue and Daikin writes are still untried), printer change events, an ESC/POS connector (USB, chota's).
 
 1. **From Gemini's second pass** (not bugs, or KO's call): Google-only weather goes `disconnected` when only the minute forecast failed; printers off at night go `down`; `createHome`'s clock is its third argument; `MANIFESTS` not exported; CI runs Bun only; `loadHome`'s Node `tls` check has no test.
 2. **Writes that return the resulting state for Hue and Daikin**, in spotify's shape (`{ state, confirmed }`).
