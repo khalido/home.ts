@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](https://keepachangelog.com/) form. Versions follow [SemVer](https://semver.org) at 0.x: a minor release can break what a consumer calls, a patch can't.
+All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](https://keepachangelog.com/) form. Versions follow [SemVer](https://semver.org) at 0.x: a minor release can break what a consumer calls, a patch can't. A release that breaks something opens with a **Breaking** heading, so a consumer on `latest` sees it first.
 
 ## [Unreleased]
 
@@ -15,7 +15,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Changed
 
-- **`ConnectorError.code`** is typed `ConnectorCode`, no longer `string`: code that builds a `ConnectorError` with a code of its own stops compiling.
+- **`ConnectorError.code`** is typed `ConnectorCode`, no longer `string`. Reading it is unchanged. Only code that builds a `ConnectorError` with a code outside that set stops compiling; chota-bot and jaldi don't.
 
 - **hue:** a room or zone the bridge gives no on or off for prints its name alone in `home hue`, no longer "off".
 
@@ -24,6 +24,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Fixed
 
+- **cast:** `announce` to a group with a `volume` left the group's own level at the announcement's, though every member's was put back. The group's is now restored too, before its members', so theirs land last.
 - **spotify:** `interrupt` paused the music when the account was playing on another speaker (the box reports `playing` while not the active device). It now leaves it alone and returns `music: "untouched"`, as `duck` does.
 - **spotify:** `maxVolume` gave up when a lowering was refused or unanswered after a second start signal (buffering, then playing) had opened a new window, leaving the volume above the cap. The new window now lowers again.
 - **`createHome`:** an `onChange` that throws or rejects no longer marks the integration `unavailable`; the error goes to `console.error` and the integration keeps running.

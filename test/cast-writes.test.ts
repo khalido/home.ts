@@ -361,7 +361,7 @@ describe("announce", () => {
     await h.done();
   });
 
-  test("a group: re-resolved first, its volume on the group socket, each member's own volume back through its own socket", async () => {
+  test("a group: re-resolved first, its volume on the group socket, the group's own volume back and then each member's through its own socket", async () => {
     const list = home();
     const h = await connected(list);
     const before = h.resolves();
@@ -369,15 +369,25 @@ describe("announce", () => {
     expect(h.resolves()).toBe(before + 1);
     expect(r).toEqual({
       played: true,
-      restored: ["Downstairs: idle", "Kitchen: volume", "Lounge: volume"],
+      restored: [
+        "Downstairs: idle",
+        "Downstairs: volume",
+        "Kitchen: volume",
+        "Lounge: volume",
+      ],
       notRestored: [],
     });
     expect(
       h.net.sent
         .filter((x) => x.p.type === "SET_VOLUME")
         .map((x) => `${x.to} ${x.p.volume.level}`),
-    ).toEqual(["Downstairs 0.7", "Kitchen 0.3", "Lounge 0.5"]);
-    expect(list.map((f) => f.level)).toEqual([0.3, 0.5, 0.7]); // the group's own level is its members', as the device computes it
+    ).toEqual([
+      "Downstairs 0.7",
+      "Downstairs 0.4",
+      "Kitchen 0.3",
+      "Lounge 0.5",
+    ]);
+    expect(list.map((f) => f.level)).toEqual([0.3, 0.5, 0.4]); // the group's own level back first; here that moves the members, and their own levels land last
     await h.done();
   });
 
@@ -524,7 +534,7 @@ describe("announce", () => {
     const r = await h.c.announce("Downstairs", { url: CLIP }, { volume: 0.7 });
     expect(r).toEqual({
       played: true,
-      restored: ["Downstairs: idle", "Kitchen: volume"],
+      restored: ["Downstairs: idle", "Downstairs: volume", "Kitchen: volume"],
       notRestored: [
         {
           name: "Lounge",

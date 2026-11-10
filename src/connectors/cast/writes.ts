@@ -428,7 +428,7 @@ export function castActions(ctx: WriteContext): CastActions {
     /**
      * Read the target's state, set the volume if asked and unmute a muted target, launch the Default Media Receiver, play the clip to its end, then
      * put back what it can, always: what the Default Media Receiver was playing is loaded again where it was, an idle
-     * device gets STOP, then the volume (a group's, member by member through each member's own socket). Another app
+     * device gets STOP, then the volume (a group's own first, then member by member through each member's own socket). Another app
      * (Spotify, YouTube) is interrupted and cannot be resumed from here; the result says so. Throws only before anything changed.
      */
     async announce(target, clip, options = {}) {
@@ -550,6 +550,26 @@ export function castActions(ctx: WriteContext): CastActions {
                   muted: before.volume?.muted,
                 },
               ];
+        // A group keeps a level of its own, which its members' levels don't bring back (live, 2026-11-10: it stayed at the
+        // announcement's 30 with every member restored). First, so whatever it does to the members, their own levels land last.
+        if (d.kind === "group" && options.volume !== undefined) {
+          const level = before.volume?.level;
+          if (level === undefined)
+            result.notRestored.push({
+              name: d.name,
+              why: "its volume before was not reported",
+            });
+          else
+            try {
+              await receiver(s, { type: "SET_VOLUME", volume: { level } });
+              result.restored.push(`${d.name}: volume`);
+            } catch (error) {
+              result.notRestored.push({
+                name: d.name,
+                why: `volume not restored: ${errorText(error)}`,
+              });
+            }
+        }
         for (const m of each) {
           const ms = m.id === d.id ? s : ctx.session(m.id);
           if (m.level === undefined)

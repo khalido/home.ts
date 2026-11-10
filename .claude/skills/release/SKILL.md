@@ -14,7 +14,7 @@ Cut a release of **@khalido/home** on npm (`khalido/home.ts` on GitHub). jaldi a
   - **patch** (0.1.0 → 0.1.1): fixes and additions that break nothing: a new connector, a new export, a field added to a state, a fix.
   - Never propose 1.0.0; KO decides that.
 - **A published version is immutable.** npm never takes the same number twice, even after an unpublish. A mistake is the next patch.
-- **`CHANGELOG.md` is the canonical record**, in [Keep a Changelog](https://keepachangelog.com/) form: `## [Unreleased]` rolls into `## [X.Y.Z] - YYYY-MM-DD` with `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`. "Fixed" means it was wrong; "Changed" means it worked and now differs. The GitHub release notes are that section, verbatim. The first release is one `Added` section.
+- **`CHANGELOG.md` is the canonical record**, in [Keep a Changelog](https://keepachangelog.com/) form: `## [Unreleased]` rolls into `## [X.Y.Z] - YYYY-MM-DD` with `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`. "Fixed" means it was wrong; "Changed" means it worked and now differs. A release that breaks what a consumer calls opens its section with a `### Breaking` heading, each change with what to do about it: chota-bot installs `latest`, so that heading is its only warning. The GitHub release notes are that section, verbatim. The first release is one `Added` section.
 - **Full commit bodies in, never raw diffs.** The body has the why.
 - **A fresh subagent fact-checks every claim** against the code before it lands: an editorial pass can invert meaning or name an export that doesn't exist.
 - **A GitHub release stages the version on npm; KO approves it with 2FA.** `.github/workflows/publish.yml` runs `npm stage publish` over trusted publishing: no stored token, provenance included, and the publisher is stage-only, so nothing goes live without KO (`docs/publishing.md`).
@@ -50,7 +50,7 @@ Name the change that forces it: "minor: spotify's `setVolume` now resolves `{ st
 
 ### 4. Roll the changelog and the version
 
-`## [Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD`; leave a fresh empty `## [Unreleased]` above it; set `version` in `package.json`. Plain, concrete, no AI-speak.
+`## [Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD`, opening with `### Breaking` when the release breaks what a consumer calls (each change, and what to do); leave a fresh empty `## [Unreleased]` above it; set `version` in `package.json`. Plain, concrete, no AI-speak.
 
 ### 5. Fact-check (a fresh subagent, Sonnet)
 
