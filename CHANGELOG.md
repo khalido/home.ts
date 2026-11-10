@@ -4,11 +4,12 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-10
+
 ### Added
 
-- **`Part.reason`:** why a part is `unavailable`, for code to switch on: `auth` (a key or token was rejected or unusable, so a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw). `health()` and `home --json` carry it. It can be absent. An Enphase token that does not parse is now `unavailable` with `auth`, not `crashed`.
-
-- **`homeDevices(snapshot, config?)`:** every device in the home in one list, each answering the same questions (`connector`, `id`, `name`, `kind`, `available`, `reason`, `asOf`, `state`, `text`, `room`, `members`), with the connector's own typed row in `detail` and `connector` narrowing its type. Each device connector also exports its own: `hueHomeDevices`, `daikinHomeDevices`, `enphaseHomeDevices`, `castHomeDevices`, `printersHomeDevices`, `spotifyHomeDevices`.
+- **`Part.reason`:** why a part is `unavailable`, for code to switch on: `auth` (a key or token was rejected or unusable, so a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw). `health()` and `home --json` carry it. It can be absent. Hue, Enphase, Amber and Up set `auth` on a rejected key, and so does an Enphase token that does not parse. In `home status`, a connector that fails to build from the environment says `auth` or `config`.
+- **`homeDevices(snapshot, config?)`:** every device in one list (Amber, Up and the weather read services and list nothing), each answering the same questions (`connector`, `id`, `name`, `kind`, `available`, `reason`, `asOf`, `state`, `text`, `room`, `members`), with the connector's own typed row in `detail` and `connector` narrowing its type. Each device connector also exports its own: `hueHomeDevices`, `daikinHomeDevices`, `enphaseHomeDevices`, `castHomeDevices`, `printersHomeDevices`, `spotifyHomeDevices`. `DeviceRecord` is the common shape and `deviceRecords(part, records)` what a connector returns them through: while its part isn't connected, none is `available`.
 - **`ConnectorCode`:** the type of `ConnectorError.code`, every code the library sets, so a consumer's table of messages fails to compile when one is added.
 - **cast:** `castStatus(snapshot)` says what each device and group is doing (`idle`, `restorable`, `busy` or `offline`, with the app, title and volume), and `castFree(snapshot, targets)` gives the targets an announcement would not disturb, with the ones it `skipped` and why. For announcing only where nothing is playing.
 - **weather:** `reason` on an `unavailable` weather part (`auth` if a stopped source's key was rejected, else `config`), and `state.sources.<name>.reason` beside `stopped`, so code can see a dead Google key while another source keeps the part `connected`. A custom `WeatherSource` can return `stopReason` with `stop`.
@@ -16,11 +17,9 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 ### Changed
 
 - **`ConnectorError.code`** is typed `ConnectorCode`, no longer `string`. Reading it is unchanged. Only code that builds a `ConnectorError` with a code outside that set stops compiling; chota-bot and jaldi don't.
-
 - **hue:** a room or zone the bridge gives no on or off for prints its name alone in `home hue`, no longer "off".
-
 - **weather:** Google's key is sent in the `X-Goog-Api-Key` header, no longer in the URL.
-- **weather:** Google's stop text says which it was: `google: the key was rejected (HTTP 400 API_KEY_INVALID)` or `google: the request was refused (HTTP 400); check the latitude and longitude`. Before, both read `key rejected or request refused`.
+- **weather:** Google's stop text says which it was: `google: the key was rejected (HTTP 400 API_KEY_INVALID)` or `google: the request was refused (HTTP 400); check the latitude and longitude`. Before, both read `google: key rejected or request refused (HTTP 400)`.
 
 ### Fixed
 
@@ -99,7 +98,8 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/khalido/home.ts/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/khalido/home.ts/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/khalido/home.ts/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/khalido/home.ts/releases/tag/v0.1.0
