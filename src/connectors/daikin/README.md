@@ -39,7 +39,7 @@ One read-only request, saved with the MAC, SSID, `edid` and the unit's ASCII ids
 ## Unconfirmed
 
 - **The write lane's rates** (1 s apart, 20 a minute) are guesses. One client lives as long as the integration and reads the unit's address at each send, so a move keeps the lane's count, and a write still waiting goes to the new address.
-- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16 and 2026-11-11, see below); a mode write was accepted but changed nothing (it was already in that mode), and setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
+- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16 and 2026-11-11, see below); dry to cool at 25 °C worked (2026-11-11, below); heat, auto, fan mode and fan-speed writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
   - Setpoint width: pydaikin sends one byte, Alira two (`3200`). One byte, because the live field is one byte (`p_02` `mi 24`, `mx 40`).
   - Method: pydaikin POSTs, Alira PUTs. POST, the method reads already use.
   - Field: Alira always writes `p_03` and `p_0A`. Those are pydaikin's heat-mode setpoint and fan, and Alira reads by list position (its `[2]` and `[8]` are `p_03` and `p_0A`), so it appears written on a unit in heat. Per-mode fields here.
@@ -66,6 +66,10 @@ Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, 
 ## Second write (2026-11-11)
 
 `setPower(true)` at KO's request, through `daikinClient().write` and the rewritten write lane (Bun 1.4.4, from a Mac): accepted in 280 ms, and reads at once, 2 s and 5 s later all showed `on` (before: off, dry, room 25 °C). The unit was found by the UDP broadcast. Then `setMode("dry")` at KO's request: accepted in 291 ms and the unit read `on`, dry. It was already in dry, so this shows the write is accepted, not that a mode changes. `home daikin on` on the running unit printed its line and exited 0. `home probe` shows 404 on the three old `/common` and `/aircon` paths and an answer on `dsiot`, as expected for this unit.
+
+## First mode change and setpoint (2026-11-11)
+
+`home daikin cool` at KO's request, the unit on in dry (Bun 1.4.4): one request with power, mode and the default setpoint; the command took 3.3 s in all, 1.5 s of it the UDP search, and printed `on · cool 25 °C`. A read some 15 s later showed the same, fan 3. So `mode` with a setpoint works on this unit, and the unit reports the change within the confirm wait. Still untried: heat, auto, fan mode, a fan-speed write, and `power(false)`.
 
 ## Read from a Pi (2026-11-10)
 

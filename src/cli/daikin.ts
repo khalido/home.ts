@@ -1,5 +1,5 @@
 // `home daikin on|off` and `home daikin cool|heat|auto|dry|fan [°C]`: one write to the AC, then what it reports.
-// Live on KO's unit (2026-11-11): power, and a mode write that changed nothing. A changed mode, a setpoint and fan are untried.
+// Live on KO's unit (2026-11-11): on, and dry to cool at 25. Off, heat, auto, fan and a fan speed are untried.
 import {
   acText,
   type DaikinApplied,

@@ -10,7 +10,7 @@ home room <name> on|off|<1-100>
 home scene <name>
 home pair                     # waits 60 s for the bridge's button, counting down; prints the env lines to set
 home daikin on | off           # power only: the AC comes back as it was last left
-home daikin cool | heat | auto [°C] | dry | fan  # mode, on, and the setpoint: the one given, else cool 25 and heat 27; prints what the unit then reports. A changed mode and a setpoint are untried on a unit (2026-11-11)
+home daikin cool | heat | auto [°C] | dry | fan  # mode, on, and the setpoint: the one given, else cool 25 and heat 27; prints what the unit then reports. Live on KO's unit: on, and dry to cool at 25 (2026-11-11); the rest untried
 home enphase login            # once a year: mints the Enphase owner token into ~/.config/home/ (0600)
 home discover [--json] [--passes n]  # which smart-home devices answer here (mDNS + Daikin UDP), which this package supports, then with a config how they match it; two passes 5 s apart
 home cache [clear]            # the addresses kept between runs, or delete them so the next run discovers afresh
