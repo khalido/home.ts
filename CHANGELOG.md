@@ -12,7 +12,8 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 - **hue: Signify's root certificates are in the package**, as `HUE_BRIDGE_ROOT_CA` from `@khalido/home/hue`: both roots, the bundle from Signify's "Using HTTPS" page. `ca` is now optional everywhere it was required: `hue({ host, bridgeId, key })`, `bunPinnedFetch(bridgeId)`, `nodePinnedFetch(bridgeId)`, the config's `ca` and the CLI's `HUE_CA_FILE`. One given still replaces the bundle. `home probe` reads the bridge without setup, and `home discover --write` no longer writes a `ca` line.
 - **hue: `pairWhenPressed`**: `pair`, asked every 2 s for 30 s until the bridge's button is pressed, with `onWaiting` for the moment to prompt. `pair` takes a `signal`. `home pair` now waits 60 s for the button, counting down, and says when no press was detected.
-- **`home daikin on | off`:** the AC's power from the command line, printing what the unit then reports. Mode, setpoint and fan are left as they were.
+- **daikin: `client.power(on)` and `client.mode(mode, targetC?)`**, resolving with `{ state, confirmed }` (`DaikinApplied`) once the unit reports what was asked, or after 5 s (`CONFIRM_MS`) without it. `mode` sends the mode, power on and the setpoint as one request: the one given, else the library's defaults, `DEFAULT_TARGET_C` (cool 25, heat 27).
+- **`home daikin on | off`** (power only, as it was last left) and **`home daikin cool | heat | auto [°C] | dry | fan`**, each printing what the unit then reports.
 - **`home devices`:** every device the connectors read, one line each from `homeDevices`: its state, its room and name from the config when there is one, and why when it isn't available. `--json` prints the records. A connector that isn't connected is named on stderr.
 
 ## [0.1.3] - 2026-11-10

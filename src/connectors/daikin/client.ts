@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Clock } from "../../clock.ts";
+import { type Clock, realClock } from "../../clock.ts";
 import { ConnectorError, getJson } from "../../connector.ts";
 import { writeLane } from "../../lane.ts";
 
@@ -80,6 +80,20 @@ const TARGET_RANGE: Partial<Record<Mode, [number, number]>> = {
   heat: [10, 30],
   auto: [18, 30],
 };
+
+/**
+ * The setpoint a mode gets when the caller names none: this library's opinion (KO's: not too cold, properly warm).
+ * Without one, "cool" would mean whatever the remote last left. Auto keeps the unit's own.
+ */
+export const DEFAULT_TARGET_C = {
+  cool: 25,
+  heat: 27,
+} as const satisfies Partial<Record<Mode, number>>;
+
+/** What a write left: the state once the unit reported the change (`confirmed`), or as it stood when `CONFIRM_MS` ran out without it. */
+export type DaikinApplied = { state: DaikinState; confirmed: boolean };
+/** How long `power` and `mode` wait for the unit to report what was asked, reading once a second. */
+export const CONFIRM_MS = 5000;
 
 /** Little-endian hex to an integer, two's complement when `signed`: "2700" → 39, "EEFF" → -18. */
 export function hexLE(hex: string, signed = false): number | undefined {
@@ -229,7 +243,7 @@ export function setFan(fan: Fan, mode: Mode): WriteRequest {
   return write([["e_3001", FAN[mode]!, key(FANS, fan)]]);
 }
 
-/** A client for one unit. Reads are op 2; `write` sends a body built by setPower, setMode, setTarget or setFan. */
+/** A client for one unit. Reads are op 2. `power` and `mode` are the writes most callers want; `write` sends any body built by setPower, setMode, setTarget or setFan. */
 export function daikinClient(options: {
   host: string;
   fetch: typeof fetch;
@@ -251,7 +265,8 @@ export function daikinClient(options: {
       schema: Multi,
       error: DaikinError,
     });
-  return {
+  const clock = options.clock ?? realClock;
+  const client = {
     /** The indoor and outdoor status in one request. A failed outdoor read leaves `outsideC` empty. */
     async read(signal?: AbortSignal): Promise<DaikinState> {
       const m = await multireq(
@@ -289,6 +304,53 @@ export function daikinClient(options: {
             );
         },
         mergeWrites,
+      );
+    },
+  };
+  /** Send `request`, then read once a second until the unit reports `asked` or `CONFIRM_MS` passes. Rejects if the write is refused, or if no read after it succeeds. */
+  async function apply(
+    request: WriteRequest,
+    asked: (s: DaikinState) => boolean,
+  ): Promise<DaikinApplied> {
+    await client.write(request);
+    const until = clock.now() + CONFIRM_MS;
+    let state: DaikinState | undefined;
+    let failed: unknown;
+    // The write was accepted, so one dropped read must not turn it into a failure: keep reading until the time is up.
+    for (;;) {
+      try {
+        state = await client.read();
+        if (asked(state)) break;
+      } catch (error) {
+        failed = error;
+      }
+      if (clock.now() >= until) break;
+      await clock.sleep(1000);
+    }
+    if (!state) throw failed; // sent, but the unit answered no read since: nothing to report
+    return { state, confirmed: asked(state) };
+  }
+  return {
+    ...client,
+    /** Turn the unit on or off, as it was last left. Only when a person asks. Resolves with what the unit then reported. */
+    power: (on: boolean): Promise<DaikinApplied> =>
+      apply(setPower(on), (s) => s.on === on),
+    /**
+     * Select a mode, turn the unit on and set its setpoint, in one request: `targetC`, else `DEFAULT_TARGET_C` (cool 25,
+     * heat 27), else (auto) the unit's own. Dry and fan take none, and a `targetC` for them throws before anything is
+     * sent, as one off the unit's range does. Only when a person asks. Resolves with what the unit then reported.
+     */
+    async mode(mode: Mode, targetC?: number): Promise<DaikinApplied> {
+      const c =
+        targetC ?? (DEFAULT_TARGET_C as Partial<Record<Mode, number>>)[mode];
+      return apply(
+        c === undefined
+          ? setMode(mode)
+          : mergeWrites(setMode(mode), setTarget(c, mode)),
+        (s) =>
+          s.on === true &&
+          s.mode === mode &&
+          (c === undefined || s.targetC === c),
       );
     },
   };

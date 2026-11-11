@@ -1,9 +1,17 @@
-// `home daikin on|off`: one write to the AC, then what it reports. Power only: mode, setpoint and fan writes are untried on a unit.
-import { acText, daikinClient, setPower } from "../connectors/daikin/index.ts";
+// `home daikin on|off` and `home daikin cool|heat|auto|dry|fan [°C]`: one write to the AC, then what it reports.
+// Live on KO's unit (2026-11-11): power, and a mode write that changed nothing. A changed mode, a setpoint and fan are untried.
+import {
+  acText,
+  type DaikinApplied,
+  daikinClient,
+  DEFAULT_TARGET_C,
+  type Mode,
+  setTarget,
+} from "../connectors/daikin/index.ts";
 import { findDaikins } from "../finders.ts";
 import { env, fail, usage, type Verbs } from "./context.ts";
 
-export const DAIKIN_USAGE = "usage: home daikin on | off";
+export const DAIKIN_USAGE = `usage: home daikin on | off | cool [°C] | heat [°C] | auto [°C] | dry | fan  (cool ${DEFAULT_TARGET_C.cool} and heat ${DEFAULT_TARGET_C.heat} when no °C is given)`;
 
 /** The unit at DAIKIN_HOST, else the first to answer the UDP broadcast. */
 async function unit() {
@@ -14,23 +22,41 @@ async function unit() {
   return daikinClient({ host, fetch });
 }
 
-/** Send the power write, then read until the unit reports it (at most 3 s) and print its line. */
-async function power(on: boolean): Promise<void> {
-  const c = await unit();
-  await c.write(setPower(on));
-  let state = await c.read();
-  for (let i = 0; state.on !== on && i < 3; i++) {
-    await Bun.sleep(1000);
-    state = await c.read();
-  }
+/** What a write left, in a line: the unit as it then reported, or that it has not reported the change yet. */
+const said = ({ state, confirmed }: DaikinApplied) =>
   console.log(
-    state.on === on
+    confirmed
       ? acText(state)
       : `sent; the unit has not reported it yet (${acText(state)})`,
   );
-}
+
+const power =
+  (on: boolean) =>
+  async ([extra]: string[]) =>
+    extra ? usage(DAIKIN_USAGE) : said(await (await unit()).power(on));
+
+const mode =
+  (m: Mode) =>
+  async ([value, extra]: string[]) => {
+    if (extra || (value !== undefined && !/^\d+(\.\d+)?$/.test(value)))
+      usage(DAIKIN_USAGE);
+    const c = value === undefined ? undefined : Number(value);
+    // A setpoint the mode can't take is a usage error, said before looking for the unit.
+    if (c !== undefined)
+      try {
+        setTarget(c, m);
+      } catch (e) {
+        usage(`${(e as Error).message}; ${DAIKIN_USAGE}`);
+      }
+    said(await (await unit()).mode(m, c));
+  };
 
 export const daikinVerbs: Verbs = {
-  on: ([extra]) => (extra ? usage(DAIKIN_USAGE) : power(true)),
-  off: ([extra]) => (extra ? usage(DAIKIN_USAGE) : power(false)),
+  on: power(true),
+  off: power(false),
+  cool: mode("cool"),
+  heat: mode("heat"),
+  auto: mode("auto"),
+  dry: mode("dry"),
+  fan: mode("fan"),
 };

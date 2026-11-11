@@ -95,7 +95,12 @@ describe("home output contract", () => {
 
   test("home daikin: a wrong verb is usage, and an unreachable unit is a network error before any line prints", () => {
     const wrong = home(["daikin", "sideways"]);
-    expect(wrong.err).toContain("usage: home daikin on | off");
+    expect(wrong.err).toContain("usage: home daikin on | off | cool");
+    expect(home(["daikin", "cool", "warm"]).code).toBe(2);
+    const cold = home(["daikin", "cool", "12"]); // off the unit's range: said before looking for the unit
+    expect(cold.err).toContain("18–32");
+    expect(cold.code).toBe(2);
+    expect(home(["daikin", "dry", "22"]).code).toBe(2);
     expect(wrong.code).toBe(2);
     const down = home(["daikin", "on", "--json"], {
       DAIKIN_HOST: "127.0.0.1:1",

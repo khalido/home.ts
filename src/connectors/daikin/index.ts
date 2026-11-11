@@ -17,8 +17,11 @@ import {
 } from "./client.ts";
 
 export {
+  CONFIRM_MS,
+  type DaikinApplied,
   DaikinError,
   type DaikinState,
+  DEFAULT_TARGET_C,
   daikinClient,
   type Fan,
   type Mode,
@@ -60,7 +63,7 @@ export type DaikinSnapshot = DaikinState & { asOf: string };
 export type DaikinClient = ReturnType<typeof daikinClient>;
 
 /**
- * One Daikin AC as a home integration: one read now, then every 120 s. Its writes are `client.write(setPower(true))`: one
+ * One Daikin AC as a home integration: one read now, then every 120 s. Its writes are `client.power(on)` and `client.mode(mode, targetC?)`: one
  * client for the integration's life, so the writes share its lane and follow the unit when it moves.
  */
 export function daikin(

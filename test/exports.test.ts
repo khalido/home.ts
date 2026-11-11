@@ -53,6 +53,8 @@ const PUBLIC: Record<string, string[]> = {
     "scenes",
   ],
   "./daikin": [
+    "CONFIRM_MS",
+    "DEFAULT_TARGET_C",
     "DaikinError",
     "POLL_MS",
     "acText",
