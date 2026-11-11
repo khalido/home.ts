@@ -142,7 +142,7 @@ const PUBLIC: Record<string, string[]> = {
   ],
   "./cast/tls": ["tlsConnect"],
   "./cast/serve": ["SERVE_MS", "lanAddress", "serveClip"],
-  "./finders": ["FINDERS", "fileCache"],
+  "./finders": ["FINDERS", "MissingTool", "fileCache"],
   "./node": ["NODE_TLS", "nodeGatewayFetch", "nodePinnedFetch"],
   "./up": [
     "POLL_MS",

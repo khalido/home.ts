@@ -37,6 +37,8 @@ health(home.snapshot(), Date.now()); // per integration: ok, stale or down, with
 
 `createHome` stamps each part with `lastGoodAt` (its last good read) and `downSince` (when it stopped being connected). `health` judges from those: a polling connector is stale after 2½ polls with no good read and down after 3 polls not connected; Hue and Cast are down after 2 minutes not connected. Health takes each connector's interval from its manifest; a home that changes one (the weather's `pollMinutes`) passes it: `health(snapshot, now, { pollSeconds: { weather: 60 * 60 } })`. For a one-shot read (a script, a printed brief), `settle(integrations, { ms })` runs them until each has answered and returns the snapshot.
 
+From a config file, with everything a Bun app on the home's network passes (Cast, discovery, an address cache), the call is at the top of [config.md](config.md).
+
 ## Every device, the same way
 
 `homeDevices(home.snapshot(), config)` lists every device the home has: each Hue light, room and zone, the Daikin, the Enphase gateway, each Cast device and group, each printer and the Soloist speaker. Each answers the same questions in the same words: `connector`, `id`, `name`, `kind` (light, group, speaker, display, tv, ac, printer, solar; `cast` for a Cast model the library doesn't know), `available` (and when it is false, `reason`: `offline`, `auth`, `config` or `crashed`), `asOf` (when the device last reported or was last read; a quiet light can be hours old and current), `state` (one word: on, off, idle, busy, cool, printing), `text` (one line for people), `room` and, for a group, `members`. A field the device hasn't reported is absent. The config is optional: with it a device takes its entry's `room`, and a device with no name of its own (the Daikin, the gateway) its entry's `name`; a device's own name is never replaced. While a connector isn't connected none of its devices is `available`, and each keeps its last values.
@@ -56,7 +58,76 @@ Below that is the connector's snapshot, exactly as the device sent it (`home.par
 
 ## Writes
 
-Writes hang off the integration: `home.integration("daikin")?.client.mode("cool")` (cool at 25, the library's default; `mode("cool", 23)` for another, `power(false)` for off), `home.integration("hue")?.client.recallScene(id)`, `home.integration("cast")?.setVolume(…)`, `home.integration("spotify")?.play(link)`. Each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands. The Daikin's `power` and `mode` and Spotify's writes resolve with `{ state, confirmed }`, the state once the device reported the change (unconfirmed is a result, not an error). Use that returned state: the Daikin's part in the snapshot is from its last poll and can be up to 120 s behind unless you call `refresh()`. For Spotify, and `duck(fn, { to })` and `interrupt(fn)` turn the music down or pause it around an announcement, returning what happened to it (`music`: `untouched`, `restored`, `kept` or `failed`). `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, stalled, recovered, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.
+A write changes someone's house: make one only when a person asked for it. Writes hang off the integration, `home.integration(name)`, and each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands.
+
+| Connector | Call                                                                                   | Resolves with                                                                                    |
+| --------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| daikin    | `.client.power(on)`, `.client.mode(mode, targetC?)`                                    | `{ state, confirmed }`                                                                           |
+| spotify   | `.play(link?)`, `.pause()`, `.next()`, `.setVolume(0–100)`, `.activate()` and the rest | `{ state, confirmed }`                                                                           |
+| spotify   | `.duck(fn, { to })`, `.interrupt(fn)`                                                  | `{ value, music, why? }`: `fn`'s result, and `music` `untouched`, `restored`, `kept` or `failed` |
+| cast      | `.announce(target, clip, { volume? })`                                                 | `{ played, why?, restored, notRestored }`                                                        |
+| cast      | `.announceAll(targets, clip, { volume? })`                                             | one of those per target, each with its `target`                                                  |
+| cast      | `.setVolume(target, 0–1)`, `.setMuted(target, on)`, `.stop(target)`                    | nothing                                                                                          |
+| hue       | `.client.put(kind, id, body)`, `.client.recallScene(id)`                               | the bridge's answer; no typed writes yet                                                         |
+
+- **`confirmed`** is true once the device reported what was asked. False is a result, not an error: the write was sent and the device hasn't shown it yet, and `state` is how it stood.
+- **Use the returned state.** The Daikin's part in the snapshot is from its last poll and can be 120 s behind, unless you call `home.refresh("daikin")`.
+- **Daikin defaults.** `mode("cool")` is 25 °C and `mode("heat")` 27 (`DEFAULT_TARGET_C`); `mode("cool", 23)` for another. `power(true)` brings the unit back as it was last left.
+- **A target** for Cast is a device's or group's name or id. A clip is `{ url, type? }` or `{ bytes, type }`; bytes need `castServe`.
+- **Volume scales differ:** Cast 0–1, Spotify 0–100.
+
+Announce only where nothing is playing, with the music on this machine turned down meanwhile:
+
+```ts
+import { castFree } from "@khalido/home/cast";
+
+const cast = home.integration("cast");
+const state = home.part("cast")?.state;
+if (cast && state) {
+  const { free, skipped } = castFree(state, ["Kitchen", "Bedroom"]); // skipped: { name, why }
+  const announce = () =>
+    cast.announceAll(free, { url: clipUrl }, { volume: 0.3 });
+  const speaker = home.integration("spotify");
+  const results = speaker
+    ? (await speaker.duck(announce, { to: 20 })).value
+    : await announce();
+  for (const r of results) if (!r.played) log(`${r.target}: ${r.why}`);
+}
+```
+
+`castStatus(state)` gives each device's and group's `idle`, `restorable`, `busy` or `offline`, with the app and title. For Spotify, `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, stalled, recovered, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.
+
+## When something is wrong
+
+Two places say so, for two different things.
+
+**A part's status** is about the connection, and reading it never throws:
+
+| `status`       | Means                                     | Do                                                          |
+| -------------- | ----------------------------------------- | ----------------------------------------------------------- |
+| `connecting`   | not answered yet                          | wait                                                        |
+| `connected`    | reading                                   |                                                             |
+| `disconnected` | unreachable now; the last `state` is kept | nothing: it keeps trying, and looks for a device that moved |
+| `unavailable`  | stopped for good                          | read `reason`, fix it, restart                              |
+
+`reason` is set on `unavailable`, when known: `auth` (a key or token was rejected: a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw; a bug). `detail` is the sentence for a person, `anomaly` an odd reading passed through. An `unavailable` part does not recover by itself: build the home again after the fix.
+
+**A write that can't be made throws** a `ConnectorError` (`HueError`, `DaikinError` and so on are subclasses), with the HTTP `status` when there was one and, where code can act on it, a `code`:
+
+| `code`        | From     | Means                                                              |
+| ------------- | -------- | ------------------------------------------------------------------ |
+| `link_button` | hue      | pairing: the bridge's button has not been pressed                  |
+| `offline`     | spotify  | not connected                                                      |
+| `waiting`     | spotify  | signed out: someone must pick the speaker in the Spotify app       |
+| `inactive`    | spotify  | it is not the active device; `activate()` first, if that is wanted |
+| `refused`     | spotify  | Soloist answered no                                                |
+| `timeout`     | spotify  | no answer in time                                                  |
+| `invalid`     | spotify  | a value it can't take; nothing was sent                            |
+| `ipp`         | printers | the printer answered an IPP error, its number in `status`          |
+
+Other failures carry no `code`: read the message (a Daikin setpoint off its range, a Cast target that doesn't exist, a device that didn't answer). Cast's `announce` throws only before anything changed; after that a failure is `played: false` with `why`.
+
+`ConnectorCode` is the union, so a `switch` over it fails to compile when one is added.
 
 ## Text for people and agents
 

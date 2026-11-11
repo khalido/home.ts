@@ -32,6 +32,7 @@ import {
 // `fileCache` keeps the addresses discovery found in a file between runs, so the next run connects straight away.
 
 /** The system's mDNS tool is not installed: discovery can't run until it is. */
+/** The discovery tool isn't installed (`dns-sd` on macOS, `avahi-browse` from avahi-utils on Linux): the message names it. */
 export class MissingTool extends Error {}
 
 /**

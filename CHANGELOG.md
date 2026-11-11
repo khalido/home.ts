@@ -6,6 +6,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Changed
 
+- **docs, for a consumer:** `docs/using.md` has each write and what it resolves with in one table, an announce-where-free example, and what a part's `status` and `reason` and an error's `code` mean. `docs/config.md`'s `loadHome` call now passes what Cast needs (`finders`, `castConnect`). `llms.txt` says what to call.
+- **`MissingTool`** is exported from `@khalido/home/finders`: thrown when the discovery tool (`avahi-browse` on Linux) isn't installed.
+- **docs:** `castStatus` and `castFree` take the Cast part's state (`home.part("cast")?.state`), which the docs called "the snapshot".
+
 - **cli:** `home` and `home daikin` find the Daikin by UDP broadcast when `DAIKIN_HOST` is unset, as the write commands do, so `DAIKIN_HOST` is optional. With no unit on the network it reads "not set up".
 - **cli:** "no route to host" on macOS now adds that the terminal may need the Local Network permission.
 

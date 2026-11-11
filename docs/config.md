@@ -7,9 +7,13 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { createHome, loadHome, parseJsonc } from "@khalido/home";
+import { serveClip } from "@khalido/home/cast/serve";
+import { tlsConnect } from "@khalido/home/cast/tls";
+import { FINDERS, fileCache } from "@khalido/home/finders";
 import { ftpFetch } from "@khalido/home/weather/ftp";
 
 const path = "/path/to/home.jsonc";
+const cachePath = "/path/to/addresses.json";
 const readFile = (p: string) =>
   readFileSync(
     resolve(dirname(path), p.replace(/^~(?=\/)/, homedir())),
@@ -19,12 +23,16 @@ const home = createHome(
   loadHome(parseJsonc(readFileSync(path, "utf8")), {
     env: process.env,
     readFile,
-    ftpFetch: ftpFetch(),
+    ftpFetch: ftpFetch(), // BOM's weather
+    finders: FINDERS, // finds Cast devices, and any device that moves
+    castConnect: tlsConnect, // Cast's socket; a config with Cast is refused without it
+    castServe: serveClip, // only to announce a clip from bytes, not a URL
+    cache: fileCache(cachePath), // addresses kept between runs
   }),
 );
 ```
 
-`loadHome` runs on Bun and Node. Hue and Enphase need a fetch that handles their certificates: Bun's `tls` fetch option by default, and under Node `tls: NODE_TLS` from `@khalido/home/node`. Under Node, a config with Hue or Enphase and no `tls` is a problem `loadHome` names, not a silent failure at the first read.
+Only `env` is always needed: `readFile` for a config that names a file, `ftpFetch` for BOM, `finders` and `castConnect` for Cast. `loadHome` runs on Bun and Node. Hue and Enphase need a fetch that handles their certificates: Bun's `tls` fetch option by default, and under Node `tls: NODE_TLS` from `@khalido/home/node`. Under Node, a config with Hue or Enphase and no `tls` is a problem `loadHome` names, not a silent failure at the first read.
 
 - **A device entry is only how to reach it and where it is**: its identity (the Hue `bridgeId`, a Daikin's `mac`, the Enphase `serial`, a Cast `castId`), its last known `host`, a key's env name, a file's path, its `room`. What a device reports about itself (model, firmware) comes live; a note about it is a comment.
 - **Secrets are env variable names** (`"key": "AMBER_KEY"`), resolved against the `env` the caller passes; a pasted key fails the schema. Files (`ca`, `token`) are paths the caller reads, relative to the config or from `~/`, which the caller expands (`home discover --write` writes Enphase's token as `~/.config/home/enphase-token.json`); the library reads nothing.

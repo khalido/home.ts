@@ -15,6 +15,8 @@ bun add @khalido/home     # or: npm install @khalido/home
 
 The library runs on Bun 1.4+ and Node 24+, and is ESM only. The `home` command needs Bun.
 
+Pointing a coding agent at it? Give it [llms.txt](llms.txt): what to call and where each doc is. [Using it from an app](docs/using.md) is the same for people.
+
 ## Try it
 
 From a clone:
@@ -67,9 +69,11 @@ Each connector's README says what has run against a real device and what has not
 
 ## More
 
+- [Using it from an app](docs/using.md): the wiring, each write and what it returns
 - [The `home` command](docs/cli.md) and [the home config](docs/config.md)
+- [Hue](docs/hue.md): Signify's guidance on certificates, pairing and write rates
 - [Why it is shaped this way](docs/philosophy.md) and [decisions](docs/decisions.md)
-- To add a connector, follow [AGENTS.md](AGENTS.md)
+- To add a connector, follow [AGENTS.md](https://github.com/khalido/home.ts/blob/main/AGENTS.md)
 - For agents: [llms.txt](llms.txt)
 
 I use it from jaldi, a Mac launcher, and chota-bot, a family bot on a Raspberry Pi, both on Bun; the docs name both.

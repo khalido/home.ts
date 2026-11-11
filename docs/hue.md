@@ -139,7 +139,8 @@ A consumer pairing from a chat:
 import { FINDERS } from "@khalido/home/finders";
 import { bunPinnedFetch, pairWhenPressed } from "@khalido/home/hue";
 
-const [bridge] = await FINDERS.hue();
+const [bridge] = await FINDERS.hue(); // mDNS: needs avahi-utils on Linux, else throws MissingTool
+if (!bridge) throw new Error("no Hue bridge answered");
 const { key } = await pairWhenPressed({
   host: bridge.host,
   fetch: bunPinnedFetch(bridge.id),
@@ -148,6 +149,8 @@ const { key } = await pairWhenPressed({
 });
 // store `key` as a secret; then hue({ host: bridge.host, bridgeId: bridge.id, key })
 ```
+
+That is Bun. Under Node, `nodePinnedFetch(bridge.id)` from `@khalido/home/node` takes the place of `bunPinnedFetch`.
 
 **What others do:** Home Assistant asks the person to press, then makes one request per click of Submit. openHAB asks every 0.5 s for 5 minutes, Homebridge every 15 s with no limit, openhue-cli every second with no limit. Home Assistant and openHAB leave out `generateclientkey`.
 

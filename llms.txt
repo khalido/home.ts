@@ -2,22 +2,35 @@
 
 > Small, typed home automation for TypeScript, published on npm as `@khalido/home`, with a `home` command. It starts with one home's devices: Philips Hue, a Daikin AC, Enphase solar, Google Cast, AirPrint printers and a Spotify Soloist speaker on the local network; Amber Electric prices, Up Bank spending and the weather from the cloud. Runs on Bun 1.4+ and Node 24+; the CLI needs Bun. MIT.
 
-The library never reads the environment or a file: callers pass addresses, keys and a `fetch`. `createHome` runs integrations and keeps one typed snapshot; `loadHome` builds them from a home config that names env vars, never secrets. Every field a device reports is optional, and odd readings pass through in `anomaly` rather than being corrected. Writes go through a per-device lane: spaced, bursts merged.
+The library never reads the environment or a file: callers pass addresses, keys and a `fetch`. `createHome` runs integrations and keeps one typed snapshot; `loadHome` builds them from a home config that names env vars, never secrets. Every field a device reports is optional, and odd readings pass through in `anomaly` rather than being corrected. Writes go through a per-device lane: spaced, bursts merged. Write to a device only when a person asked for that change.
+
+## What you call
+
+- **One home:** `loadHome(config, options)` builds the integrations and `createHome(integrations, onChange)` runs them: `home.start(signal)`, `home.snapshot()`, `home.part(name)`, `home.refresh(name)`, and `home.integration(name)` for the writes. `health(home.snapshot(), Date.now())` judges each part. All from `@khalido/home`.
+- **Every device, one shape:** `homeDevices(snapshot, config?)` gives a `DeviceRecord` per device (`connector`, `id`, `name`, `kind`, `available`, `reason`, `state`, `text`, `room`), with the connector's own typed row in `detail`.
+- **Why a part is down:** `part.status` (`connected`, `disconnected`, `unavailable`) and, when `unavailable`, `part.reason` (`auth`, `config`, `crashed`). Errors are `ConnectorError` with a typed `code`.
+- **Hue** (`@khalido/home/hue`): `pairWhenPressed` waits for the bridge's button and returns `{ key }`; Signify's root certificates are in the package, so `hue({ host, bridgeId, key })` needs no file. Writes: `client.put`, `client.recallScene`.
+- **Daikin** (`@khalido/home/daikin`): `client.power(on)` and `client.mode(mode, targetC?)` resolve `{ state, confirmed }`; cool defaults to 25 °C and heat to 27.
+- **Cast** (`@khalido/home/cast`): `castStatus(state)` and `castFree(state, targets)`, on the Cast part's state, say what is playing and where an announcement would disturb nothing; `announce`, `announceAll`, `setVolume`, `setMuted`, `stop`.
+- **Spotify Soloist** (`@khalido/home/spotify`): `play`, `pause`, `setVolume` and the rest resolve `{ state, confirmed }`; `duck` and `interrupt` wrap an announcement.
+- **Discovery** (`@khalido/home/finders`, Node-side): `FINDERS`, one finder per connector, and `fileCache`. **Node** needs the fetches in `@khalido/home/node`.
+- **The command:** `home`, `home devices`, `home <connector>`, and writes such as `home daikin cool`, `home room <name> on`, `home cast announce`.
 
 ## Start here
 
 - [README](https://raw.githubusercontent.com/khalido/home.ts/main/README.md): what it is, install, the connectors
-- [Using it from an app](https://raw.githubusercontent.com/khalido/home.ts/main/docs/using.md): createHome, loadHome, health, change events, writes, energy
+- [Using it from an app](https://raw.githubusercontent.com/khalido/home.ts/main/docs/using.md): the whole wiring on Bun, every device in one list, each write and what it returns, errors, health, energy
 - [The home config](https://raw.githubusercontent.com/khalido/home.ts/main/docs/config.md): devices by identity, rooms, discovery
-- [The home command](https://raw.githubusercontent.com/khalido/home.ts/main/docs/cli.md): status, probe, discover, per-connector verbs
+- [The home command](https://raw.githubusercontent.com/khalido/home.ts/main/docs/cli.md): status, devices, probe, discover, per-connector verbs
 - [Agent skill: use-home](https://raw.githubusercontent.com/khalido/home.ts/main/skills/use-home/SKILL.md): reading safely, connecting, the rules for writes
 
 ## Connectors
 
-- [hue](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/hue/README.md): lights, rooms, scenes over the bridge's event stream
-- [daikin](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/daikin/README.md): the AC over its local API
+- [hue](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/hue/README.md): lights, rooms, scenes over the bridge's event stream; pairing
+- [hue: Signify's guidance](https://raw.githubusercontent.com/khalido/home.ts/main/docs/hue.md): certificates, discovery, write rates, rooms, colour, pairing, and what this library does about each
+- [daikin](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/daikin/README.md): the AC over its local API: power and mode writes that report what the unit then said
 - [enphase](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/enphase/README.md): solar from the IQ Gateway
-- [cast](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/cast/README.md): Cast devices and groups, volume, announcements
+- [cast](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/cast/README.md): Cast devices and groups, what each is playing, volume, announcements
 - [printers](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/printers/README.md): AirPrint printers over IPP
 - [spotify](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/spotify/README.md): a Spotify Soloist speaker: state, confirmed writes, duck and interrupt, change events, stall watch
 - [amber](https://raw.githubusercontent.com/khalido/home.ts/main/src/connectors/amber/README.md): live electricity prices and forecast
