@@ -152,7 +152,7 @@ const { key } = await pairWhenPressed({
 // store `key` as a secret; then hue({ host: bridge.host, bridgeId: bridge.id, key })
 ```
 
-`FINDERS.hue()` returns every bridge that answers; this takes the first. A home with two should list them by id and let the person choose. To use the key from a home config, pass it in `env` under the name the config gives (`env: { ...process.env, HUE_APPLICATION_KEY: key }`), and build the home again: `createHome` takes its integrations once.
+`FINDERS.hue()` returns every bridge that answers; this takes the first. A home with two should list them by id and let the person choose. To use the key from a home config, pass it in `env` under the name the config gives (`env: { ...process.env, HUE_APPLICATION_KEY: key }`), and `home.add` the Hue integration that builds ([using.md](using.md) has the three lines).
 
 That is Bun. Under Node, `nodePinnedFetch(bridge.id)` from `@khalido/home/node` takes the place of `bunPinnedFetch`.
 

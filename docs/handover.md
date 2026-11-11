@@ -35,7 +35,7 @@ In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device
 
 **chota's asks after reading the consumer docs (2026-11-11), for KO to decide; the doc gaps in the same message are fixed:**
 
-- `home.add(integration)`, so a bot that pairs Hue while running needn't rebuild the home. Today the docs say to build it again.
+- `home.add(integration)` and `home.remove(name)`: built 2026-11-11, unreleased.
 - Hue writes by name: built (below).
 - `castFree` with a `forms` option, or the docs' filter (now shown): an idle TV is free, so "announce everywhere" plays on it.
 - For the home map: a `byRoom(homeDevices(snapshot, config))` helper with "no data" for a room whose connector is down; a documented `photos` field on a room; whether a walkthrough video is a source for `draw-home`.

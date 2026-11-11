@@ -6,7 +6,7 @@ The library never reads the environment or a file: callers pass addresses, keys 
 
 ## What you call
 
-- **One home:** `loadHome(config, options)` builds the integrations and `createHome(integrations, onChange)` runs them: `home.start(signal)`, `home.snapshot()`, `home.part(name)`, `home.refresh(name)`, and `home.integration(name)` for the writes. `health(home.snapshot(), Date.now())` judges each part. All from `@khalido/home`.
+- **One home:** `loadHome(config, options)` builds the integrations and `createHome(integrations, onChange)` runs them: `home.start(signal)`, `home.snapshot()`, `home.part(name)`, `home.refresh(name)`, `home.integration(name)` for the writes, and `home.add(integration)` / `home.remove(name)` to change the set while it runs. `health(home.snapshot(), Date.now())` judges each part. All from `@khalido/home`.
 - **Every device, one shape:** `homeDevices(snapshot, config?)` gives a `DeviceRecord` per device (`connector`, `id`, `name`, `kind`, `available`, `reason`, `state`, `text`, `room`), with the connector's own typed row in `detail`.
 - **Why a part is down:** `part.status` (`connected`, `disconnected`, `unavailable`) and, when `unavailable`, `part.reason` (`auth`, `config`, `crashed`). Errors are `ConnectorError` with a typed `code`.
 - **Hue** (`@khalido/home/hue`): `pairWhenPressed` waits for the bridge's button and returns `{ key }`; Signify's root certificates are in the package, so `hue({ host, bridgeId, key })` needs no file. Writes by name: `client.light(name, change)`, `client.room(name, change)`, `client.scene(name, room?)`, with `change` `{ on?, brightness?, color?, kelvin?, transitionMs? }`, each resolving `{ state, confirmed }`.

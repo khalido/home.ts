@@ -140,7 +140,7 @@ function stamped(part: Part, before: Part | undefined, now: string): Part {
 
 /**
  * Load a home: run each integration, keep one snapshot, call `onChange` with it and what changed after every report.
- * `clock` stamps each part's `lastGoodAt` and `downSince`.
+ * `clock` stamps each part's `lastGoodAt` and `downSince`. `add` and `remove` change the set while it runs.
  */
 export function createHome<I extends Integration<any, string>>(
   integrations: readonly I[],
@@ -148,14 +148,34 @@ export function createHome<I extends Integration<any, string>>(
   options: { clock?: Clock } = {},
 ) {
   type Name = I["name"];
+  type Run = { stop: AbortController; done: Promise<void> };
   const clock = options.clock ?? realClock;
+  const list: I[] = [...integrations]; // the integrations now: `add` and `remove` change it
+  const parts = () => snapshot as Record<string, Part>;
   let snapshot = Object.fromEntries(
-    integrations.map((i) => [i.name, { status: "connecting" }]),
+    list.map((i) => [i.name, { status: "connecting" }]),
   ) as HomeSnapshot<I>;
   const waiting = new Map<string, (() => void)[]>(); // refresh() callers, resolved by the integration's next report
-  const finished = new Set<string>(integrations.map((i) => i.name)); // not running, before start or after its run ended: a refresh of one resolves at once, nothing will report
-  const set = (name: Name, reported: Part) => {
-    const before = (snapshot as Record<string, Part>)[name]!;
+  const runs = new Map<I, Run>(); // the ones running: before start or after its run ended, a refresh resolves at once, nothing will report
+  const latest = new WeakMap<I, Run>(); // each integration's newest run: a report from an older run of the same object is dropped
+  let started: AbortSignal | undefined; // start()'s signal, while it runs
+  let changing: Promise<unknown> = Promise.resolve(); // add and remove, one at a time: two on one name must not overlap
+  let changes = 0; // those under way or queued: start outlasts a replace of its only integration
+  const change = <T>(fn: () => Promise<T>): Promise<T> => {
+    changes++;
+    const done = changing.then(fn).finally(() => changes--);
+    changing = done.catch(() => {});
+    return done;
+  };
+  const heard = (name: string) => {
+    for (const resolve of waiting.get(name) ?? []) resolve();
+    waiting.delete(name);
+  };
+  // A report counts only from the integration now listed under its name: one replaced or removed may still be finishing.
+  const set = (i: I, run: Run, reported: Part) => {
+    const name: Name = i.name;
+    const before = parts()[name];
+    if (latest.get(i) !== run || !list.includes(i) || !before) return;
     const part = stamped(reported, before, asOf(clock));
     snapshot = { ...snapshot, [name]: part };
     Promise.try(() =>
@@ -163,11 +183,45 @@ export function createHome<I extends Integration<any, string>>(
     ).catch((error) =>
       console.error(`onChange threw on ${name}: ${errorText(error)}`),
     ); // the caller's bug, thrown or async, not the device's: the integration keeps running
-    const w = waiting.get(name);
-    if (w) {
-      waiting.delete(name);
-      for (const resolve of w) resolve();
-    }
+    heard(name);
+  };
+  /** Run one integration until the home's signal or its own `stop` aborts. One failing marks itself unavailable. */
+  const launch = (i: I, signal: AbortSignal) => {
+    const stop = new AbortController();
+    const run: Run = { stop, done: Promise.resolve() };
+    runs.set(i, run);
+    latest.set(i, run);
+    run.done = Promise.try(() =>
+      i.run(AbortSignal.any([signal, stop.signal]), (part) =>
+        set(i, run, part),
+      ),
+    )
+      .catch((error) =>
+        set(i, run, {
+          status: "unavailable",
+          reason: "crashed",
+          detail: errorText(error),
+          state: parts()[i.name]?.state, // the last good state stays, as it does through a failed read
+        }),
+      )
+      .finally(() => {
+        if (runs.get(i) !== run) return;
+        runs.delete(i);
+        if (list.includes(i)) heard(i.name); // nothing more will report
+      });
+  };
+  /** Take one out of the list and the snapshot, and wait for its run to end. */
+  const drop = async (name: string) => {
+    const at = list.findIndex((i) => i.name === name);
+    if (at < 0) return false;
+    const [old] = list.splice(at, 1);
+    const { [name]: _, ...rest } = parts();
+    snapshot = rest as HomeSnapshot<I>;
+    heard(name);
+    const run = runs.get(old!);
+    run?.stop.abort();
+    await run?.done;
+    return true;
   };
   return {
     /** The latest snapshot. Never touches a device. */
@@ -178,61 +232,67 @@ export function createHome<I extends Integration<any, string>>(
     integration: <N extends Name>(
       name: N,
     ): Extract<I, { name: N }> | undefined =>
-      integrations.find((i) => i.name === name) as
-        Extract<I, { name: N }> | undefined,
+      list.find((i) => i.name === name) as Extract<I, { name: N }> | undefined,
     /**
      * Read now: one integration by name, or every one. Results arrive through the snapshot and `onChange` as usual; the
      * promise resolves once each target has reported (its next update, good or bad), or at once for one that isn't running.
      */
     refresh(name?: Name): Promise<void> {
       const targets =
-        name === undefined
-          ? integrations
-          : integrations.filter((i) => i.name === name);
-      if (!targets.length)
+        name === undefined ? [...list] : list.filter((i) => i.name === name);
+      if (!targets.length && name !== undefined)
         throw new Error(
-          `no integration "${name}"; have ${integrations.map((i) => i.name).join(", ")}`,
+          `no integration "${name}"; have ${list.map((i) => i.name).join(", ")}`,
         );
       const reported = targets.map(
         (i) =>
           new Promise<void>((resolve) => {
-            if (finished.has(i.name)) return resolve();
+            if (!runs.has(i)) return resolve();
             waiting.set(i.name, [...(waiting.get(i.name) ?? []), resolve]);
           }),
       );
       for (const i of targets) i.refresh();
       return Promise.all(reported).then(() => undefined);
     },
-    /** Run every integration until `signal` aborts. One failing marks itself unavailable; the rest carry on. */
+    /**
+     * Add an integration while the home runs, or before it starts: a bridge paired just now, a key that arrived late. One
+     * already there under that name is stopped first and its part dropped, so the new one starts from `connecting` and
+     * the two never run together. Resolves once the new one is running; its reports arrive as any other's. Calls on
+     * one home run one at a time. Once `start`'s signal has aborted, an added one waits for the next `start`.
+     */
+    add: (integration: I): Promise<void> =>
+      change(async () => {
+        await drop(integration.name);
+        list.push(integration);
+        const live = started && !started.aborted ? started : undefined;
+        snapshot = {
+          ...snapshot,
+          [integration.name]: {
+            status: "connecting",
+            ...(live ? { downSince: asOf(clock) } : {}),
+          },
+        };
+        if (live) launch(integration, live);
+      }),
+    /** Stop one integration and drop its part from the snapshot. Resolves once its run has ended; false if there was none by that name. */
+    remove: (name: Name): Promise<boolean> => change(() => drop(name)),
+    /** Run every integration, and any added meanwhile, until `signal` aborts. One failing marks itself unavailable; the rest carry on. */
     async start(signal: AbortSignal): Promise<void> {
-      finished.clear(); // a second start, after the first has stopped, runs them all again
+      started = signal;
       const now = asOf(clock); // the wait for a first report counts from here, not from createHome
       snapshot = Object.fromEntries(
-        Object.entries(snapshot as Record<string, Part>).map(([name, p]) => [
+        Object.entries(parts()).map(([name, p]) => [
           name,
           p.status === "connecting"
             ? { ...p, downSince: p.downSince ?? now }
             : p,
         ]),
       ) as HomeSnapshot<I>;
-      await Promise.all(
-        integrations.map((i) =>
-          Promise.try(() => i.run(signal, (part) => set(i.name, part)))
-            .catch((error) =>
-              set(i.name, {
-                status: "unavailable",
-                reason: "crashed",
-                detail: errorText(error),
-                state: (snapshot as Record<string, Part>)[i.name]!.state, // the last good state stays, as it does through a failed read
-              }),
-            )
-            .finally(() => {
-              finished.add(i.name);
-              for (const resolve of waiting.get(i.name) ?? []) resolve(); // nothing more will report
-              waiting.delete(i.name);
-            }),
-        ),
-      );
+      for (const i of list) launch(i, signal); // a second start, after the first has stopped, runs them all again
+      // Until every run has ended, those added meanwhile too.
+      while (runs.size || changes)
+        await Promise.all([...[...runs.values()].map((r) => r.done), changing]);
+      // `started` stays: one added after every run has ended still runs, until the signal aborts.
     },
   };
 }

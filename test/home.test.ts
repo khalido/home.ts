@@ -215,3 +215,136 @@ describe("settle", () => {
     expect([s.a?.status, s.b?.status]).toEqual(["connected", "connecting"]);
   });
 });
+
+describe("createHome.add and remove", () => {
+  test("one added while running starts at once, reports like the rest, and start waits for it", async () => {
+    const a = fake("a");
+    const b = fake("b");
+    const changes: string[] = [];
+    const home = createHome([a], (_, c) => changes.push(c.name));
+    const stop = new AbortController();
+    let ended = false;
+    const running = home.start(stop.signal).then(() => (ended = true));
+    await home.add(b);
+    expect(home.part("b")).toMatchObject({ status: "connecting" });
+    expect(home.part("b")?.downSince).toBeDefined();
+    b.report();
+    expect(home.part("b")).toMatchObject({ status: "connected", state: 0 });
+    expect(changes).toEqual(["b"]);
+    expect(home.integration("b")).toBe(b as never);
+    const read = home.refresh("b");
+    b.report();
+    await read;
+    stop.abort();
+    await running;
+    expect(ended).toBe(true);
+  });
+
+  test("the same name replaces: the old one has ended before the new one runs, and its late report is dropped", async () => {
+    const order: string[] = [];
+    const slow = (tag: string): Integration<string> & { late(): void } => {
+      let update: ((p: Part<string>) => void) | undefined;
+      return {
+        name: "a",
+        refresh() {},
+        run: (signal, u) =>
+          new Promise((resolve) => {
+            update = u;
+            order.push(`${tag} runs`);
+            signal.addEventListener("abort", () =>
+              setTimeout(() => (order.push(`${tag} ended`), resolve()), 5),
+            );
+          }),
+        late: () => update?.({ status: "connected", state: tag }),
+      };
+    };
+    const [old, next] = [slow("old"), slow("new")];
+    const home = createHome<Integration<string>>([old]);
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    old.late();
+    expect(home.part("a")?.state).toBe("old");
+    await home.add(next);
+    expect(order).toEqual(["old runs", "old ended", "new runs"]);
+    expect(home.part("a")).toMatchObject({ status: "connecting" });
+    expect(home.part("a")?.state).toBeUndefined();
+    old.late();
+    expect(home.part("a")?.state).toBeUndefined();
+    next.late();
+    expect(home.part("a")?.state).toBe("new");
+    stop.abort();
+    await running;
+  });
+
+  test("remove stops it, drops its part and frees a waiting refresh; an unknown name is false", async () => {
+    const a = fake("a");
+    const b = fake("b");
+    const home = createHome([a, b]);
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    const read = home.refresh("b");
+    expect(await home.remove("b")).toBe(true);
+    await read;
+    expect(home.snapshot()).toEqual({ a: expect.anything() });
+    expect(home.integration("b")).toBeUndefined();
+    expect(() => home.refresh("b")).toThrow('no integration "b"; have a');
+    expect(await home.remove("b")).toBe(false);
+    stop.abort();
+    await running;
+  });
+
+  test("added before start, it runs with the rest", async () => {
+    const a = fake("a");
+    const home = createHome<Integration<number>>([]);
+    await home.add(a);
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    a.report();
+    expect(home.part("a")).toMatchObject({ status: "connected" });
+    stop.abort();
+    await running;
+  });
+
+  test("two adds on one name at once run one after the other; a remove right behind an add takes it out", async () => {
+    const order: string[] = [];
+    const slow = (tag: string): Integration<string> => ({
+      name: "a",
+      refresh() {},
+      run: (signal) =>
+        new Promise((resolve) => {
+          order.push(`${tag} runs`);
+          signal.addEventListener("abort", () =>
+            setTimeout(() => (order.push(`${tag} ended`), resolve()), 5),
+          );
+        }),
+    });
+    const home = createHome<Integration<string>>([slow("old")]);
+    const stop = new AbortController();
+    const running = home.start(stop.signal);
+    await Promise.all([home.add(slow("x1")), home.add(slow("x2"))]);
+    expect(order).toEqual([
+      "old runs",
+      "old ended",
+      "x1 runs",
+      "x1 ended",
+      "x2 runs",
+    ]);
+    void home.add(slow("x3"));
+    expect(await home.remove("a")).toBe(true);
+    expect(home.snapshot()).toEqual({});
+    await home.refresh(); // nothing to read: resolves
+    stop.abort();
+    await running;
+  });
+
+  test("added after every run has ended, with the signal still live, it runs", async () => {
+    const a = fake("a");
+    const home = createHome<Integration<number>>([]);
+    const stop = new AbortController();
+    await home.start(stop.signal); // nothing to run: returns
+    await home.add(a);
+    a.report();
+    expect(home.part("a")).toMatchObject({ status: "connected" });
+    stop.abort();
+  });
+});

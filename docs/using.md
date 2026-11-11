@@ -76,7 +76,23 @@ A write changes someone's house: make one only when a person asked for it. Write
 - **Daikin defaults.** `mode("cool")` is 25 °C and `mode("heat")` 27 (`DEFAULT_TARGET_C`); `mode("cool", 23)` for another. `power(true)` brings the unit back as it was last left.
 - **A target** for Cast is a device's or group's name or id. A clip is `{ url, type? }` or `{ bytes, type }`; bytes need `castServe`.
 - **Clips: MP3 or AAC.** A 24 kHz mono WAV played on the displays and failed on the audio-only speakers (2026-11-09), so convert a WAV from a text-to-speech engine first.
-- **A new integration needs a new home.** `createHome` takes its integrations once: after pairing Hue while the app runs, abort the signal and build the home again with the key. Every socket reconnects (Cast, Spotify, Hue's stream) and `lastGoodAt` starts over; the address cache keeps discovery short. The same goes for an `unavailable` part once its key is fixed.
+- **Adding one while it runs.** `await home.add(integration)` starts it on the running home; the rest keep their sockets. One already there under that name is stopped first, so this is also how an `unavailable` part comes back once its key is fixed. `await home.remove(name)` stops one and drops its part. After pairing Hue from a chat, add the bridge's entry to the config (`loadHome` refuses an entry whose key is unset, so it can't be there before), build it as the config would, so it gets the pinned fetch and discovery, and add that one:
+
+  ```ts
+  const { key } = await pairWhenPressed({
+    host,
+    fetch: bunPinnedFetch(bridgeId),
+    deviceType: "chota#pi",
+  });
+  const built = loadHome(config, {
+    ...options,
+    env: { ...process.env, HUE_APPLICATION_KEY: key },
+  });
+  await home.add(built.find((i) => i.name === "hue")!);
+  ```
+
+  A replaced part starts over from `connecting`, with no state and no `lastGoodAt`, and no `onChange` until its first report. The second `loadHome` keeps its own copy of the address cache, so pass the same `cache` and expect the last writer to win.
+
 - **Hue by name.** `room("Bedroom", { brightness: 40, kelvin: 2700 })`, `light("Desk lamp", { color: "#ff8800" })`, `scene("Relax", "Bedroom")`. A change is `{ on?, brightness?, color?, kelvin?, transitionMs? }`; an unknown name throws with the names that exist.
 - **Volume scales differ:** Cast 0–1, Spotify 0–100.
 
@@ -116,9 +132,9 @@ Two places say so, for two different things.
 | `connecting`   | not answered yet                          | wait                                                        |
 | `connected`    | reading                                   |                                                             |
 | `disconnected` | unreachable now; the last `state` is kept | nothing: it keeps trying, and looks for a device that moved |
-| `unavailable`  | stopped for good                          | read `reason`, fix it, restart                              |
+| `unavailable`  | stopped for good                          | read `reason`, fix it, `home.add` it again                  |
 
-`reason` is set on `unavailable`, when known: `auth` (a key or token was rejected: a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw; a bug). `detail` is the sentence for a person, `anomaly` an odd reading passed through. An `unavailable` part does not recover by itself: build the home again after the fix.
+`reason` is set on `unavailable`, when known: `auth` (a key or token was rejected: a person must re-key), `config` (a setting or file is wrong) or `crashed` (its `run` threw; a bug). `detail` is the sentence for a person, `anomaly` an odd reading passed through. An `unavailable` part does not recover by itself: after the fix, `home.add` a fresh one under the same name.
 
 **A write that can't be made throws** a `ConnectorError` (`HueError`, `DaikinError` and so on are subclasses), with the HTTP `status` when there was one and, where code can act on it, a `code`:
 
