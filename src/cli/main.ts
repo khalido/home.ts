@@ -27,7 +27,7 @@ const HUE_HELP: Record<string, string> = {
   lights: "lights off: one write to the whole-home group",
   room: "room <name> on|off|<1-100>",
   scene: "scene <name>",
-  pair: "pair: waits 30 s for the bridge's button; prints the env lines to set",
+  pair: "pair: waits 60 s for the bridge's button, counting down; prints the env lines to set",
 };
 
 /** Each connector's verbs beyond its status, the usage a wrong one prints, and any options of its own. */
@@ -156,7 +156,15 @@ function describe(e: unknown): {
     e instanceof Error &&
     (e.name === "TimeoutError" || e.name === "AbortError" || socket)
   )
-    return { error, code: "network" };
+    return {
+      // macOS answers "no route to host" for a LAN address when the terminal app lacks the Local Network permission.
+      error:
+        (e as { code?: string }).code === "EHOSTUNREACH" &&
+        process.platform === "darwin"
+          ? `${error} If the device is up, allow this terminal under System Settings > Privacy & Security > Local Network.`
+          : error,
+      code: "network",
+    };
   return { error, code: "error" };
 }
 

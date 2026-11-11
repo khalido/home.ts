@@ -26,7 +26,7 @@ The bridge serves its certificate, `CN=<bridge id>`, signed by one of Signify's 
 
 ## Pairing
 
-`pair({ host, fetch, deviceType })` makes one `POST /api`. Until someone presses the bridge's link button it throws `HueError` with `code: "link_button"` (bridge error 101). `pairWhenPressed` takes the same and asks every 2 s (`everyMs`) for 30 s (`timeoutMs`), calling `onWaiting` once when the bridge first says the button isn't pressed, so the caller can prompt; then it throws that error. `home pair` uses it. Pairing happens once: the key it returns keeps working, and the library never stores it. Untried against a bridge (2026-11-11).
+`pair({ host, fetch, deviceType })` makes one `POST /api`. Until someone presses the bridge's link button it throws `HueError` with `code: "link_button"` (bridge error 101). `pairWhenPressed` takes the same and asks every 2 s (`everyMs`) for 30 s (`timeoutMs`), calling `onWaiting` once when the bridge first says the button isn't pressed, so the caller can prompt; then it throws that error. `home pair` uses it with 60 s and a countdown. Pairing happens once: the key it returns keeps working, and the library never stores it. Live, 2026-11-11, KO's BSB002 (Bun 1.4.4): `home pair` timed out with no press, then returned a key once the button was pressed.
 
 ## Events
 

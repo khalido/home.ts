@@ -23,7 +23,7 @@ Four read-only subagent tracks plus my own reads, each checked against the code.
 
 **Unverified:** a bridge whose certificate fails validation (a self-signed one, a wrong `ca` override) retrying forever as `disconnected`.
 
-**Untried on a device, for chota's tests:** every Daikin write but `setPower(true)`, and that predates the write lane's rewrite; Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
+**Untried on a device, for chota's tests:** every Daikin write but `setPower(true)` (which worked again on 2026-11-11, through the rewritten write lane); Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
 
 ## 0.1.3 is on npm (2026-11-10)
 
@@ -31,7 +31,7 @@ Live as `latest`, approved by KO; chota-bot has been told. jaldi has not (no ses
 
 In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `Part.reason` (`auth`, `config`, `crashed`), `ConnectorCode`, Google's key in a header, and fixes to spotify's cap and `interrupt`, a Cast group's level after an announce, and `createHome`.
 
-**Hue, unreleased (2026-11-11):** both of Signify's roots are in the package (`HUE_BRIDGE_ROOT_CA`, identical to Signify's page, pinned live against KO's BSB002 with reads only), `ca` is optional everywhere, and `pairWhenPressed` waits for the button. `docs/hue.md` has Signify's rules and what other projects do. Pairing itself has never run: the next step is KO at the button with `home pair`, then `home hue` and `home devices`. chota-bot wants to pair from a chat message and is waiting on a release with this.
+**Hue, unreleased (2026-11-11):** both of Signify's roots are in the package (`HUE_BRIDGE_ROOT_CA`, identical to Signify's page, pinned live against KO's BSB002 with reads only), `ca` is optional everywhere, and `pairWhenPressed` waits for the button. `docs/hue.md` has Signify's rules and what other projects do. `home pair` worked live for KO on 2026-11-11 (a timeout with no press, then a key); it now waits 60 s with a countdown. The key is not in this repo's `.env` yet, so no read has used it: once it is, run `home hue` and `home devices`, then build typed light writes (on, brightness, colour, temperature, transition), which do not exist. chota-bot wants to pair from a chat message and is waiting on a release with this.
 
 Hue's device records are from the docs' shapes, like the rest of Hue. `home devices` is built and unreleased (2026-11-11): it listed KO's Cast devices and printer live; Hue, the Daikin and the Soloist were not set up on that machine, so their lines are still from fixtures. From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
 

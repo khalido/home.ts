@@ -130,7 +130,7 @@ Signify's rules ([Color Conversion Formulas](https://developers.meethue.com/deve
 
 - `pair({ host, fetch, deviceType })`: one request. Throws `HueError` with `code: "link_button"` until the button is pressed.
 - `pairWhenPressed({ …, timeoutMs?, everyMs?, onWaiting?, signal? })`: asks every 2 s for 30 s, calls `onWaiting` once when the bridge first says the button isn't pressed, and returns the key. After the time it throws the `link_button` error.
-- `home pair` uses it and prints the env lines.
+- `home pair` uses it with 60 s, names the bridge it found, counts down on a terminal, and prints the env lines. With no press it says so and exits 1.
 - The library never stores the key.
 
 A consumer pairing from a chat:
@@ -151,4 +151,4 @@ const { key } = await pairWhenPressed({
 
 **What others do:** Home Assistant asks the person to press, then makes one request per click of Submit. openHAB asks every 0.5 s for 5 minutes, Homebridge every 15 s with no limit, openhue-cli every second with no limit. Home Assistant and openHAB leave out `generateclientkey`.
 
-**Untried:** pairing has never run against a bridge from this library (2026-11-11).
+**Live, 2026-11-11, KO's BSB002 (Bun 1.4.4):** `home pair` gave the `link_button` error after its wait with no press, and a key on the next run once the button was pressed. The key has not yet been used for a read.

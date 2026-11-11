@@ -8,7 +8,7 @@ home up transactions | categories | uncategorised | spend | categorise | tag | w
 home lights off               # one write to the whole-home group
 home room <name> on|off|<1-100>
 home scene <name>
-home pair                     # waits 30 s for the bridge's button; prints the env lines to set
+home pair                     # waits 60 s for the bridge's button, counting down; prints the env lines to set
 home enphase login            # once a year: mints the Enphase owner token into ~/.config/home/ (0600)
 home discover [--json] [--passes n]  # which smart-home devices answer here (mDNS + Daikin UDP), which this package supports, then with a config how they match it; two passes 5 s apart
 home cache [clear]            # the addresses kept between runs, or delete them so the next run discovers afresh

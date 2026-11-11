@@ -39,7 +39,7 @@ One read-only request, saved with the MAC, SSID, `edid` and the unit's ASCII ids
 ## Unconfirmed
 
 - **The write lane's rates** (1 s apart, 20 a minute) are guesses. One client lives as long as the integration and reads the unit's address at each send, so a move keeps the lane's count, and a write still waiting goes to the new address.
-- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16, Bun 1.4.3, see below); mode, setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
+- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16 and 2026-11-11, see below); mode, setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
   - Setpoint width: pydaikin sends one byte, Alira two (`3200`). One byte, because the live field is one byte (`p_02` `mi 24`, `mx 40`).
   - Method: pydaikin POSTs, Alira PUTs. POST, the method reads already use.
   - Field: Alira always writes `p_03` and `p_0A`. Those are pydaikin's heat-mode setpoint and fan, and Alira reads by list position (its `[2]` and `[8]` are `p_03` and `p_0A`), so it appears written on a unit in heat. Per-mode fields here.
@@ -62,6 +62,10 @@ All setpoint and fan fields, read from `e_3001` with `md` (setpoint is one byte,
 | `p_26`, `p_28` | auto, fan-mode fan | auto, speed 5   |       |
 
 Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, `mi FA`, `mx 00`), and the `p_05`–`p_08`, `p_20`–`p_25` fields (3- and 4-byte values, mostly `0F…`, likely schedules or limits). Meaning unknown.
+
+## Second write (2026-11-11)
+
+`setPower(true)` at KO's request, through `daikinClient().write` and the rewritten write lane (Bun 1.4.4, from a Mac): accepted in 280 ms, and reads at once, 2 s and 5 s later all showed `on` (before: off, dry, room 25 °C). The unit was found by the UDP broadcast. `home probe` shows 404 on the three old `/common` and `/aircon` paths and an answer on `dsiot`, as expected for this unit.
 
 ## Read from a Pi (2026-11-10)
 

@@ -43,7 +43,7 @@ Weather: `blocks` holds morning, afternoon and evening for today and tomorrow in
 
 **Keys** come from environment variables by name (`.env.example` lists them; Bun loads `.env` from the working directory). A real environment variable beats `.env`. Some keys come from a command, not a website:
 
-- Hue: `home pair`, then press the bridge's button within 30 s; it prints the env lines. Signify's root certificates are in the package.
+- Hue: `home pair`, then press the bridge's button within the 60 s it counts down; it prints the env lines. Signify's root certificates are in the package.
 - Enphase: `home enphase login` once a year writes the owner token to `~/.config/home/enphase-token.json` (0600).
 - Amber, Up, Google Weather: a token from each service's website.
 - Spotify (Soloist): no key in `home`; Soloist's own API key is the daemon's. Set `SOLOIST_WS` to the address its `--ws` opens. Signed out is normal until someone picks the speaker in the Spotify app.

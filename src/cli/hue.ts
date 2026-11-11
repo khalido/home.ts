@@ -59,6 +59,9 @@ function byName<T extends { name?: string }>(
   );
 }
 
+/** How long `home pair` waits for the button: time to walk to the bridge. */
+const PAIR_WAIT_MS = 60_000;
+
 export const hueVerbs: Verbs = {
   async lights([state]) {
     if (state !== "off") usage("usage: home lights off");
@@ -98,19 +101,42 @@ export const hueVerbs: Verbs = {
 
   async pair() {
     const b = await bridge();
+    console.error(`Hue bridge ${b.id.slice(-6).toUpperCase()} at ${b.host}.`);
+    // The countdown redraws one line on a terminal; piped, it is one line said once.
+    const live = process.stderr.isTTY;
+    const until = Date.now() + PAIR_WAIT_MS;
+    const prompt = () =>
+      `Press the link button on the bridge: ${Math.max(0, Math.ceil((until - Date.now()) / 1000))} s left`;
+    let tick: ReturnType<typeof setInterval> | undefined;
     const { key } = await pairWhenPressed({
       host: b.host,
       fetch: bunPinnedFetch(b.id, ca()),
       deviceType: `home#${hostname().slice(0, 19)}`,
-      onWaiting: () =>
-        console.error("Press the link button on the bridge (waiting 30 s)…"),
-    }).catch((e) =>
-      e.code === "link_button"
-        ? fail("the link button was not pressed in time", "auth", "home pair")
-        : Promise.reject(e),
-    );
+      timeoutMs: PAIR_WAIT_MS,
+      onWaiting() {
+        if (!live) return console.error(prompt());
+        process.stderr.write(prompt());
+        tick = setInterval(
+          () => process.stderr.write(`\r\x1b[K${prompt()}`),
+          1000,
+        );
+      },
+    })
+      .finally(() => {
+        clearInterval(tick);
+        if (tick) process.stderr.write("\r\x1b[K");
+      })
+      .catch((e) =>
+        e.code === "link_button"
+          ? fail(
+              `no button press detected in ${PAIR_WAIT_MS / 1000} s; nothing was changed`,
+              "auth",
+              "home pair",
+            )
+          : Promise.reject(e),
+      );
     console.error(
-      "Paired. Put this in your shell environment (never in a repo):",
+      "Paired. Put these in your shell environment or .env (never in a repo):",
     );
     console.log(
       `HUE_APPLICATION_KEY=${key}\nHUE_BRIDGE_HOST=${b.host}\nHUE_BRIDGE_ID=${b.id}`,
