@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { changeFrom } from "../src/cli/hue.ts";
 import { deviceLine } from "../src/cli/status.ts";
 
 // The output contract in docs/cli.md: errors as JSON on stderr under --json, exit 2 for usage, 1 for a connector that is down.
@@ -170,5 +171,24 @@ describe("home output contract", () => {
     expect(deviceLine({ ...d, available: false, reason: "auth" })).toBe(
       "daikin   Lounge AC: on · cool 23 °C · not available: auth",
     );
+  });
+
+  test("home light and home room: the words after the name, in any order", () => {
+    const u = "usage";
+    expect(changeFrom(["on", "40", "2700k"], u)).toEqual({
+      on: true,
+      brightness: 40,
+      kelvin: 2700,
+    });
+    expect(changeFrom(["ff8800", "100%"], u)).toEqual({
+      color: "ff8800",
+      brightness: 100,
+    });
+    expect(changeFrom(["#f80"], u)).toEqual({ color: "#f80" });
+    expect(changeFrom(["123456"], u)).toEqual({ color: "123456" }); // six digits is a colour
+    expect(changeFrom(["888"], u)).toEqual({ brightness: 888 }); // three is a brightness: the library refuses it; a grey is #888
+    expect(() => changeFrom(["on", "off"], u)).toThrow("not both");
+    expect(() => changeFrom(["warm"], u)).toThrow("is not on, off");
+    expect(() => changeFrom([], u)).toThrow("usage");
   });
 });

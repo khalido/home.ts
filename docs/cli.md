@@ -6,8 +6,9 @@ home [status|doctor] [--json] # each integration: connected or not, which env na
 home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), and why when it isn't available
 home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
 home lights off               # one write to the whole-home group
-home room <name> on|off|<1-100>
-home scene <name>
+home light <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]  # one light: `home light "Desk lamp" 40 2700k`, `home light Shelf ff8800`
+home room <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]   # every light in a room or zone, one write
+home scene <name> [in <room>]  # a scene; name the room when several have one by that name
 home pair                     # waits 60 s for the bridge's button, counting down; prints the env lines to set
 home daikin on | off           # power only: the AC comes back as it was last left
 home daikin cool | heat | auto [°C] | dry | fan  # mode, on, and the setpoint: the one given, else cool 25 and heat 27; prints what the unit then reports. Live on KO's unit: on, and dry to cool at 25 (2026-11-11); the rest untried

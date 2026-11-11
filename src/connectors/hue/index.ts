@@ -27,7 +27,19 @@ import {
 
 export { HUE_BRIDGE_ROOT_CA } from "./ca.ts";
 export {
+  colorToXy,
+  type Gamut,
+  kelvinToMirek,
+  mirekToKelvin,
+  type Rgb,
+  type XY,
+  xyToHex,
+} from "./color.ts";
+export {
   bunPinnedFetch,
+  CONFIRM_MS,
+  type HueApplied,
+  type LightChange,
   type HueClient,
   HueError,
   type HueOptions,
@@ -226,14 +238,26 @@ const view = (s: HueSnapshot) => ({
   })),
 });
 
-/** "Kitchen: on · 40%", "Kitchen: off", or the name alone when the bridge hasn't said. */
-const onText = (v: {
+/** A light, room or zone in a line: "Kitchen: on · 40%", "Desk: on · 40% · 2700 K", "Strip: on · 80% · #ff8800", "Kitchen: off", or the name alone when the bridge hasn't said. */
+export const hueText = (v: {
   name?: string;
   id: string;
   on?: boolean;
   brightness?: number;
-}) =>
-  `${v.name ?? v.id}${v.on === undefined ? "" : `: ${v.on ? `on${v.brightness === undefined ? "" : ` · ${Math.round(v.brightness)}%`}` : "off"}`}`;
+  kelvin?: number;
+  hex?: string;
+}) => {
+  if (v.on === undefined) return v.name ?? v.id;
+  const parts = v.on
+    ? [
+        "on",
+        v.brightness === undefined ? "" : `${Math.round(v.brightness)}%`,
+        // A colour light showing a white reports both; the white is what it is showing.
+        v.kelvin !== undefined ? `${v.kelvin} K` : (v.hex ?? ""),
+      ]
+    : ["off"];
+  return `${v.name ?? v.id}: ${parts.filter(Boolean).join(" · ")}`;
+};
 
 /** A Hue light, or a room or zone, as a home device: `detail` is its `LightView` or `GroupView`. */
 export type HueHomeDevice =
@@ -259,7 +283,7 @@ export function hueHomeDevices(
       ...(l.reachable === undefined ? {} : { available: l.reachable }),
       ...on(l),
       asOf: s.asOf,
-      text: onText(l),
+      text: hueText(l),
       detail: l,
     })),
     ...groups(s).map((g): HueHomeDevice => ({
@@ -269,7 +293,7 @@ export function hueHomeDevices(
       kind: "group",
       ...on(g),
       asOf: s.asOf,
-      text: onText(g),
+      text: hueText(g),
       members: g.lightIds,
       detail: g,
     })),
@@ -311,7 +335,7 @@ export const manifest: Manifest<HueSnapshot> = {
   lines({ state }) {
     if (!state) return [];
     const { lightsOn } = view(state);
-    return [`${lightsOn} lights on`, ...groups(state).map(onText)];
+    return [`${lightsOn} lights on`, ...groups(state).map(hueText)];
   },
   record: ({ state }) => (state ? view(state) : {}),
 };

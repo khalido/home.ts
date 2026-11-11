@@ -1,5 +1,14 @@
 import { z } from "zod";
+import { colorToXy, kelvinToMirek, type Rgb, type XY } from "./color.ts";
 import { Envelope, type Kind, PairResponse, Resource } from "./schemas.ts";
+import {
+  type GroupView,
+  groups,
+  type LightView,
+  lights,
+  scenes,
+  snapshotFrom,
+} from "./state.ts";
 import { HUE_BRIDGE_ROOT_CA } from "./ca.ts";
 import { type Clock, realClock } from "../../clock.ts";
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
@@ -13,10 +22,29 @@ export type HueOptions = {
   clock?: Clock;
 };
 
-/** A failed bridge call. `code` is "link_button" when pairing waits on the bridge's button. */
+/** A failed bridge call. `code` is "link_button" when pairing waits on the bridge's button, "invalid" for a change that can't be made (an unknown name, a value off the light's range), caught before anything is sent. */
 export class HueError extends ConnectorError {
-  declare readonly code?: "link_button";
+  declare readonly code?: "link_button" | "invalid";
 }
+
+/**
+ * What to change on a light, or on a room or zone: only what is given is sent. `brightness` is 1–100, `color` a hex
+ * string or `{ r, g, b }`, `kelvin` a white temperature; `color` and `kelvin` are one or the other. Without `on`, a
+ * change turns the light on, since a light that is off takes no brightness or colour. `transitionMs` is the fade (the
+ * bridge's own is 400 ms; 0 is at once).
+ */
+export type LightChange = {
+  on?: boolean;
+  brightness?: number;
+  color?: string | Rgb;
+  kelvin?: number;
+  transitionMs?: number;
+};
+
+/** What a write left: the light or group once the bridge reported the change (`confirmed`), or as it stood when `CONFIRM_MS` ran out. */
+export type HueApplied<V> = { state: V; confirmed: boolean };
+/** How long `light`, `room` and `scene` wait for the bridge to report what was asked, reading every half second. */
+export const CONFIRM_MS = 3000;
 
 /** Minimum gap between writes, per lane: Signify's guidance (Hue System Performance, read 2026-11-11), about 10 a second to lights and 1 a second to groups. */
 export const WRITE_GAP_MS = { group: 1000, light: 100 } as const;
@@ -84,7 +112,8 @@ export function hueClient(options: HueOptions) {
       mergeBody,
     );
 
-  return {
+  const clock = options.clock ?? realClock;
+  const base = {
     put,
     /** Every resource of one kind, or every resource on the bridge when `kind` is left out (one call). */
     async get(kind?: Kind, signal?: AbortSignal): Promise<Resource[]> {
@@ -102,6 +131,201 @@ export function hueClient(options: HueOptions) {
     /** Recall a scene in its room or zone. */
     recallScene(id: string): Promise<unknown[]> {
       return put("scene", id, { recall: { action: "active" } });
+    },
+  };
+
+  const invalid = (message: string) =>
+    new HueError(message, { code: "invalid" });
+  /** One of `items` by id or by name (any case). A miss, or a name two of them share, throws listing what exists. */
+  function pick<T extends { id: string; name?: string }>(
+    items: T[],
+    target: string,
+    what: string,
+    label: (item: T) => string = (i) => i.name ?? i.id,
+  ): T {
+    const wanted = target.trim().toLowerCase();
+    const found = items.filter(
+      (i) => i.id === target || i.name?.toLowerCase() === wanted,
+    );
+    if (found.length === 1) return found[0]!;
+    throw invalid(
+      found.length
+        ? `"${target}" names ${found.length}: ${found.map((i) => `${label(i)} (${i.id})`).join(", ")}`
+        : `no ${what} "${target}"; have: ${items.map(label).join(", ") || "none"}`,
+    );
+  }
+  const read = async () => snapshotFrom(await base.get(), "");
+
+  /** The CLIP body for `change`, checked against what the light (or a group's lights) can take. Throws before anything is sent. */
+  function bodyFor(
+    change: LightChange,
+    name: string,
+    members: LightView[],
+    isOn: boolean | undefined,
+  ): Record<string, unknown> {
+    const { on, brightness, color, kelvin, transitionMs } = change;
+    const look =
+      brightness !== undefined || color !== undefined || kelvin !== undefined;
+    if (on === undefined && !look) throw invalid("nothing to change");
+    if (on === false && look)
+      throw invalid("off takes no brightness or colour");
+    if (color !== undefined && kelvin !== undefined)
+      throw invalid("a colour or a white temperature, not both");
+    const body: Record<string, unknown> = {};
+    if (on !== undefined) body.on = { on };
+    else if (isOn !== true) body.on = { on: true }; // off, or a group where some may be
+    if (brightness !== undefined) {
+      if (!(brightness >= 1 && brightness <= 100))
+        throw invalid(`brightness is 1–100, not ${brightness}`);
+      body.dimming = { brightness };
+    }
+    if (color !== undefined) {
+      const gamut = members.find((l) => l.gamut)?.gamut;
+      if (!gamut) throw invalid(`${name} has no colour light`);
+      try {
+        body.color = { xy: colorToXy(color, gamut) };
+      } catch (error) {
+        throw invalid((error as Error).message); // a bad colour, as every other change that can't be made
+      }
+    }
+    if (kelvin !== undefined) {
+      const ranges = members.flatMap((l) =>
+        l.kelvinRange ? [l.kelvinRange] : [],
+      );
+      if (!ranges.length) throw invalid(`${name} takes no white temperature`);
+      const low = Math.min(...ranges.map((r) => r[0]));
+      const high = Math.max(...ranges.map((r) => r[1]));
+      if (!(kelvin >= low && kelvin <= high))
+        throw invalid(
+          `${kelvin} K is outside ${name}'s range, ${low}–${high} K`,
+        );
+      body.color_temperature = { mirek: kelvinToMirek(kelvin) };
+    }
+    if (transitionMs !== undefined) {
+      if (!(Number.isInteger(transitionMs) && transitionMs >= 0))
+        throw invalid(
+          `transitionMs is a whole number of ms, not ${transitionMs}`,
+        );
+      body.dynamics = { duration: transitionMs };
+    }
+    return body;
+  }
+
+  /** Read every half second until `view()` gives a state that is as `asked`, or `CONFIRM_MS` passes. A failed read is not a failed write. */
+  async function confirm<V>(
+    view: () => Promise<V | undefined>,
+    asked: (v: V) => boolean,
+  ): Promise<HueApplied<V>> {
+    const until = clock.now() + CONFIRM_MS;
+    let state: V | undefined;
+    let failed: unknown;
+    for (;;) {
+      try {
+        state = (await view()) ?? state;
+        if (state !== undefined && asked(state)) break;
+      } catch (error) {
+        failed = error;
+      }
+      if (clock.now() >= until) break;
+      await clock.sleep(500);
+    }
+    if (state === undefined)
+      throw failed ?? new HueError("sent, but it is no longer on the bridge");
+    return { state, confirmed: asked(state) };
+  }
+  /**
+   * Whether a view shows what the body asked: on, brightness within a point, and on a light the white temperature within
+   * 2 mirek or the colour within 0.02 in `xy`. A room reports neither, so its colour is not compared (its `on` is).
+   */
+  const shows =
+    (body: Record<string, unknown>, light: boolean) =>
+    (v: Partial<LightView>): boolean => {
+      const on = (body.on as { on: boolean } | undefined)?.on;
+      const brightness = (body.dimming as { brightness: number } | undefined)
+        ?.brightness;
+      const mirek = (body.color_temperature as { mirek: number } | undefined)
+        ?.mirek;
+      const xy = (body.color as { xy: XY } | undefined)?.xy;
+      return (
+        (on === undefined || v.on === on) &&
+        (brightness === undefined ||
+          (v.brightness !== undefined &&
+            Math.abs(v.brightness - brightness) <= 1)) &&
+        (!light ||
+          mirek === undefined ||
+          (v.kelvin !== undefined &&
+            Math.abs(kelvinToMirek(v.kelvin) - mirek) <= 2)) &&
+        (!light ||
+          xy === undefined ||
+          (v.xy !== undefined &&
+            Math.abs(v.xy.x - xy.x) <= 0.02 &&
+            Math.abs(v.xy.y - xy.y) <= 0.02))
+      );
+    };
+
+  return {
+    ...base,
+    /** Change one light, by name or id. Only when a person asks. Resolves with the light as the bridge then reported it. */
+    async light(
+      target: string,
+      change: LightChange,
+    ): Promise<HueApplied<LightView>> {
+      const l = pick(lights(await read()), target, "light");
+      const body = bodyFor(change, l.name ?? l.id, [l], l.on);
+      await put("light", l.id, body);
+      return confirm(
+        async () => lights(await read()).find((x) => x.id === l.id),
+        shows(body, true),
+      );
+    },
+    /**
+     * Change every light in a room or zone with one write, by name or id. Only when a person asks. Resolves with the
+     * group as the bridge then reported it; its brightness is the bridge's figure for the group, so a group holding a
+     * light that is off or unreachable may stay unconfirmed.
+     */
+    async room(
+      target: string,
+      change: LightChange,
+    ): Promise<HueApplied<GroupView>> {
+      const s = await read();
+      const g = pick(groups(s), target, "room or zone");
+      const name = g.name ?? g.id;
+      if (!g.groupedLightId) throw invalid(`${name} has no lights`);
+      const members = lights(s).filter((l) => g.lightIds.includes(l.id));
+      const body = bodyFor(change, name, members, undefined);
+      await put("grouped_light", g.groupedLightId, body);
+      return confirm(
+        async () => groups(await read()).find((x) => x.id === g.id),
+        shows(body, false),
+      );
+    },
+    /**
+     * Recall a scene by name or id. A name several rooms use ("Relax") needs `room`. Only when a person asks. Resolves
+     * with the scene's room or zone, `confirmed` once the bridge reports the scene active.
+     */
+    async scene(target: string, room?: string): Promise<HueApplied<GroupView>> {
+      const s = await read();
+      const all = groups(s);
+      const within =
+        room === undefined ? undefined : pick(all, room, "room or zone");
+      const roomName = (id?: string) =>
+        all.find((g) => g.id === id)?.name ?? "no room";
+      const sc = pick(
+        scenes(s).filter((x) => !within || x.groupId === within.id),
+        target,
+        "scene",
+        (x) => `${x.name ?? x.id} in ${roomName(x.groupId)}`,
+      );
+      await put("scene", sc.id, { recall: { action: "active" } });
+      let active = false;
+      return confirm(
+        async () => {
+          const now = await read();
+          active = scenes(now).find((x) => x.id === sc.id)?.active === true;
+          return groups(now).find((x) => x.id === sc.groupId);
+        },
+        () => active,
+      );
     },
   };
 }

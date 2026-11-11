@@ -1,3 +1,4 @@
+import { type Gamut, mirekToKelvin, type XY, xyToHex } from "./color.ts";
 import type { HueEvent, Resource } from "./schemas.ts";
 
 /** Every resource on the bridge by id, from the last full read plus every event since. `asOf` is local time it was last known fresh. */
@@ -56,9 +57,17 @@ export type LightView = {
   on?: boolean;
   brightness?: number;
   reachable?: boolean;
+  /** White temperature in kelvin, while the light shows a white; its range is `kelvinRange` (warmest, coolest). */
+  kelvin?: number;
+  kelvinRange?: [number, number];
+  /** The colour it shows: the bridge's `xy`, and `hex` for a screen (the hue at full brightness). Colour lights only. */
+  xy?: XY;
+  hex?: string;
+  /** The colours it can show. Present on a colour light, so its presence says "takes a colour". */
+  gamut?: Gamut;
 };
 
-/** Every light, with on, brightness and reachability. */
+/** Every light, with on, brightness, reachability, and its white temperature and colour where it has them. */
 export function lights(s: HueSnapshot): LightView[] {
   const zigbee = ofType(s, "zigbee_connectivity");
   return ofType(s, "light").map((l) => {
@@ -69,8 +78,25 @@ export function lights(s: HueSnapshot): LightView[] {
       on: l.on?.on,
       brightness: l.dimming?.brightness,
       reachable: link ? link.status === "connected" : undefined,
+      ...colorOf(l),
     };
   });
+}
+
+/** A light's temperature and colour fields, only those the bridge reported. */
+function colorOf(l: Resource): Partial<LightView> {
+  const out: Partial<LightView> = {};
+  const ct = l.color_temperature;
+  if (typeof ct?.mirek === "number") out.kelvin = mirekToKelvin(ct.mirek);
+  const { mirek_minimum: min, mirek_maximum: max } = ct?.mirek_schema ?? {};
+  if (min !== undefined && max !== undefined)
+    out.kelvinRange = [mirekToKelvin(max), mirekToKelvin(min)];
+  if (l.color?.xy) {
+    out.xy = l.color.xy;
+    out.hex = xyToHex(l.color.xy);
+  }
+  if (l.color?.gamut) out.gamut = l.color.gamut;
+  return out;
 }
 
 /** A room or zone as a row shows it, with its grouped light's state. */

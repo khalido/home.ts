@@ -1,14 +1,19 @@
-// `home lights off`, `home room`, `home scene`, `home pair` (also as `home hue <verb>`): one write to the bridge each.
+// `home lights off`, `home light`, `home room`, `home scene`, `home pair` (also as `home hue <verb>`): one write to the bridge each,
+// then what the bridge reports. The name lookups and the checks are the library's (`client.light`, `room`, `scene`).
 import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import {
   bunPinnedFetch,
-  groups,
+  type GroupView,
+  type HueApplied,
+  HueError,
   homeGroupedLightId,
   hue,
   hueClient,
+  hueText,
+  type LightChange,
+  type LightView,
   pairWhenPressed,
-  scenes,
 } from "../connectors/hue/index.ts";
 import { snapshotFrom } from "../connectors/hue/state.ts";
 import { FINDERS } from "../finders.ts";
@@ -47,17 +52,41 @@ async function client() {
   });
 }
 
-/** Find one room, zone or scene by name, case-insensitively; a miss lists what exists. */
-function byName<T extends { name?: string }>(
-  items: T[],
-  name: string,
-  what: string,
-): T {
-  return (
-    items.find((i) => i.name?.toLowerCase() === name.toLowerCase()) ??
-    fail(`no ${what} "${name}"; have: ${items.map((i) => i.name).join(", ")}`)
+/** What a write left, in a line: the light or room as the bridge then reported it, or that it has not reported the change yet. */
+const said = ({ state, confirmed }: HueApplied<LightView | GroupView>) =>
+  console.log(
+    confirmed
+      ? hueText(state)
+      : `sent; the bridge has not reported it yet (${hueText(state)})`,
   );
+
+export const CHANGE_USAGE = "[on|off] [<1-100>] [<kelvin>k] [<hex colour>]";
+/** The words after a name as a change: `on`, `off`, `40` (brightness), `2700k` (white), `ff8800` (colour), in any order. */
+export function changeFrom(words: string[], usageLine: string): LightChange {
+  const change: LightChange = {};
+  for (const w of words) {
+    if (w === "on" || w === "off") {
+      if (change.on !== undefined && change.on !== (w === "on"))
+        usage(`on or off, not both; ${usageLine}`);
+      change.on = w === "on";
+    } else if (/^\d{1,3}%?$/.test(w))
+      change.brightness = Number.parseInt(w, 10);
+    else if (/^\d{4,5}k$/i.test(w)) change.kelvin = Number.parseInt(w, 10);
+    else if (/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(w)) change.color = w;
+    else
+      usage(
+        `"${w}" is not on, off, a brightness, a temperature like 2700k or a colour like ff8800; ${usageLine}`,
+      );
+  }
+  if (!words.length) usage(usageLine);
+  return change;
 }
+
+/** A change the bridge can't make (an unknown name, a value off the light's range) is a usage error; anything else passes through. */
+const orUsage = (e: unknown): never => {
+  if (e instanceof HueError && e.code === "invalid") usage(e.message);
+  throw e;
+};
 
 /** How long `home pair` waits for the button: time to walk to the bridge. */
 const PAIR_WAIT_MS = 60_000;
@@ -72,30 +101,38 @@ export const hueVerbs: Verbs = {
     await c.put("grouped_light", id, { on: { on: false } });
   },
 
-  async room([name, value]) {
-    if (!name || !value) usage("usage: home room <name> on|off|<1-100>");
-    const c = await client();
-    const room = byName(
-      groups(snapshotFrom(await c.get(), "")),
-      name!,
-      "room or zone",
-    );
-    if (!room.groupedLightId) fail(`${room.name} has no grouped light`);
-    const level = Number(value);
-    if (value !== "on" && value !== "off" && !(level >= 1 && level <= 100))
-      usage(`brightness must be 1-100, got ${value}`);
-    const body =
-      value === "on" || value === "off"
-        ? { on: { on: value === "on" } }
-        : { on: { on: true }, dimming: { brightness: level } };
-    await c.put("grouped_light", room.groupedLightId!, body);
+  async light([name, ...words]) {
+    const line = `usage: home light <name> ${CHANGE_USAGE}`;
+    if (!name) usage(line);
+    const change = changeFrom(words, line);
+    said(await (await client()).light(name!, change).catch(orUsage));
+  },
+
+  async room([name, ...words]) {
+    const line = `usage: home room <name> ${CHANGE_USAGE}`;
+    if (!name) usage(line);
+    const change = changeFrom(words, line);
+    said(await (await client()).room(name!, change).catch(orUsage));
   },
 
   async scene(words) {
-    const name = words.join(" ") || usage("usage: home scene <name>");
+    const line = "usage: home scene <name> [in <room>]";
+    if (!words.length) usage(line);
     const c = await client();
-    await c.recallScene(
-      byName(scenes(snapshotFrom(await c.get(), "")), name, "scene").id,
+    // "Relax in Bedroom" is the scene Relax in that room, unless a scene is named all of it.
+    const at = words.lastIndexOf("in");
+    const whole = () => c.scene(words.join(" "));
+    said(
+      await (
+        at > 0 && at < words.length - 1
+          ? whole().catch(() =>
+              c.scene(
+                words.slice(0, at).join(" "),
+                words.slice(at + 1).join(" "),
+              ),
+            )
+          : whole()
+      ).catch(orUsage),
     );
   },
 

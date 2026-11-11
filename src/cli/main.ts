@@ -17,7 +17,7 @@ import {
 import { DAIKIN_USAGE, daikinVerbs } from "./daikin.ts";
 import { discover } from "./discover.ts";
 import { enphaseVerbs } from "./enphase.ts";
-import { hueVerbs } from "./hue.ts";
+import { CHANGE_USAGE, hueVerbs } from "./hue.ts";
 import { locate } from "./locate.ts";
 import { probe } from "./probe.ts";
 import { SPOTIFY_USAGE, spotifyVerbs } from "./spotify.ts";
@@ -26,8 +26,9 @@ import { UP_OPTIONS, UP_USAGE, upVerbs } from "./up.ts";
 
 const HUE_HELP: Record<string, string> = {
   lights: "lights off: one write to the whole-home group",
-  room: "room <name> on|off|<1-100>",
-  scene: "scene <name>",
+  light: `light <name> ${CHANGE_USAGE}`,
+  room: `room <name> ${CHANGE_USAGE}: every light in a room or zone, one write`,
+  scene: "scene <name> [in <room>]",
   pair: "pair: waits 60 s for the bridge's button, counting down; prints the env lines to set",
 };
 

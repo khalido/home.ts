@@ -60,15 +60,16 @@ Below that is the connector's snapshot, exactly as the device sent it (`home.par
 
 A write changes someone's house: make one only when a person asked for it. Writes hang off the integration, `home.integration(name)`, and each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands.
 
-| Connector | Call                                                                                   | Resolves with                                                                                    |
-| --------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| daikin    | `.client.power(on)`, `.client.mode(mode, targetC?)`                                    | `{ state, confirmed }`                                                                           |
-| spotify   | `.play(link?)`, `.pause()`, `.next()`, `.setVolume(0–100)`, `.activate()` and the rest | `{ state, confirmed }`                                                                           |
-| spotify   | `.duck(fn, { to })`, `.interrupt(fn)`                                                  | `{ value, music, why? }`: `fn`'s result, and `music` `untouched`, `restored`, `kept` or `failed` |
-| cast      | `.announce(target, clip, { volume? })`                                                 | `{ played, why?, restored, notRestored }`                                                        |
-| cast      | `.announceAll(targets, clip, { volume? })`                                             | one of those per target, each with its `target`                                                  |
-| cast      | `.setVolume(target, 0–1)`, `.setMuted(target, on)`, `.stop(target)`                    | nothing                                                                                          |
-| hue       | `.client.put(kind, id, body)`, `.client.recallScene(id)`                               | the bridge's answer; no typed writes yet                                                         |
+| Connector | Call                                                                                      | Resolves with                                                                                    |
+| --------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| daikin    | `.client.power(on)`, `.client.mode(mode, targetC?)`                                       | `{ state, confirmed }`                                                                           |
+| spotify   | `.play(link?)`, `.pause()`, `.next()`, `.setVolume(0–100)`, `.activate()` and the rest    | `{ state, confirmed }`                                                                           |
+| spotify   | `.duck(fn, { to })`, `.interrupt(fn)`                                                     | `{ value, music, why? }`: `fn`'s result, and `music` `untouched`, `restored`, `kept` or `failed` |
+| cast      | `.announce(target, clip, { volume? })`                                                    | `{ played, why?, restored, notRestored }`                                                        |
+| cast      | `.announceAll(targets, clip, { volume? })`                                                | one of those per target, each with its `target`                                                  |
+| cast      | `.setVolume(target, 0–1)`, `.setMuted(target, on)`, `.stop(target)`                       | nothing                                                                                          |
+| hue       | `.client.light(name, change)`, `.client.room(name, change)`, `.client.scene(name, room?)` | `{ state, confirmed }`, `state` the light or the room                                            |
+| hue       | `.client.put(kind, id, body)`, `.client.recallScene(id)`                                  | the bridge's answer, for what the typed writes don't cover                                       |
 
 - **`confirmed`** is true once the device reported what was asked. False is a result, not an error: the write was sent and the device hasn't shown it yet, and `state` is how it stood.
 - **Use the returned state.** The Daikin's part in the snapshot is from its last poll and can be 120 s behind, unless you call `home.refresh("daikin")`.
@@ -76,6 +77,7 @@ A write changes someone's house: make one only when a person asked for it. Write
 - **A target** for Cast is a device's or group's name or id. A clip is `{ url, type? }` or `{ bytes, type }`; bytes need `castServe`.
 - **Clips: MP3 or AAC.** A 24 kHz mono WAV played on the displays and failed on the audio-only speakers (2026-11-09), so convert a WAV from a text-to-speech engine first.
 - **A new integration needs a new home.** `createHome` takes its integrations once: after pairing Hue while the app runs, abort the signal and build the home again with the key. Every socket reconnects (Cast, Spotify, Hue's stream) and `lastGoodAt` starts over; the address cache keeps discovery short. The same goes for an `unavailable` part once its key is fixed.
+- **Hue by name.** `room("Bedroom", { brightness: 40, kelvin: 2700 })`, `light("Desk lamp", { color: "#ff8800" })`, `scene("Relax", "Bedroom")`. A change is `{ on?, brightness?, color?, kelvin?, transitionMs? }`; an unknown name throws with the names that exist.
 - **Volume scales differ:** Cast 0–1, Spotify 0–100.
 
 Announce only where nothing is playing, with the music on this machine turned down meanwhile:

@@ -90,7 +90,7 @@ Signify's rules ([Hue System Performance](https://developers.meethue.com/develop
 
 **Not done:** a 503 (error 901) is reported as a failed write, not retried or slowed for. Whether a merged write carries a field the light already has (an `on` to a light that is on) is the caller's to avoid. No Entertainment API.
 
-**Transition time.** A change fades over 400 ms unless the write says otherwise, and the setting does not stick: each write that wants another time must carry it (v2: `dynamics.duration`, in ms). Right for everyday use; an app that wants a light to respond at once sends 0. Latency above is measured with 0. This library sends none, so every write takes the bridge's 400 ms.
+**Transition time.** A change fades over 400 ms unless the write says otherwise, and the setting does not stick: each write that wants another time must carry it (v2: `dynamics.duration`, in ms). Right for everyday use; an app that wants a light to respond at once sends 0. Latency above is measured with 0. `transitionMs` on a light or room change sets it; without one a write takes the bridge's 400 ms.
 
 ## Rooms, zones and scenes
 
@@ -105,9 +105,11 @@ People group their lights into rooms in the Hue app, so a home app should use th
 
 In v2 a room or zone is a `room` or `zone` resource whose `grouped_light` service takes the writes, and the whole home is `bridge_home`.
 
-**What this library does.** Reads rooms, zones (`groups(state)`, each with its lights and its grouped light's on/off and brightness), the whole-home group (`homeGroupedLightId`) and scenes (`scenes(state)`). The config's `hueRoom` ties a Hue room to a room on the plan, and `homeDevices` gives each light its room. Writes: `home lights off`, `home room <name> on|off|<1-100>`, `home scene <name>`, each one group write; from code, `client.put("grouped_light", id, body)` and `client.recallScene(id)`.
+**What this library does.** Reads rooms, zones (`groups(state)`, each with its lights and its grouped light's on/off and brightness), the whole-home group (`homeGroupedLightId`) and scenes (`scenes(state)`). The config's `hueRoom` ties a Hue room to a room on the plan, and `homeDevices` gives each light its room. Writes: `home lights off`, `home room <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]`, `home scene <name>`, each one group write; from code, the typed writes below, or `client.put("grouped_light", id, body)` and `client.recallScene(id)` for anything else.
 
-**Not done:** typed writes for a room or a light (on, brightness, colour, temperature, transition); creating or editing rooms and scenes, which stays in the Hue app.
+Typed writes by name: `client.light(name, change)`, `client.room(name, change)`, `client.scene(name, room?)`, each resolving `{ state, confirmed }` (the connector README has the rules).
+
+**Not done:** creating or editing rooms and scenes, which stays in the Hue app. The typed writes are untried on a bridge (2026-11-11).
 
 ## Colour
 
@@ -120,7 +122,7 @@ Signify's rules ([Color Conversion Formulas](https://developers.meethue.com/deve
 - A colour given as hue, saturation and value goes to RGB first.
 - White is a colour temperature in mirek (`color_temperature.mirek`, 153 cool to 500 warm on most lights), not an `xy`.
 
-**What this library does: nothing yet.** The schema reads `on` and `dimming.brightness` and no colour. KO's bridge does report it (2026-11-11): each light's `color.xy`, its `gamut` and `gamut_type`, and `color_temperature.mirek` with the light's own `mirek_minimum` and `mirek_maximum`. Writes are `client.put(kind, id, body)` with a raw CLIP body, and `recallScene(id)`. The conversions are public maths; Signify's page also carries an iOS SDK extract "as is", which is read for the method and not copied.
+**What this library does.** `light(name, { color })` and `room(name, { color })` take a hex string or `{ r, g, b }` and send its `xy`, moved inside the light's own gamut; `kelvin` is a white temperature checked against the light's own range, never rounded into it. The state has each light's `kelvin`, `kelvinRange`, `xy`, `gamut` and a `hex` for a screen. Brightness stays separate: a dark red and a bright red are one colour. KO's bridge does report it (2026-11-11): each light's `color.xy`, its `gamut` and `gamut_type`, and `color_temperature.mirek` with the light's own `mirek_minimum` and `mirek_maximum`. The conversions are public maths; Signify's page also carries an iOS SDK extract "as is", which is read for the method and not copied.
 
 ## Pairing
 

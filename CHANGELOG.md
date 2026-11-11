@@ -6,15 +6,19 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Changed
 
+- **cli:** `home room <name> <n>` and `home scene` print the room's line after the write, where they printed nothing; a wrong name is a usage error (exit 2), where it was exit 1. `home scene <name>` no longer takes the first match when several rooms have a scene by that name: it lists them, and `home scene <name> in <room>` picks one.
+- **hue:** a light's line shows its white temperature or colour when on (`Desk: on · 40% · 2700 K`), in `home hue`, `home devices` and `homeDevices`.
 - **docs, for a consumer:** `docs/using.md` has each write and what it resolves with in one table, an announce-where-free example, and what a part's `status` and `reason` and an error's `code` mean. `docs/config.md`'s `loadHome` call now passes what Cast needs (`finders`, `castConnect`). `llms.txt` says what to call.
 - **`MissingTool`** is exported from `@khalido/home/finders`: thrown when the discovery tool (`avahi-browse` on Linux) isn't installed.
 - **docs:** `castStatus` and `castFree` take the Cast part's state (`home.part("cast")?.state`), which the docs called "the snapshot".
-
 - **cli:** `home` and `home daikin` find the Daikin by UDP broadcast when `DAIKIN_HOST` is unset, as the write commands do, so `DAIKIN_HOST` is optional. With no unit on the network it reads "not set up".
 - **cli:** "no route to host" on macOS now adds that the terminal may need the Local Network permission.
 
 ### Added
 
+- **hue: lights, rooms and scenes by name.** `client.light(name, change)`, `client.room(name, change)` and `client.scene(name, room?)`, each resolving `{ state, confirmed }` (`HueApplied`). `change` (`LightChange`) is `{ on?, brightness?, color?, kelvin?, transitionMs? }`: a colour as hex or `{ r, g, b }`, sent as `xy` inside the light's own gamut; a white temperature in kelvin, checked against the light's range. An unknown name or a value the light can't take throws `HueError` with `code: "invalid"` before anything is sent.
+- **hue: colour in the state.** Each light's `kelvin` and `kelvinRange`, and on a colour light its `xy`, `hex` and `gamut`. `colorToXy`, `xyToHex`, `kelvinToMirek`, `mirekToKelvin` and `hueText` are exported.
+- **`home light <name> …`**, and `home room` and `home scene` now take a brightness, a temperature (`2700k`) and a colour (`ff8800`) together, name a scene's room (`in <room>`), and print what the bridge then reported.
 - **hue: Signify's root certificates are in the package**, as `HUE_BRIDGE_ROOT_CA` from `@khalido/home/hue`: both roots, the bundle from Signify's "Using HTTPS" page. `ca` is now optional everywhere it was required: `hue({ host, bridgeId, key })`, `bunPinnedFetch(bridgeId)`, `nodePinnedFetch(bridgeId)`, the config's `ca` and the CLI's `HUE_CA_FILE`. One given still replaces the bundle. `home probe` reads the bridge without setup, and `home discover --write` no longer writes a `ca` line.
 - **hue: `pairWhenPressed`**: `pair`, asked every 2 s for 30 s until the bridge's button is pressed, with `onWaiting` for the moment to prompt. `pair` takes a `signal`. `home pair` now waits 60 s for the button, counting down, and says when no press was detected.
 - **daikin: `client.power(on)` and `client.mode(mode, targetC?)`**, resolving with `{ state, confirmed }` (`DaikinApplied`) once the unit reports what was asked, or after 5 s (`CONFIRM_MS`) without it. `mode` sends the mode, power on and the setpoint as one request: the one given, else the library's defaults, `DEFAULT_TARGET_C` (cool 25, heat 27).

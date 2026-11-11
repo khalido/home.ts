@@ -13,10 +13,13 @@ import {
   hueClient,
   HueError,
   lights,
+  colorToXy,
   HUE_BRIDGE_ROOT_CA,
+  kelvinToMirek,
   pair,
   pairWhenPressed,
   scenes,
+  xyToHex,
   type HueSnapshot,
 } from "../src/connectors/hue/index.ts";
 import { hueEvents, IDLE_MS, parseSse } from "../src/connectors/hue/events.ts";
@@ -330,6 +333,236 @@ describe("pair", () => {
     }).catch((e) => e);
     expect(error.name).toBe("AbortError");
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("colour", () => {
+  const C = {
+    red: { x: 0.6915, y: 0.3083 },
+    green: { x: 0.17, y: 0.7 },
+    blue: { x: 0.1532, y: 0.0475 },
+  };
+  test("hex and rgb to xy: white is D65, and the forms agree", () => {
+    expect(colorToXy("#ffffff")).toEqual({ x: 0.3127, y: 0.329 });
+    expect(colorToXy("fff")).toEqual(colorToXy({ r: 255, g: 255, b: 255 }));
+    expect(colorToXy("#ff0000")).toEqual({ x: 0.6401, y: 0.33 }); // sRGB red, inside gamut C
+    expect(colorToXy("#800000")).toEqual(colorToXy("#ff0000")); // brightness is not part of a colour
+  });
+  test("a colour the light can't show moves to the nearest point of its gamut", () => {
+    const green = colorToXy("#00ff00"); // sRGB green (0.3, 0.6)
+    expect(colorToXy("#00ff00", C)).toEqual(green); // gamut C holds it
+    const small = { ...C, green: { x: 0.409, y: 0.518 } }; // the older bulb's
+    const moved = colorToXy("#00ff00", small);
+    expect(moved).not.toEqual(green);
+    expect(moved.x).toBeGreaterThan(0.3);
+    expect(moved.y).toBeLessThan(0.6);
+  });
+  test("what is not a colour throws: black, a word, a value off 0–255", () => {
+    expect(() => colorToXy("#000000")).toThrow("black");
+    expect(() => colorToXy("warm")).toThrow("not a colour");
+    expect(() => colorToXy({ r: 300, g: 0, b: 0 })).toThrow("0–255");
+  });
+  test("xy back to a hex for a screen, and kelvin to mirek", () => {
+    expect(xyToHex({ x: 0.3127, y: 0.329 })).toBe("#ffffff");
+    expect(xyToHex({ x: 0.64, y: 0.33 })).toBe("#ff0000");
+    expect(kelvinToMirek(2700)).toBe(370);
+  });
+});
+
+describe("light, room and scene by name", () => {
+  /** A bridge that applies each PUT to its resources and reports it on the next read; `deaf` accepts writes and changes nothing. */
+  const fakeBridge = (deaf = false) => {
+    const data = structuredClone(JSON.parse(resourcesJson).data) as any[];
+    const one = (id: string) => data.find((r) => r.id === id);
+    Object.assign(one("light-1"), {
+      color: { xy: { x: 0.4, y: 0.4 }, gamut: C_GAMUT },
+      color_temperature: {
+        mirek: null,
+        mirek_schema: { mirek_minimum: 153, mirek_maximum: 500 },
+      },
+    });
+    one("light-2").color_temperature = {
+      mirek: 366,
+      mirek_schema: { mirek_minimum: 153, mirek_maximum: 454 },
+    };
+    one("scene-relax").status = { active: "inactive" };
+    const puts: { path: string; body: any }[] = [];
+    const { f } = fakeFetch((url, init) => {
+      if (init?.method !== "PUT")
+        return new Response(JSON.stringify({ errors: [], data }));
+      const path = url.split("/resource/")[1]!;
+      const body = JSON.parse(init.body as string);
+      puts.push({ path, body });
+      const r = one(path.split("/")[1]!);
+      if (!deaf) {
+        if (body.recall) r.status = { active: "static" };
+        else
+          for (const [k, v] of Object.entries(body))
+            r[k] = { ...r[k], ...(v as object) };
+      }
+      return new Response(JSON.stringify({ errors: [], data: [] }));
+    });
+    const { clock } = fakeClock();
+    return {
+      c: hueClient({ host: "h", key: "k", fetch: f, clock }),
+      puts,
+      add: (r: object) => void data.push(r),
+    };
+  };
+  const C_GAMUT = {
+    red: { x: 0.6915, y: 0.3083 },
+    green: { x: 0.17, y: 0.7 },
+    blue: { x: 0.1532, y: 0.0475 },
+  };
+
+  test("a light by name: only what was asked is sent, and it resolves with what the bridge then reported", async () => {
+    const b = fakeBridge();
+    // Floor lamp is on at 60: brightness alone, no `on` (Signify: one Zigbee message per field).
+    expect(await b.c.light("floor lamp", { brightness: 30 })).toMatchObject({
+      confirmed: true,
+      state: { id: "light-1", on: true, brightness: 30 },
+    });
+    // Shelf is off: a change turns it on.
+    expect(
+      await b.c.light("Shelf", { kelvin: 2700, transitionMs: 0 }),
+    ).toMatchObject({ confirmed: true, state: { on: true, kelvin: 2703 } });
+    expect(b.puts).toEqual([
+      { path: "light/light-1", body: { dimming: { brightness: 30 } } },
+      {
+        path: "light/light-2",
+        body: {
+          on: { on: true },
+          color_temperature: { mirek: 370 },
+          dynamics: { duration: 0 },
+        },
+      },
+    ]);
+  });
+
+  test("a colour goes out as xy inside the light's gamut; off is one field", async () => {
+    const b = fakeBridge();
+    const lit = await b.c.light("light-1", { color: "#ff0000" });
+    expect(lit.state.xy).toEqual({ x: 0.6401, y: 0.33 });
+    expect(lit.state.hex).toBe("#ff0000");
+    await b.c.light("Floor lamp", { on: false });
+    expect(b.puts.map((p) => p.body)).toEqual([
+      { color: { xy: { x: 0.6401, y: 0.33 } } },
+      { on: { on: false } },
+    ]);
+  });
+
+  test("a room is one write to its grouped light, always with on", async () => {
+    const b = fakeBridge();
+    expect(await b.c.room("living", { brightness: 40 })).toMatchObject({
+      confirmed: true,
+      state: { id: "room-living", on: true, brightness: 40 },
+    });
+    expect(b.puts).toEqual([
+      {
+        path: "grouped_light/gl-living",
+        body: { on: { on: true }, dimming: { brightness: 40 } },
+      },
+    ]);
+  });
+
+  test("what can't be done throws before anything is sent, saying what exists", async () => {
+    const b = fakeBridge();
+    const why = (p: Promise<unknown>) =>
+      p.catch((e) => `${e.code}: ${e.message}`);
+    expect(await why(b.c.light("Lamp", { on: true }))).toBe(
+      'invalid: no light "Lamp"; have: Floor lamp, Shelf',
+    );
+    expect(await why(b.c.room("Attic", { on: true }))).toBe(
+      'invalid: no room or zone "Attic"; have: Living, Reading',
+    );
+    expect(await why(b.c.light("Shelf", { color: "#ff0000" }))).toBe(
+      "invalid: Shelf has no colour light",
+    );
+    expect(await why(b.c.light("Shelf", { kelvin: 2000 }))).toBe(
+      "invalid: 2000 K is outside Shelf's range, 2203–6536 K",
+    );
+    expect(await why(b.c.light("Shelf", { brightness: 0 }))).toContain("1–100");
+    expect(
+      await why(b.c.light("Shelf", { on: false, brightness: 5 })),
+    ).toContain("off takes no");
+    expect(
+      await why(b.c.light("Floor lamp", { color: "#fff", kelvin: 3000 })),
+    ).toContain("not both");
+    expect(await why(b.c.light("Shelf", {}))).toContain("nothing to change");
+    expect(await why(b.c.room("Reading", { on: true }))).toContain("no lights");
+    expect(b.puts).toEqual([]);
+  });
+
+  test("a scene by name, confirmed once the bridge says it is active; a miss names each scene's room", async () => {
+    const b = fakeBridge();
+    expect(await b.c.scene("relax")).toMatchObject({
+      confirmed: true,
+      state: { id: "room-living" },
+    });
+    expect(await b.c.scene("Relax", "Living")).toMatchObject({
+      confirmed: true,
+    });
+    expect(b.puts[0]).toEqual({
+      path: "scene/scene-relax",
+      body: { recall: { action: "active" } },
+    });
+    expect(await b.c.scene("Party").catch((e) => e.message)).toBe(
+      'no scene "Party"; have: Relax in Living',
+    );
+    expect(await b.c.scene("Relax", "Reading").catch((e) => e.message)).toBe(
+      'no scene "Relax"; have: none',
+    );
+  });
+
+  test("a bridge that accepts the write and never shows it: unconfirmed, with the light as it stands", async () => {
+    const b = fakeBridge(true);
+    expect(await b.c.light("Shelf", { on: true })).toMatchObject({
+      confirmed: false,
+      state: { on: false },
+    });
+  });
+
+  test("a colour or a temperature that never shows is unconfirmed too, on a light already on", async () => {
+    const b = fakeBridge(true);
+    expect(
+      (await b.c.light("Floor lamp", { color: "#ff0000" })).confirmed,
+    ).toBe(false);
+    expect((await b.c.light("Floor lamp", { kelvin: 3000 })).confirmed).toBe(
+      false,
+    );
+    const ok = fakeBridge();
+    expect(
+      (await ok.c.light("Floor lamp", { color: "#ff0000" })).confirmed,
+    ).toBe(true);
+    expect((await ok.c.light("Floor lamp", { kelvin: 3000 })).confirmed).toBe(
+      true,
+    );
+  });
+
+  test("a scene name two rooms use needs the room; a room takes the widest range and the first gamut of its lights", async () => {
+    const b = fakeBridge();
+    b.add({
+      id: "scene-relax-2",
+      type: "scene",
+      metadata: { name: "Relax" },
+      group: { rid: "zone-reading", rtype: "zone" },
+      status: { active: "inactive" },
+    });
+    expect(await b.c.scene("Relax").catch((e) => e.message)).toBe(
+      '"Relax" names 2: Relax in Living (scene-relax), Relax in Reading (scene-relax-2)',
+    );
+    await b.c.scene("Relax", "reading");
+    expect(b.puts.at(-1)!.path).toBe("scene/scene-relax-2");
+    // Living holds a colour light (to 2000 K) and a white one (to 2203 K): 2000 K is in the room's range, and a colour goes out.
+    await b.c.room("Living", { kelvin: 2000 });
+    await b.c.room("Living", { color: "#00f" });
+    expect(b.puts.slice(-2).map((p) => Object.keys(p.body))).toEqual([
+      ["on", "color_temperature"],
+      ["on", "color"],
+    ]);
+    expect(
+      await b.c.room("Living", { kelvin: 1500 }).catch((e) => e.message),
+    ).toBe("1500 K is outside Living's range, 2000–6536 K");
   });
 });
 
