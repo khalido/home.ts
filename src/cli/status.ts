@@ -20,6 +20,7 @@ import { type Integration, type Part, type Status, settle } from "../home.ts";
 import { kw, type Manifest } from "../manifest.ts";
 import { MANIFESTS, manifestOf } from "../manifests.ts";
 import { castNow } from "./cast.ts";
+import { daikinHost } from "./daikin.ts";
 import { printersNow } from "./printers.ts";
 import { spotifyFromEnv } from "./spotify.ts";
 import {
@@ -63,17 +64,25 @@ export const weatherSources = (): WeatherSource[] => [
 
 /**
  * Each connector from the shell's env names, once the manifest's non-optional names are set. `needs` adds a step that
- * is not an env name (Enphase's token file). Addresses come from the env only; `home probe` and `home discover` search.
+ * is not an env name (Enphase's token file). Addresses come from the env, except the Daikin's and the Hue bridge's, which
+ * are searched for when unset; `home probe` and `home discover` search for the rest.
  */
 const FROM_ENV: Record<
   string,
   {
-    needs?: () => string[];
+    needs?: () => string[] | Promise<string[]>;
     build: () => Integration<any> | Promise<Integration<any>>;
   }
 > = {
   hue: { build: hueFromEnv },
-  daikin: { build: () => daikin({ host: env.DAIKIN_HOST!, fetch }) },
+  daikin: {
+    // No address set: ask the network. A home with no unit reads "not set up", not as a failure.
+    needs: async () =>
+      (await daikinHost())
+        ? []
+        : ["DAIKIN_HOST (no unit answered the UDP broadcast)"],
+    build: async () => daikin({ host: (await daikinHost())!, fetch }),
+  },
   enphase: {
     needs: () => (existsSync(TOKEN_FILE) ? [] : ["`home enphase login`"]),
     build: enphaseFromEnv,
@@ -107,7 +116,7 @@ async function statusFromEnv(
       const from = FROM_ENV[m.name]!;
       const needs = [
         ...m.env.filter((e) => !e.optional && !env[e.name]).map((e) => e.name),
-        ...(from.needs?.() ?? []),
+        ...((await from.needs?.()) ?? []),
       ];
       rows[m.name] = {
         status: needs.length ? "not set up" : "connecting",

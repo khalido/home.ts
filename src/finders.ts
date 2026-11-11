@@ -153,21 +153,32 @@ function decoded(v: string): string {
   }
 }
 
-/** Broadcast pydaikin's discovery packet (UDP 30000 → 30050) and collect who answers within `ms`. */
+/** Broadcast pydaikin's discovery packet (UDP 30000 → 30050), three times across `ms`, and collect who answers, each unit once. */
 export function findDaikins(
   ms = 1500,
 ): Promise<{ ip: string; fields: Record<string, string> }[]> {
   return new Promise((resolve) => {
     const found: { ip: string; fields: Record<string, string> }[] = [];
     const sock = createSocket({ type: "udp4", reuseAddr: true });
-    sock.on("message", (msg, from) =>
-      found.push({ ip: from.address, fields: daikinFields(msg.toString()) }),
+    sock.on("message", (msg, from) => {
+      if (!found.some((f) => f.ip === from.address))
+        found.push({ ip: from.address, fields: daikinFields(msg.toString()) });
+    });
+    const asks: ReturnType<typeof setTimeout>[] = [];
+    const done = () => (
+      asks.forEach(clearTimeout),
+      sock.close(),
+      resolve(found)
     );
-    sock.on("error", () => (sock.close(), resolve(found)));
+    sock.on("error", done);
     sock.bind(30000, () => {
       sock.setBroadcast(true);
-      sock.send("DAIKIN_UDP/common/basic_info", 30050, "255.255.255.255");
-      setTimeout(() => (sock.close(), resolve(found)), ms);
+      // UDP drops packets, more so while mDNS is busy beside it: one ask missed KO's unit in 2 runs of 3 (2026-11-11). Ask three times.
+      const ask = () =>
+        sock.send("DAIKIN_UDP/common/basic_info", 30050, "255.255.255.255");
+      ask();
+      asks.push(setTimeout(ask, ms / 3), setTimeout(ask, (2 * ms) / 3));
+      setTimeout(done, ms);
     });
   });
 }

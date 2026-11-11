@@ -13,11 +13,16 @@ import { env, fail, usage, type Verbs } from "./context.ts";
 
 export const DAIKIN_USAGE = `usage: home daikin on | off | cool [°C] | heat [°C] | auto [°C] | dry | fan  (cool ${DEFAULT_TARGET_C.cool} and heat ${DEFAULT_TARGET_C.heat} when no °C is given)`;
 
-/** The unit at DAIKIN_HOST, else the first to answer the UDP broadcast. */
+let found: Promise<string | undefined> | undefined;
+/** The unit's address: DAIKIN_HOST, else the first to answer the UDP broadcast (asked once a run). Undefined when none does. */
+export const daikinHost = (): Promise<string | undefined> =>
+  (found ??= env.DAIKIN_HOST
+    ? Promise.resolve(env.DAIKIN_HOST)
+    : findDaikins().then((units) => units[0]?.ip));
+
 async function unit() {
   const host =
-    env.DAIKIN_HOST ??
-    (await findDaikins())[0]?.ip ??
+    (await daikinHost()) ??
     fail("no Daikin answered the UDP broadcast; set DAIKIN_HOST", "network");
   return daikinClient({ host, fetch });
 }

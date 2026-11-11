@@ -6,6 +6,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Changed
 
+- **cli:** `home` and `home daikin` find the Daikin by UDP broadcast when `DAIKIN_HOST` is unset, as the write commands do, so `DAIKIN_HOST` is optional. With no unit on the network it reads "not set up".
 - **cli:** "no route to host" on macOS now adds that the terminal may need the Local Network permission.
 
 ### Added

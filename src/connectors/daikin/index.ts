@@ -151,7 +151,8 @@ export const manifest: Manifest<DaikinSnapshot> = {
     {
       name: "DAIKIN_HOST",
       example: "192.0.2.20",
-      what: "the unit's address; `home probe` finds it by UDP broadcast",
+      optional: true,
+      what: "the unit's address; found by UDP broadcast when unset (1.5 s a run)",
     },
   ],
   lines: ({ state }) => (state ? [acText(state)] : []),
