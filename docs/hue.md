@@ -109,7 +109,7 @@ In v2 a room or zone is a `room` or `zone` resource whose `grouped_light` servic
 
 Typed writes by name: `client.light(name, change)`, `client.room(name, change)`, `client.scene(name, room?)`, each resolving `{ state, confirmed }` (the connector README has the rules).
 
-**Not done:** creating or editing rooms and scenes, which stays in the Hue app. The typed writes are untried on a bridge (2026-11-11).
+**Not done:** creating or editing rooms and scenes, which stays in the Hue app. The typed writes ran on KO's bridge on 2026-11-11: every one confirmed in about a second, a fade included (the connector README has the run).
 
 ## Colour
 

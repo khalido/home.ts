@@ -22,9 +22,9 @@ export type HueOptions = {
   clock?: Clock;
 };
 
-/** A failed bridge call. `code` is "link_button" when pairing waits on the bridge's button, "invalid" for a change that can't be made (an unknown name, a value off the light's range), caught before anything is sent. */
+/** A failed bridge call. `code` is "link_button" when pairing waits on the bridge's button, "invalid" for a change that can't be made (an unknown name, a value off the light's range) and "offline" for a light the bridge has lost, both caught before anything is sent. */
 export class HueError extends ConnectorError {
-  declare readonly code?: "link_button" | "invalid";
+  declare readonly code?: "link_button" | "invalid" | "offline";
 }
 
 /**
@@ -134,6 +134,8 @@ export function hueClient(options: HueOptions) {
     },
   };
 
+  /** Whether two of these labels are the same, so only an id tells them apart. */
+  const same = (labels: string[]) => new Set(labels).size < labels.length;
   const invalid = (message: string) =>
     new HueError(message, { code: "invalid" });
   /** One of `items` by id or by name (any case). A miss, or a name two of them share, throws listing what exists. */
@@ -150,7 +152,7 @@ export function hueClient(options: HueOptions) {
     if (found.length === 1) return found[0]!;
     throw invalid(
       found.length
-        ? `"${target}" names ${found.length}: ${found.map((i) => `${label(i)} (${i.id})`).join(", ")}`
+        ? `"${target}" names ${found.length}: ${same(found.map(label)) ? found.map((i) => `${label(i)} (${i.id})`).join(", ") : found.map(label).join(", ")}`
         : `no ${what} "${target}"; have: ${items.map(label).join(", ") || "none"}`,
     );
   }
@@ -271,6 +273,12 @@ export function hueClient(options: HueOptions) {
       change: LightChange,
     ): Promise<HueApplied<LightView>> {
       const l = pick(lights(await read()), target, "light");
+      // The bridge takes a write to a light it has lost and answers "may not have effect": say so before sending.
+      if (l.reachable === false)
+        throw new HueError(
+          `${l.name ?? l.id} is unreachable: the bridge has lost it (is it switched off at the wall?)`,
+          { code: "offline" },
+        );
       const body = bodyFor(change, l.name ?? l.id, [l], l.on);
       await put("light", l.id, body);
       return confirm(

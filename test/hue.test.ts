@@ -386,6 +386,13 @@ describe("light, room and scene by name", () => {
       mirek_schema: { mirek_minimum: 153, mirek_maximum: 454 },
     };
     one("scene-relax").status = { active: "inactive" };
+    const link = (lightId: string) =>
+      data.find(
+        (r) =>
+          r.type === "zigbee_connectivity" &&
+          r.owner?.rid === one(lightId).owner?.rid,
+      );
+    link("light-2").status = "connected"; // the fixture's Shelf has lost its link; these tests write to it
     const puts: { path: string; body: any }[] = [];
     const { f } = fakeFetch((url, init) => {
       if (init?.method !== "PUT")
@@ -407,6 +414,8 @@ describe("light, room and scene by name", () => {
       c: hueClient({ host: "h", key: "k", fetch: f, clock }),
       puts,
       add: (r: object) => void data.push(r),
+      lose: (lightId: string) =>
+        void (link(lightId).status = "connectivity_issue"),
     };
   };
   const C_GAMUT = {
@@ -490,6 +499,10 @@ describe("light, room and scene by name", () => {
     ).toContain("not both");
     expect(await why(b.c.light("Shelf", {}))).toContain("nothing to change");
     expect(await why(b.c.room("Reading", { on: true }))).toContain("no lights");
+    b.lose("light-2"); // its Zigbee link is gone
+    expect(await why(b.c.light("Shelf", { on: true }))).toBe(
+      "offline: Shelf is unreachable: the bridge has lost it (is it switched off at the wall?)",
+    );
     expect(b.puts).toEqual([]);
   });
 
@@ -549,7 +562,7 @@ describe("light, room and scene by name", () => {
       status: { active: "inactive" },
     });
     expect(await b.c.scene("Relax").catch((e) => e.message)).toBe(
-      '"Relax" names 2: Relax in Living (scene-relax), Relax in Reading (scene-relax-2)',
+      '"Relax" names 2: Relax in Living, Relax in Reading',
     );
     await b.c.scene("Relax", "reading");
     expect(b.puts.at(-1)!.path).toBe("scene/scene-relax-2");

@@ -36,12 +36,12 @@ The bridge serves its certificate, `CN=<bridge id>`, signed by one of Signify's 
 - `change` is `{ on?, brightness?, color?, kelvin?, transitionMs? }`, and only what is given is sent. `brightness` is 1–100. `color` is a hex string or `{ r, g, b }`, sent as `xy` moved inside the light's own gamut (a room: its first colour light's). `kelvin` is a white temperature, checked against the light's own range (a room: the widest of its lights'). `color` and `kelvin` are one or the other. `transitionMs` is the fade; the bridge's own is 400 ms.
 - Without `on`, a change to a light that is off turns it on, since an off light takes nothing else; a light already on gets no `on`. A room always gets `on: true`, since some of its lights may be off.
 - `scene(name, room?)` recalls a scene. Scene names repeat across rooms, so a name several rooms use needs `room`. `confirmed` is the bridge reporting the scene active.
-- A name is matched whole, in any case. A miss, a name two things share, a value off the range, a colour for a white light: each throws `HueError` with `code: "invalid"` before anything is sent; a miss lists what exists, and a name two things share lists them with their ids.
+- A name is matched whole, in any case. A miss, a name two things share, a value off the range, a colour for a white light: each throws `HueError` with `code: "invalid"` before anything is sent, and a light the bridge has lost throws with `code: "offline"`; a miss lists what exists, and a name two things share lists them with their ids.
 - Confirmation compares on/off, brightness within a point, and on a light the white temperature (within 2 mirek) or the colour (within 0.02 in `xy`). A room reports no colour, so only its on/off and brightness are compared; its brightness is the bridge's figure for the group.
 
 The state has each light's `kelvin` and `kelvinRange`, and on a colour light its `xy`, a `hex` for a screen (the hue at full brightness) and its `gamut`. `colorToXy`, `xyToHex`, `kelvinToMirek` and `mirekToKelvin` are exported. `hueText(view)` is the line.
 
-CLI: `home light <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]`, the same for `home room`, and `home scene <name> [in <room>]`, each printing what the bridge then reported. Quote a name with a space. **Untried on a bridge** (2026-11-11): every one of these writes, and so whether the bridge reports a change inside the 3 s.
+CLI: `home light <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]`, the same for `home room`, and `home scene <name> [in <room>]`, each printing what the bridge then reported. Quote a name with a space. They ran on KO's bridge on 2026-11-11 (below).
 
 ## Events
 
@@ -62,6 +62,18 @@ KO's BSB002, software 1978545030, Bun 1.4.4, reads only, with the key from `home
 - Every light has `dimming` and `color_temperature`, each with its own mirek range (153–500 on a colour light, 153–454 on a white one). 6 have `color`, with `xy` and their gamut (type C) on the resource, as Signify's page says. `grouped_light` carries `on`, `dimming`, `color_temperature` and `color` too.
 - The event stream: connected at 0.4 s, then nothing from the bridge for 90 s, so the watchdog reconnected and read again at 90.8 s, as designed. With no light changing, that is one full read every 90 s.
 - Untried: any write through the paired key, an event arriving (nothing changed while watching), a move to a new address.
+
+## First live writes (2026-11-11)
+
+KO's BSB002 at his request, Bun 1.4.4, every light put back as it was.
+
+- **A room of four white lights:** brightness, a white temperature, off and on each confirmed in 0.8–1.4 s (a read, the write, a read). Each light restored one by one read exactly as before.
+- **A room of three colour lights, one unreachable, through the CLI:** on at 50% and 2700 K, a colour on each reachable light (`ff8800` and `0044ff` read back as exactly those), a colour for the room, a scene by name and room, then off. All confirmed, each command about 1 s. The unreachable light did not stop the room confirming.
+- **A fade does not delay confirmation:** with `transitionMs: 1500` the bridge reported the target at once. Ten room writes 2 s apart over 20 s all confirmed.
+- **A light the bridge has lost:** it accepted the write and answered "has communication issues, command may not have effect", naming the light by id. `light` now refuses first, by name, with `code: "offline"`.
+- **A scene name three rooms use** listed the three with their rooms and exited 2.
+- **A group's brightness is the bridge's own average:** after a room write to 40%, one light read 46% and the group 42%. Passed through as reported.
+- Untried: zones, a white temperature on a room that mixes ranges, an event arriving on the stream after a write, effects and gradients (not built).
 
 ## Sources
 

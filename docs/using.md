@@ -122,16 +122,16 @@ Two places say so, for two different things.
 
 **A write that can't be made throws** a `ConnectorError` (`HueError`, `DaikinError` and so on are subclasses), with the HTTP `status` when there was one and, where code can act on it, a `code`:
 
-| `code`        | From     | Means                                                              |
-| ------------- | -------- | ------------------------------------------------------------------ |
-| `link_button` | hue      | pairing: the bridge's button has not been pressed                  |
-| `offline`     | spotify  | not connected                                                      |
-| `waiting`     | spotify  | signed out: someone must pick the speaker in the Spotify app       |
-| `inactive`    | spotify  | it is not the active device; `activate()` first, if that is wanted |
-| `refused`     | spotify  | Soloist answered no                                                |
-| `timeout`     | spotify  | no answer in time                                                  |
-| `invalid`     | spotify  | a value it can't take; nothing was sent                            |
-| `ipp`         | printers | the printer answered an IPP error, its number in `status`          |
+| `code`        | From         | Means                                                                         |
+| ------------- | ------------ | ----------------------------------------------------------------------------- |
+| `link_button` | hue          | pairing: the bridge's button has not been pressed                             |
+| `offline`     | spotify, hue | not connected; for Hue, a light the bridge has lost                           |
+| `waiting`     | spotify      | signed out: someone must pick the speaker in the Spotify app                  |
+| `inactive`    | spotify      | it is not the active device; `activate()` first, if that is wanted            |
+| `refused`     | spotify      | Soloist answered no                                                           |
+| `timeout`     | spotify      | no answer in time                                                             |
+| `invalid`     | spotify, hue | a value it can't take, or for Hue a name that doesn't exist; nothing was sent |
+| `ipp`         | printers     | the printer answered an IPP error, its number in `status`                     |
 
 Other failures carry no `code`: read the message (a Daikin setpoint off its range, a Cast target that doesn't exist, a device that didn't answer). Cast's `announce` throws only before anything changed; after that a failure is `played: false` with `why`.
 
