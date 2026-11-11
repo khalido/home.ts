@@ -9,7 +9,7 @@ description: Use the `home` command and the @khalido/home library to see and run
 
 ## Rules
 
-- **Reads are free.** `home`, `home <connector>`, `home discover`, `home probe`, `home up spend` and every `--json` read touch nothing.
+- **Reads are free.** `home`, `home <connector>`, `home devices`, `home discover`, `home probe`, `home up spend` and every `--json` read touch nothing.
 - **Writes only on request.** Lights, AC, speakers, Up categories and tags, webhooks: run one only when the person asked for that change, then read back and report the state it left. Never write to "test" something.
 - **Never print a key, token or password**, not even part of one. Say "set" or "unset". Env names are fine; values are not.
 - **Nothing private into a public repo**: no IPs, MACs, serials, device or room names, Up transactions or balances. A real `home.jsonc`, `home.svg` and floor plan live in a private folder.
@@ -43,7 +43,7 @@ Weather: `blocks` holds morning, afternoon and evening for today and tomorrow in
 
 **Keys** come from environment variables by name (`.env.example` lists them; Bun loads `.env` from the working directory). A real environment variable beats `.env`. Some keys come from a command, not a website:
 
-- Hue: press the bridge's button, then `home pair` within 30 s; it prints the env lines. Set `HUE_CA_FILE` to Signify's root CA (`src/connectors/hue/README.md`).
+- Hue: `home pair`, then press the bridge's button within 30 s; it prints the env lines. Signify's root certificates are in the package.
 - Enphase: `home enphase login` once a year writes the owner token to `~/.config/home/enphase-token.json` (0600).
 - Amber, Up, Google Weather: a token from each service's website.
 - Spotify (Soloist): no key in `home`; Soloist's own API key is the daemon's. Set `SOLOIST_WS` to the address its `--ws` opens. Signed out is normal until someone picks the speaker in the Spotify app.

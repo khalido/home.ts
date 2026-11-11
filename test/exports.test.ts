@@ -37,6 +37,7 @@ const PUBLIC: Record<string, string[]> = {
     "sunNow",
   ],
   "./hue": [
+    "HUE_BRIDGE_ROOT_CA",
     "HueError",
     "bunPinnedFetch",
     "configSchema",
@@ -48,6 +49,7 @@ const PUBLIC: Record<string, string[]> = {
     "lights",
     "manifest",
     "pair",
+    "pairWhenPressed",
     "scenes",
   ],
   "./daikin": [

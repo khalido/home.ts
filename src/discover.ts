@@ -134,8 +134,7 @@ function newEntry(f: Found): Record<string, string | number> {
     host: f.host,
     [IDENTITY[f.connector]]: f.id,
   };
-  if (f.connector === "hue")
-    return { ...base, key: "HUE_APPLICATION_KEY", ca: "hue-root-ca.pem" };
+  if (f.connector === "hue") return { ...base, key: "HUE_APPLICATION_KEY" };
   if (f.connector === "enphase")
     return { ...base, token: "~/.config/home/enphase-token.json" };
   return base;

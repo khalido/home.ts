@@ -21,7 +21,7 @@ Four read-only subagent tracks plus my own reads, each checked against the code.
 3. **Doc drift.** `AGENTS.md` says "going public"; the README says jaldi and chota-bot use it; `cast/README.md:3` and `docs/cast.md:106` say writes ran only on a fake socket (they played live 2026-11-09); `spotify/README.md` lines 3, 61 and 80 disagree on live writes; `decisions.md:94` says the manifest drives the README table (it is hand-written).
 4. **Small code tidy:** one `withRunning(i, ms, act)` in `cli/context.ts` for `withSpotify`, `withCast` and the coming printers verb; infer `HomeIntegration` from a lifted `buildDevice` switch; a test that `FROM_ENV`'s keys equal the `MANIFESTS` names; tests for Up's `createWebhook`, `deleteWebhook`, `pingWebhook` (none today); no CLI write verb has a test.
 
-**Unverified:** a wrong Hue CA retrying forever as `disconnected`.
+**Unverified:** a bridge whose certificate fails validation (a self-signed one, a wrong `ca` override) retrying forever as `disconnected`.
 
 **Untried on a device, for chota's tests:** every Daikin write but `setPower(true)`, and that predates the write lane's rewrite; Cast `setVolume`, `setMuted`, `stop`, `announceAll`, groups, announce over playback; all of Hue; Up's writes; Enphase since 28 Oct.
 
@@ -31,7 +31,11 @@ Live as `latest`, approved by KO; chota-bot has been told. jaldi has not (no ses
 
 In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device connector, step 7 of "Adding a connector"), `castStatus` and `castFree`, `Part.reason` (`auth`, `config`, `crashed`), `ConnectorCode`, Google's key in a header, and fixes to spotify's cap and `interrupt`, a Cast group's level after an announce, and `createHome`.
 
-Hue's device records are from the docs' shapes, like the rest of Hue. Not built: a `home devices` command (status keeps rows, not parts, so it needs a small change there). From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
+**Hue, unreleased (2026-11-11):** both of Signify's roots are in the package (`HUE_BRIDGE_ROOT_CA`, identical to Signify's page, pinned live against KO's BSB002 with reads only), `ca` is optional everywhere, and `pairWhenPressed` waits for the button. `docs/hue.md` has Signify's rules and what other projects do. Pairing itself has never run: the next step is KO at the button with `home pair`, then `home hue` and `home devices`. chota-bot wants to pair from a chat message and is waiting on a release with this.
+
+Hue's device records are from the docs' shapes, like the rest of Hue. `home devices` is built and unreleased (2026-11-11): it listed KO's Cast devices and printer live; Hue, the Daikin and the Soloist were not set up on that machine, so their lines are still from fixtures. From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
+
+**Spotify cap, two gaps found live on 0.1.3** (chota, 2026-11-11; `spotify/README.md` has the timeline): Soloist puts its level back 90 ms after `playing`, after the cap's lowering was confirmed, and the cap stops at its first confirmed lowering while `anomaly` says "lowered it"; and a resume while already active is never capped. chota asks for the cap to hold on any reported volume above it while playing. KO has not decided; he said earlier not to overdo this. The Cast group restore passed live the same day.
 
 The four cap flags in spotify (`capping`, `capped`, `capUntil`, `startBuffering`) are a state machine in all but name. Not done.
 
@@ -68,7 +72,7 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
 
 ## Waiting on KO
 
-- Hue pairing (`home pair`, `.env`, `HUE_CA_FILE`, then `home hue`).
+- Hue pairing (`home pair`, the env lines it prints, then `home hue`).
 - Enphase: why the gateway refuses connections (`home discover`), then a read on Node with `NODE_TLS`.
 - First writes, each with KO's say-so: Up categorise, Daikin presets, a Hue burst.
 - Package Settings → Publishing access → "Require two-factor authentication and disallow tokens", now a release has gone through.
@@ -82,7 +86,7 @@ On the Pi: home's Linux finders need `avahi-utils`; Wi-Fi makes mDNS lossier, so
    - **spotify: `playing` while `active: false`** is the account playing elsewhere. Proposed: `speakerState` gives `elsewhere`, `spotifyText` says so, and `spotifyChanges` doesn't fire playback events for it.
    - **`home cast volume | mute | stop` print nothing**; print the device's line, as the spotify verbs do.
    - **Announcing over Spotify on a Cast speaker: no resume** (KO, 2026-11-10, in chota's session: "regular annoucements go to chota, and free cast spkrs. only important ones interrurpt and those are ok to disrupt the stream"). Important ones keep today's behaviour. For regular ones chota leaves busy Cast speakers alone with `castStatus` and `castFree` (built 2026-11-10, pure, over the snapshot): `castFree(snapshot, targets).free` goes to `announceAll`. To check live: what a group's members report while the group plays Spotify (the code takes `playingVia` or the member's own app as busy).
-   - Small, from chota's switch to the spotify connector (it runs on 0.1.2 in chota's working tree, not deployed): `home probe` says Hue "needs HUE_CA_FILE" though probe is documented as needing no keys; `positionMs` can step back a second around an aside; Google's `forecast/hours` pages at 24 with a `nextPageToken`, which matters if the source ever asks for more than 24 (it asks for 6). Read on the Pi, 2026-11-10: `home discover` found the Hue bridge, the gateway, 8 Cast devices, the Brother and the Daikin; `home printers` and `home daikin` read their devices.
+   - Small, from chota's switch to the spotify connector (it runs on 0.1.2 in chota's working tree, not deployed): `positionMs` can step back a second around an aside; Google's `forecast/hours` pages at 24 with a `nextPageToken`, which matters if the source ever asks for more than 24 (it asks for 6). Read on the Pi, 2026-11-10: `home discover` found the Hue bridge, the gateway, 8 Cast devices, the Brother and the Daikin; `home printers` and `home daikin` read their devices.
    - Still to run live: an announce to a group with a `volume` (its own level is now put back first, then each member's; fake socket only), the first-play cap from idle, stall events, `home cast stop`, an announce over a Default Media Receiver stream, `announceAll`. Open: one speaker read 50 before a failed announce and 56 after.
 
    - **chota's ranked wishlist** (2026-11-10, KO has the same list; my triage, not agreed). Small and real, for 0.1.3: the Cast verbs printing the device's line (not built). Next: a fake Soloist socket exported for consumers' tests (chota has written two, this repo one), `{ state, confirmed }` on Hue and Daikin writes, a tested table of clip formats per Cast device kind (needs chota's live tests), `castChanges`. Already there: `pair()` from `@khalido/home/hue` is one call that throws `link_button` until the button is pressed. Not now: writes described in the manifest with schemas so chota generates agent tools (one consumer, and Hue and Daikin writes are still untried), printer change events, an ESC/POS connector (USB, chota's).

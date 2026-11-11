@@ -13,7 +13,9 @@ import {
   hueClient,
   HueError,
   lights,
+  HUE_BRIDGE_ROOT_CA,
   pair,
+  pairWhenPressed,
   scenes,
   type HueSnapshot,
 } from "../src/connectors/hue/index.ts";
@@ -264,6 +266,92 @@ describe("pair", () => {
     expect(error).toBeInstanceOf(HueError);
     expect(error.code).toBe("link_button");
     expect(calls).toHaveLength(1);
+  });
+
+  const notPressed = () =>
+    new Response(
+      '[{"error":{"type":101,"address":"","description":"link button not pressed"}}]',
+    );
+  test("pairWhenPressed asks every 2 s until the button is pressed, and says once that it is waiting", async () => {
+    const { clock, sleeps } = fakeClock();
+    let n = 0;
+    const { f, calls } = fakeFetch(() =>
+      n++ < 3
+        ? notPressed()
+        : new Response('[{"success":{"username":"key-1","clientkey":"ck"}}]'),
+    );
+    let waiting = 0;
+    const got = await pairWhenPressed({
+      host: "h",
+      fetch: f,
+      deviceType: "d",
+      clock,
+      onWaiting: () => waiting++,
+    });
+    expect(got).toEqual({ key: "key-1", clientKey: "ck" });
+    expect(calls).toHaveLength(4);
+    expect(sleeps).toEqual([2000, 2000, 2000]);
+    expect(waiting).toBe(1);
+  });
+  test("pairWhenPressed gives up after 30 s with the link_button error; another error ends it at once", async () => {
+    const { clock, sleeps } = fakeClock();
+    const never = fakeFetch(notPressed);
+    const error = await pairWhenPressed({
+      host: "h",
+      fetch: never.f,
+      deviceType: "d",
+      clock,
+    }).catch((e) => e);
+    expect(error.code).toBe("link_button");
+    expect(sleeps).toHaveLength(15);
+    expect(never.calls).toHaveLength(16);
+
+    const broken = fakeFetch(() => new Response("nope", { status: 500 }));
+    const other = await pairWhenPressed({
+      host: "h",
+      fetch: broken.f,
+      deviceType: "d",
+      clock,
+    }).catch((e) => e);
+    expect(other).toBeInstanceOf(HueError);
+    expect(other.code).toBeUndefined();
+    expect(broken.calls).toHaveLength(1);
+  });
+  test("pairWhenPressed stops when aborted", async () => {
+    const { clock } = fakeClock();
+    const stop = new AbortController();
+    const { f, calls } = fakeFetch(() => (stop.abort(), notPressed()));
+    const error = await pairWhenPressed({
+      host: "h",
+      fetch: f,
+      deviceType: "d",
+      clock,
+      signal: stop.signal,
+    }).catch((e) => e);
+    expect(error.name).toBe("AbortError");
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("Signify's roots", () => {
+  // The bytes other projects ship (openHAB, hb-hue-tools, openhue-go, Raycast); the first verified against KO's bridge, 2026-11-11.
+  test("the package carries exactly the two, by fingerprint", async () => {
+    const ders = [
+      ...HUE_BRIDGE_ROOT_CA.matchAll(
+        /-----BEGIN CERTIFICATE-----([^-]+)-----END CERTIFICATE-----/g,
+      ),
+    ].map((m) =>
+      Uint8Array.from(atob(m[1]!.replace(/\s/g, "")), (c) => c.charCodeAt(0)),
+    );
+    const prints = await Promise.all(
+      ders.map(async (d) =>
+        Buffer.from(await crypto.subtle.digest("SHA-256", d)).toString("hex"),
+      ),
+    );
+    expect(prints).toEqual([
+      "f0bd8e6509e82f774d63bc009d5388c969fe3dcf7d6d541d6351b72b898d8acf", // CN=root-bridge, to 2038
+      "d8b89448b2af8e1676185ac07219ee9dcbc8f01c122a026a2a4b7b5cfe0328b8", // CN=Hue Root CA 01, to 2050
+    ]);
   });
 });
 

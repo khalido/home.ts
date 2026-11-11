@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Envelope, type Kind, PairResponse, Resource } from "./schemas.ts";
-import type { Clock } from "../../clock.ts";
+import { HUE_BRIDGE_ROOT_CA } from "./ca.ts";
+import { type Clock, realClock } from "../../clock.ts";
 import { ConnectorError, fetchTimeout } from "../../connector.ts";
 import { writeLane } from "../../lane.ts";
 
@@ -17,7 +18,7 @@ export class HueError extends ConnectorError {
   declare readonly code?: "link_button";
 }
 
-/** Minimum gap between writes, per lane. Signify's guidance (login-gated, unconfirmed): ~10/s to lights, 1/s to groups. */
+/** Minimum gap between writes, per lane: Signify's guidance (Hue System Performance, read 2026-11-11), about 10 a second to lights and 1 a second to groups. */
 export const WRITE_GAP_MS = { group: 1000, light: 100 } as const;
 type Lane = keyof typeof WRITE_GAP_MS;
 
@@ -111,15 +112,21 @@ export async function pair(options: {
   host: string;
   fetch: typeof fetch;
   deviceType: string;
+  signal?: AbortSignal;
 }): Promise<{ key: string; clientKey?: string }> {
-  const res = await fetchTimeout(options.fetch, `https://${options.host}/api`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      devicetype: options.deviceType,
-      generateclientkey: true,
-    }),
-  });
+  const res = await fetchTimeout(
+    options.fetch,
+    `https://${options.host}/api`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        devicetype: options.deviceType,
+        generateclientkey: true,
+      }),
+    },
+    { signal: options.signal },
+  );
   const parsed = PairResponse.safeParse(
     await res.json().catch(() => undefined),
   );
@@ -138,10 +145,48 @@ export async function pair(options: {
 }
 
 /**
- * A `fetch` that trusts only `ca` and accepts only a certificate whose CN is `bridgeId`.
+ * `pair`, asked again every `everyMs` (2 s) until someone presses the bridge's button, for `timeoutMs` (30 s, as long as
+ * the button stays pressed). `onWaiting` is called once, when the bridge first says the button isn't pressed: the moment
+ * to tell the person. Throws the last `link_button` error when time runs out, any other error at once, and the signal's
+ * reason when aborted.
+ */
+export async function pairWhenPressed(options: {
+  host: string;
+  fetch: typeof fetch;
+  deviceType: string;
+  timeoutMs?: number;
+  everyMs?: number;
+  onWaiting?: () => void;
+  clock?: Clock;
+  signal?: AbortSignal;
+}): Promise<{ key: string; clientKey?: string }> {
+  const clock = options.clock ?? realClock;
+  const until = clock.now() + (options.timeoutMs ?? 30_000);
+  let waiting = false;
+  while (true) {
+    try {
+      return await pair(options);
+    } catch (error) {
+      const pressed = !(
+        error instanceof HueError && error.code === "link_button"
+      );
+      if (pressed || clock.now() >= until) throw error;
+      if (!waiting) options.onWaiting?.();
+      waiting = true;
+    }
+    await clock.sleep(options.everyMs ?? 2000, options.signal);
+    options.signal?.throwIfAborted();
+  }
+}
+
+/**
+ * A `fetch` that trusts only `ca` (Signify's roots, `HUE_BRIDGE_ROOT_CA`, when left out) and accepts only a certificate whose CN is `bridgeId`.
  * Uses Bun's `tls` fetch option; Node ignores it and then rejects the bridge, so it fails closed there; Node uses `nodePinnedFetch` from `@khalido/home/node`.
  */
-export function bunPinnedFetch(bridgeId: string, ca: string): typeof fetch {
+export function bunPinnedFetch(
+  bridgeId: string,
+  ca: string = HUE_BRIDGE_ROOT_CA,
+): typeof fetch {
   const checkServerIdentity = (
     _host: string,
     cert: { subject?: { CN?: string } },

@@ -3,11 +3,12 @@
 ```sh
 home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, printers, spotify, up, weather
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
+home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), and why when it isn't available
 home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
 home lights off               # one write to the whole-home group
 home room <name> on|off|<1-100>
 home scene <name>
-home pair                     # press the bridge's button first; prints the env lines to set
+home pair                     # waits 30 s for the bridge's button; prints the env lines to set
 home enphase login            # once a year: mints the Enphase owner token into ~/.config/home/ (0600)
 home discover [--json] [--passes n]  # which smart-home devices answer here (mDNS + Daikin UDP), which this package supports, then with a config how they match it; two passes 5 s apart
 home cache [clear]            # the addresses kept between runs, or delete them so the next run discovers afresh
@@ -26,14 +27,14 @@ home spotify activate | pause | play [link] | next | volume <0-100>  # the Soloi
 
 - **stdout is data, stderr everything else.** Notes such as "nothing to categorise" or "no webhooks" go to stderr, so `home … | jq` never sees them.
 - **Bun on PATH.** The command starts with `#!/usr/bin/env bun`. A non-login SSH shell may not have `~/.bun/bin` on its PATH: run `PATH="$HOME/.bun/bin:$PATH" home`.
-- **`--json` shapes.** `home --json` is one object keyed by connector, with `now` (`energyNow`) first. `home <connector> --json` is that connector's object: `status`, `needs`, `access`, `detail`, `reason` (why it is `unavailable`, when known: `auth`, `config` or `crashed`), `anomaly`, then its state (the weather adds `line`, its text). Lists (`home up transactions`, `uncategorised`, `spend --by merchant`) are arrays, `[]` when empty.
+- **`--json` shapes.** `home --json` is one object keyed by connector, with `now` (`energyNow`) first. `home devices --json` is the array `homeDevices` returns; a connector that isn't connected is named on stderr, and the command exits 0. `home <connector> --json` is that connector's object: `status`, `needs`, `access`, `detail`, `reason` (why it is `unavailable`, when known: `auth`, `config` or `crashed`), `anomaly`, then its state (the weather adds `line`, its text). Lists (`home up transactions`, `uncategorised`, `spend --by merchant`) are arrays, `[]` when empty.
 - **Errors under `--json`** are one object on stderr: `{"error": "…", "code": "usage" | "auth" | "network" | "error", "fix": "home enphase login"}`; `fix` is there only when one command resolves it. In text: `home: <error> (run \`<fix>\`)`.
 - **Exit codes.** 0 success, empty results included. 1 a failure, and `home <connector>` when that connector is not `connected`, so a script can test one. 2 a wrong command, verb or argument. `home` alone lists every connector and exits 0 whatever their state.
 
 With `--config <home.jsonc>` or `HOME_CONFIG`, `status` runs the integrations the config describes until each has answered (at most 15 s) and `probe` takes its addresses from it; keys still come from the shell, by the names in the file. Without one, it reads `HUE_*` and the other names in `.env.example` from the shell, and parses arguments with [cac](https://github.com/cacjs/cac), which also generates `home --help`. Every connector has a verb of its own: `home amber`, `home cast`, `home hue` print only that connector's lines (`--json` for its record), and the verbs that need more sit under it (`home hue pair`, `home enphase login`, `home cast announce …`). The commands come from each connector's manifest (`src/manifest.ts`), as does `.env.example` (`bun run gen`). With no `HUE_BRIDGE_HOST` it finds the bridge by mDNS (`dns-sd`, macOS) every time and caches nothing. `home` with no arguments is `status`:
 
 ```
-hue      not set up · needs HUE_APPLICATION_KEY, HUE_CA_FILE  (local HTTPS, key from `home pair`)
+hue      not set up · needs HUE_APPLICATION_KEY  (local HTTPS, key from `home pair`)
 daikin   connected · off · cool 25 °C · room 24 °C · outdoor unit 19.5 °C  (local HTTP JSON (dsiot), no key)
 weather  connected · Sydney - Observatory Hill (1.1 km) 20:20: 16.6 °C, feels 16.7, 93%, 23.6 mm since 9am to 20:23 · today showers rain 80%, tomorrow 14–19 °C cloudy rain 30% (bom) · cloud 100%, UV 0, 0 W/m² (open-meteo) · sun -17°, setting, rises 06:15  (BOM anonymous FTP, Open-Meteo, Google with GOOGLE_WEATHER_KEY; sun computed)
 ```

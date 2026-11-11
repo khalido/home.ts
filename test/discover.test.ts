@@ -80,7 +80,6 @@ describe("matchFound", () => {
             host: "192.0.2.2",
             bridgeId: "0017880000000000",
             key: "HUE_APPLICATION_KEY",
-            ca: "hue-root-ca.pem",
           },
         },
       ],
@@ -147,7 +146,7 @@ describe("applyFound", () => {
     expect(after).toHaveLength(before.length + 1);
     expect(after[4]).toBe(before[4]!.replace("192.0.2.10", "192.0.2.44"));
     expect(after[6]).toBe(
-      `    { "id": "hue", "connector": "hue", "host": "192.0.2.2", "bridgeId": "0017880000000000", "key": "HUE_APPLICATION_KEY", "ca": "hue-root-ca.pem" },`,
+      `    { "id": "hue", "connector": "hue", "host": "192.0.2.2", "bridgeId": "0017880000000000", "key": "HUE_APPLICATION_KEY" },`,
     );
     expect(after.filter((_, i) => i !== 4 && i !== 6)).toEqual(
       before.filter((_, i) => i !== 4),

@@ -26,6 +26,7 @@ bun link        # puts `home` on your PATH
 home discover   # what answers on this network, and which of it this package supports
 home probe      # read-only checks, no keys
 home            # each connector: connected, or what it still needs
+home devices    # every device, one line each
 ```
 
 Copy [.env.example](.env.example) to `.env` and fill in the connectors you have, or describe the home in a [config file](docs/config.md) ([example](examples/home.jsonc)).

@@ -49,7 +49,6 @@
       "host": "192.0.2.2",
       "bridgeId": "0017880000000000",
       "key": "HUE_APPLICATION_KEY",
-      "ca": "hue-root-ca.pem",
     },
     {
       "id": "ac",

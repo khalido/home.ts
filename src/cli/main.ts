@@ -20,14 +20,14 @@ import { hueVerbs } from "./hue.ts";
 import { locate } from "./locate.ts";
 import { probe } from "./probe.ts";
 import { SPOTIFY_USAGE, spotifyVerbs } from "./spotify.ts";
-import { status } from "./status.ts";
+import { devices, status } from "./status.ts";
 import { UP_OPTIONS, UP_USAGE, upVerbs } from "./up.ts";
 
 const HUE_HELP: Record<string, string> = {
   lights: "lights off: one write to the whole-home group",
   room: "room <name> on|off|<1-100>",
   scene: "scene <name>",
-  pair: "pair: press the bridge's button first; prints the env lines to set",
+  pair: "pair: waits 30 s for the bridge's button; prints the env lines to set",
 };
 
 /** Each connector's verbs beyond its status, the usage a wrong one prints, and any options of its own. */
@@ -66,6 +66,12 @@ const statusCommand = cli
   .alias("doctor")
   .alias("!") // cac's marker for the default command: `home` alone runs status
   .action((o: Options) => status(o));
+cli
+  .command(
+    "devices",
+    "every device the connectors read, one line each: its state, its room, and why when it isn't available",
+  )
+  .action((o: Options) => devices(o));
 cli
   .command(
     "discover",

@@ -323,7 +323,7 @@ export type LoadOptions = {
   fetch?: typeof fetch;
   /** Hue's pinned fetch and Enphase's unverified one: Bun's by default, `NODE_TLS` from `@khalido/home/node` under Node. */
   tls?: {
-    hue(bridgeId: string, ca: string): typeof fetch;
+    hue(bridgeId: string, ca?: string): typeof fetch;
     enphase(): typeof fetch;
   };
   /** BOM's transport: `ftpFetch()` from `@khalido/home/weather/ftp`. Without it a listed `bom` source stops and says why. */
@@ -445,7 +445,7 @@ export function loadHome(
   ): HomeIntegration {
     switch (d.connector) {
       case "hue": {
-        const ca = file(d.ca);
+        const ca = d.ca === undefined ? undefined : file(d.ca);
         return hue({
           ...start("hue", d.bridgeId, d.host),
           bridgeId: d.bridgeId,

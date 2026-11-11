@@ -6,6 +6,7 @@ import {
   printerList,
 } from "../connectors/printers/index.ts";
 import { gatewayHost } from "../connectors/enphase/client.ts";
+import { fetchTimeout } from "../connector.ts";
 import { bunPinnedFetch } from "../connectors/hue/index.ts";
 import { type WeatherSource } from "../connectors/weather/index.ts";
 import {
@@ -39,7 +40,7 @@ function envFromConfig(path: string): Record<string, string> {
       Object.assign(out, {
         HUE_BRIDGE_HOST: d.host,
         HUE_BRIDGE_ID: d.bridgeId,
-        HUE_CA_FILE: fromConfig(path, d.ca),
+        HUE_CA_FILE: d.ca && fromConfig(path, d.ca),
         HUE_APPLICATION_KEY: env[d.key],
       });
     if (d.connector === "daikin") out.DAIKIN_HOST = d.host;
@@ -111,25 +112,28 @@ const jsonOr = (body: string) => {
 
 export async function probe(o: Options): Promise<void> {
   const configPath = configPathOf(o);
-  if (configPath) Object.assign(env, envFromConfig(configPath)); // the config's addresses, for this one command
+  if (configPath) {
+    delete env.HUE_CA_FILE; // the config's `ca` or the package's roots, never the shell's file
+    Object.assign(env, envFromConfig(configPath)); // the config's addresses, for this one command
+  }
   const out: Record<string, unknown> = {};
   try {
     const b = await bridge();
-    const fetchPinned = env.HUE_CA_FILE
-      ? bunPinnedFetch(b.id, ca())
-      : undefined;
-    const r = fetchPinned
-      ? await fetchPinned(`https://${b.host}/api/0/config`).then((x) =>
-          x.json(),
-        )
-      : "needs HUE_CA_FILE";
-    out.hue =
-      typeof r === "string"
-        ? { status: r }
-        : {
-            status: "answers",
-            ...pick(r, ["name", "modelid", "apiversion", "swversion"]),
-          };
+    const r = await fetchTimeout(
+      bunPinnedFetch(b.id, ca()),
+      `https://${b.host}/api/0/config`,
+      {},
+      { timeoutMs: 5000 },
+    ).then((x) => x.json());
+    out.hue = {
+      status: "answers",
+      ...pick(r as Record<string, unknown>, [
+        "name",
+        "modelid",
+        "apiversion",
+        "swversion",
+      ]),
+    };
   } catch (error) {
     out.hue = { status: "unavailable", detail: (error as Error).message };
   }

@@ -63,17 +63,17 @@ Before writing one, search Home Assistant's [integration list](https://www.home-
 
 ## Where things are written down
 
-| Where                                                                                                              | Holds                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `README.md`                                                                                                        | for a visitor: what this is, the connectors, install, links                                       |
-| `AGENTS.md` (this file; `CLAUDE.md` imports it)                                                                    | rules and how the code is shaped                                                                  |
-| `src/connectors/<name>/README.md`                                                                                  | everything about one connector: protocol, what the live device said, sources                      |
-| `docs/decisions.md`                                                                                                | KO's decisions and why, newest last; overrides other docs where they conflict                     |
-| `docs/philosophy.md`, `docs/using.md`, `docs/config.md`, `docs/cli.md`                                             | why, wiring it in, the config, the command                                                        |
-| `docs/cast.md`, `docs/google.md`, `docs/up.md`, `docs/matter.md`, `docs/weather-probe.md`, `docs/enphase-notes.md` | the design or investigation behind a connector                                                    |
-| `docs/ideas.md`                                                                                                    | connectors and features considered, with the research, not yet decided                            |
-| `docs/devices.md`                                                                                                  | devices worth buying for a home: local, Google Home, AU price, whether this library can read them |
-| `docs/handover.md`                                                                                                 | where things stand and what is next; disposable, rewritten                                        |
+| Where                                                                                                                             | Holds                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `README.md`                                                                                                                       | for a visitor: what this is, the connectors, install, links                                       |
+| `AGENTS.md` (this file; `CLAUDE.md` imports it)                                                                                   | rules and how the code is shaped                                                                  |
+| `src/connectors/<name>/README.md`                                                                                                 | everything about one connector: protocol, what the live device said, sources                      |
+| `docs/decisions.md`                                                                                                               | KO's decisions and why, newest last; overrides other docs where they conflict                     |
+| `docs/philosophy.md`, `docs/using.md`, `docs/config.md`, `docs/cli.md`                                                            | why, wiring it in, the config, the command                                                        |
+| `docs/cast.md`, `docs/hue.md`, `docs/google.md`, `docs/up.md`, `docs/matter.md`, `docs/weather-probe.md`, `docs/enphase-notes.md` | the design or investigation behind a connector                                                    |
+| `docs/ideas.md`                                                                                                                   | connectors and features considered, with the research, not yet decided                            |
+| `docs/devices.md`                                                                                                                 | devices worth buying for a home: local, Google Home, AU price, whether this library can read them |
+| `docs/handover.md`                                                                                                                | where things stand and what is next; disposable, rewritten                                        |
 
 ## Drawing a home
 

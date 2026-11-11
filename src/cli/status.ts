@@ -12,7 +12,8 @@ import {
   type WeatherSource,
 } from "../connectors/weather/index.ts";
 import { ftpFetch } from "../connectors/weather/ftp.ts";
-import { loadHome } from "../config.ts";
+import { HomeConfig, loadHome } from "../config.ts";
+import { DEVICES, type HomeDevice, homeDevices } from "../devices.ts";
 import { energyNow, gridText } from "../energy.ts";
 import { FINDERS } from "../finders.ts";
 import { type Integration, type Part, type Status, settle } from "../home.ts";
@@ -216,13 +217,54 @@ function rowLines(name: string, r: Row): string[] {
   ];
 }
 
+/** Every connector's row (or the one named), from the config at `path`, else from the shell's env names. */
+const rowsOf = (path: string | undefined, only?: string) =>
+  path
+    ? statusFromConfig(path, only)
+    : statusFromEnv(only === undefined ? MANIFESTS : [manifestOf(only)!]);
+
+/**
+ * `home devices`: every device the connectors read, one line each from `homeDevices`, with its room and name from the
+ * config when there is one. A connector that isn't connected is named on stderr.
+ */
+export async function devices(o: Options): Promise<void> {
+  const path = configPathOf(o);
+  const rows = await rowsOf(path);
+  const parts: Record<string, Part> = {};
+  for (const [name, r] of Object.entries(rows))
+    if (r.status !== "not set up") parts[name] = r as Part;
+  // loadHome has already accepted the config, so a parse that fails here is not expected: list without rooms.
+  const config = path ? HomeConfig.safeParse(readConfig(path)).data : undefined;
+  const list = homeDevices(parts, config);
+  // A connector that isn't connected may have no device to list: say so, off stdout.
+  for (const [name, r] of Object.entries(rows))
+    if (name in DEVICES && r.status !== "connected")
+      console.error(
+        [
+          `${name}: ${r.status}`,
+          r.needs.length ? `needs ${r.needs.join(", ")}` : "",
+          r.detail ?? "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+  if (o.json) return printJson(list);
+  for (const d of list) console.log(deviceLine(d));
+}
+
+/** A device's line: "connector  text · in room · not available: reason". */
+export const deviceLine = (d: HomeDevice): string =>
+  [
+    `${d.connector.padEnd(9)}${d.text}`,
+    d.room ? `in ${d.room}` : "",
+    d.available === false ? `not available: ${d.reason}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
 /** `home status`: every connector, with the energy now on top. With `only` (`home <connector>`), that connector alone. */
 export async function status(o: Options, only?: string): Promise<void> {
-  const path = configPathOf(o);
-  const manifests = only === undefined ? MANIFESTS : [manifestOf(only)!];
-  const rows = path
-    ? await statusFromConfig(path, only)
-    : await statusFromEnv(manifests);
+  const rows = await rowsOf(configPathOf(o), only);
   if (only !== undefined) {
     const row = rows[only]!;
     if (row.status !== "connected") process.exitCode = 1; // `home <connector>` is a check a script can test; `home` alone lists every one and exits 0

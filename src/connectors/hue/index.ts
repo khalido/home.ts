@@ -25,6 +25,7 @@ import {
   snapshotFrom,
 } from "./state.ts";
 
+export { HUE_BRIDGE_ROOT_CA } from "./ca.ts";
 export {
   bunPinnedFetch,
   type HueClient,
@@ -32,6 +33,7 @@ export {
   type HueOptions,
   hueClient,
   pair,
+  pairWhenPressed,
 } from "./client.ts";
 export type { HueEvent, Resource } from "./schemas.ts";
 export {
@@ -54,18 +56,22 @@ export const configSchema = z.looseObject({
   key: envName.describe(
     "env name holding the application key from `home pair`",
   ),
-  ca: filePath.describe("Signify's root CA (PEM), relative to the config file"),
+  ca: filePath
+    .optional()
+    .describe(
+      "a root CA (PEM) to trust instead of Signify's two, which the package carries; relative to the config file",
+    ),
 });
 
 /**
- * Hue settings for a home. Leave out `fetch` in Bun and it pins to `ca` and `bridgeId`; in Node pass a pinned one.
+ * Hue settings for a home. Leave out `fetch` in Bun and it pins to `bridgeId` and `ca` (Signify's roots, `HUE_BRIDGE_ROOT_CA`, when left out); in Node pass a pinned one.
  * `find` (mDNS, matched by `bridgeId`) finds the bridge again after three failed reconnects; `idleMs` is the stream's watchdog.
  */
 export type HueConfig = {
   host: string;
   bridgeId: string;
   key: string;
-  ca: string;
+  ca?: string;
   fetch?: typeof fetch;
   clock?: Clock;
   find?: Finder;
@@ -296,7 +302,8 @@ export const manifest: Manifest<HueSnapshot> = {
     {
       name: "HUE_CA_FILE",
       example: "/path/to/hue-root-ca.pem",
-      what: "until HUE_BRIDGE_ROOT_CA ships in src/connectors/hue/",
+      optional: true,
+      what: "a root CA to trust instead of Signify's two, which the package carries",
     },
   ],
   files: ["ca"],

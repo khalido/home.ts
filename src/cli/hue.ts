@@ -7,7 +7,7 @@ import {
   homeGroupedLightId,
   hue,
   hueClient,
-  pair,
+  pairWhenPressed,
   scenes,
 } from "../connectors/hue/index.ts";
 import { snapshotFrom } from "../connectors/hue/state.ts";
@@ -24,12 +24,9 @@ export async function bridge(): Promise<{ host: string; id: string }> {
   return { host: env.HUE_BRIDGE_HOST ?? b.host, id: env.HUE_BRIDGE_ID ?? b.id };
 }
 
+/** HUE_CA_FILE when set; else undefined, and the package's own copy of Signify's roots is used. */
 export const ca = () =>
-  env.HUE_CA_FILE
-    ? readFileSync(env.HUE_CA_FILE, "utf8")
-    : fail(
-        "set HUE_CA_FILE to Signify's root CA (see src/connectors/hue/README.md)",
-      );
+  env.HUE_CA_FILE ? readFileSync(env.HUE_CA_FILE, "utf8") : undefined;
 
 const key = () =>
   env.HUE_APPLICATION_KEY ??
@@ -101,17 +98,15 @@ export const hueVerbs: Verbs = {
 
   async pair() {
     const b = await bridge();
-    const { key } = await pair({
+    const { key } = await pairWhenPressed({
       host: b.host,
       fetch: bunPinnedFetch(b.id, ca()),
       deviceType: `home#${hostname().slice(0, 19)}`,
+      onWaiting: () =>
+        console.error("Press the link button on the bridge (waiting 30 s)…"),
     }).catch((e) =>
       e.code === "link_button"
-        ? fail(
-            "press the link button on the bridge, then pair again within 30 s",
-            "auth",
-            "home pair",
-          )
+        ? fail("the link button was not pressed in time", "auth", "home pair")
         : Promise.reject(e),
     );
     console.error(

@@ -1,5 +1,6 @@
 import { Agent, fetch as undiciFetch } from "undici";
 import type { LoadOptions } from "./config.ts";
+import { HUE_BRIDGE_ROOT_CA } from "./connectors/hue/ca.ts";
 
 // `@khalido/home/node`: the fetches Hue and Enphase need under Node, where Bun's `tls` fetch option does not exist. Node's
 // global `fetch` takes no CA, so these use undici's own `fetch` and `Agent` (one undici on both sides). Outside the
@@ -13,8 +14,11 @@ const through = (dispatcher: Agent) =>
       { ...init, dispatcher } as never,
     )) as unknown as typeof fetch;
 
-/** A `fetch` that trusts only `ca` and accepts only a certificate whose CN is `bridgeId`: Node's `bunPinnedFetch`. */
-export function nodePinnedFetch(bridgeId: string, ca: string): typeof fetch {
+/** A `fetch` that trusts only `ca` (Signify's roots when left out) and accepts only a certificate whose CN is `bridgeId`: Node's `bunPinnedFetch`. */
+export function nodePinnedFetch(
+  bridgeId: string,
+  ca: string = HUE_BRIDGE_ROOT_CA,
+): typeof fetch {
   const checkServerIdentity = (
     _host: string,
     cert: { subject?: { CN?: string | string[] } },

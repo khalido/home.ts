@@ -167,7 +167,6 @@ describe("checkHome", () => {
         settings: {
           host: "192.0.2.2",
           bridgeId: "0017880000000000",
-          ca: "hue-root-ca.pem",
         },
         secrets: { HUE_APPLICATION_KEY: "set" },
       },
@@ -258,7 +257,7 @@ describe("home config check", () => {
     );
     const out = run.stdout.toString();
     expect(out.split("\n").slice(0, 5)).toEqual([
-      "hue      from bridge · host 192.0.2.2 · bridgeId 0017880000000000 · ca hue-root-ca.pem · HUE_APPLICATION_KEY unset",
+      "hue      from bridge · host 192.0.2.2 · bridgeId 0017880000000000 · HUE_APPLICATION_KEY unset",
       "daikin   from ac · host 192.0.2.10 · mac 00005E005301",
       "enphase  from solar · host 192.0.2.21 · serial 000000000000 · token enphase-token.json · marker marker-solar · capacityW 6600",
       "amber    from prices · AMBER_KEY set",
@@ -267,7 +266,7 @@ describe("home config check", () => {
     expect(out).toContain(
       "problem: devices[0] (bridge).key: env HUE_APPLICATION_KEY is not set",
     );
-    expect(out).toContain("problem: bridge.ca: no file hue-root-ca.pem");
+    expect(out).toContain("problem: solar.token: no file");
     expect(out).not.toContain("psk_secret");
     expect(run.exitCode).toBe(1);
   });
@@ -321,7 +320,14 @@ describe("loadHome", () => {
   });
 
   test("a file the config needs, with no reader, is named", () => {
-    expect(() => loadHome(example, { env })).toThrow(
+    // The example leaves `ca` out (the package carries Signify's roots); one given is still a file to read.
+    const ownCa = {
+      ...example,
+      devices: example.devices.map((d: { connector: string }) =>
+        d.connector === "hue" ? { ...d, ca: "hue-root-ca.pem" } : d,
+      ),
+    };
+    expect(() => loadHome(ownCa, { env })).toThrow(
       "devices[0] (bridge).ca: needs readFile to read hue-root-ca.pem; devices[2] (solar).token: needs readFile to read enphase-token.json",
     );
   });

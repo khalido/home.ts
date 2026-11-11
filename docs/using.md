@@ -13,7 +13,7 @@ Give every device a fixed address in your router (a DHCP reservation; eero, UniF
 ```ts
 import { NODE_TLS, nodePinnedFetch } from "@khalido/home/node";
 loadHome(config, { env: process.env, readFile, tls: NODE_TLS }); // from a home config
-hue({ host, bridgeId, key, ca, fetch: nodePinnedFetch(bridgeId, ca) }); // or one integration
+hue({ host, bridgeId, key, fetch: nodePinnedFetch(bridgeId) }); // or one integration
 ```
 
 Checked on Node 24.20 and 26.11 against a local TLS server (2026-10-28): the right CA and CN pass, another certificate or CN is rejected. Not yet against a real bridge.

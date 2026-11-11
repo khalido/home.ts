@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { deviceLine } from "../src/cli/status.ts";
 
 // The output contract in docs/cli.md: errors as JSON on stderr under --json, exit 2 for usage, 1 for a connector that is down.
 const home = (args: string[], env: Record<string, string> = {}) => {
@@ -39,6 +40,20 @@ describe("home output contract", () => {
       expect(r.err).toBe("");
       expect(JSON.parse(r.out).status).toBe("disconnected");
       expect(r.code).toBe(1);
+    });
+
+    test("home devices lists what answered, and names on stderr the connector that didn't", () => {
+      const only = join(mkdtempSync(join(tmpdir(), "home-")), "home.jsonc");
+      writeFileSync(
+        only,
+        JSON.stringify({
+          devices: [{ id: "daikin", connector: "daikin", host: "127.0.0.1:1" }],
+        }),
+      );
+      const r = home(["devices", "--config", only, "--json"]);
+      expect(JSON.parse(r.out)).toEqual([]);
+      expect(r.err).toContain("daikin: disconnected");
+      expect(r.code).toBe(0);
     });
 
     test("a connector the config doesn't have says so", () => {
@@ -119,6 +134,24 @@ describe("home output contract", () => {
     expect(r.code).toBe(1);
     expect(JSON.parse(r.out).detail).toBe(
       "HOME_TIMEZONE: an IANA time zone, e.g. Australia/Sydney, not AEST",
+    );
+  });
+
+  test("a device's line: its connector, its text, its room, and why when it isn't available", () => {
+    const d = {
+      connector: "daikin",
+      id: "daikin",
+      name: "Lounge AC",
+      kind: "ac",
+      state: "cool",
+      text: "Lounge AC: on · cool 23 °C",
+      detail: { asOf: "2026-11-11T00:00:00.000Z" },
+    } as const;
+    expect(deviceLine({ ...d, available: true, room: "room-living" })).toBe(
+      "daikin   Lounge AC: on · cool 23 °C · in room-living",
+    );
+    expect(deviceLine({ ...d, available: false, reason: "auth" })).toBe(
+      "daikin   Lounge AC: on · cool 23 °C · not available: auth",
     );
   });
 });

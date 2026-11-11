@@ -68,6 +68,12 @@ Writes through this connector, and what a live read hasn't shown. In particular:
 
 ## Live findings
 
+**2026-11-11, Raspberry Pi 5, Bun 1.4.4, on 0.1.3** (chota-bot's session; `maxVolume: 40` watching, writes from the CLI in another process). Two gaps in the cap, not fixed:
+
+- From inactive and paused at 60, `play`: lowered to 40 within 2 ms of going active, `playing` at 40, then 60 again 90 ms after `playing`, and it played at 60. The cap takes its first confirmed lowering as done, so nothing lowered it again, and `anomaly` still said "lowered it". Soloist puts its own level back after `playing`.
+- The connector started while the speaker was already active and paused at 60: `play` resumed at 60, nothing lowered it, no anomaly. This is the documented "not on resuming from pause while active".
+- A volume set by hand (35) held through pause and play, so the put-back belongs to activation, not to pause.
+
 **2026-11-10, Raspberry Pi 5, Bun 1.4.4, on 0.1.2, through this connector** (chota-bot's session, KO listening).
 
 - Confirmed with `maxVolume: 60`, the speaker active and playing: `activate`, `setVolume(50)`, `setVolume(90)` (came back 60), `seek`, `setShuffle`, `setRepeat("context")` and `("off")` (about 2.1 s each), `queue` (first in `upNext`), `play` of a playlist URI. `duck(fn, { to: 20 })` around a Cast announce: 20 inside, `music: "restored"`, 60 after, 5.2 s in all.

@@ -4,6 +4,12 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+
+- **hue: Signify's root certificates are in the package**, as `HUE_BRIDGE_ROOT_CA` from `@khalido/home/hue`: both roots, the bundle from Signify's "Using HTTPS" page. `ca` is now optional everywhere it was required: `hue({ host, bridgeId, key })`, `bunPinnedFetch(bridgeId)`, `nodePinnedFetch(bridgeId)`, the config's `ca` and the CLI's `HUE_CA_FILE`. One given still replaces the bundle. `home probe` reads the bridge without setup, and `home discover --write` no longer writes a `ca` line.
+- **hue: `pairWhenPressed`**: `pair`, asked every 2 s for 30 s until the bridge's button is pressed, with `onWaiting` for the moment to prompt. `pair` takes a `signal`. `home pair` now waits for the button.
+- **`home devices`:** every device the connectors read, one line each from `homeDevices`: its state, its room and name from the config when there is one, and why when it isn't available. `--json` prints the records. A connector that isn't connected is named on stderr.
+
 ## [0.1.3] - 2026-11-10
 
 ### Added

@@ -116,9 +116,9 @@
                 "description": "env name holding the application key from `home pair`"
               },
               "ca": {
+                "description": "a root CA (PEM) to trust instead of Signify's two, which the package carries; relative to the config file",
                 "type": "string",
-                "minLength": 1,
-                "description": "Signify's root CA (PEM), relative to the config file"
+                "minLength": 1
               },
               "id": {
                 "type": "string"
@@ -137,7 +137,6 @@
               "host",
               "bridgeId",
               "key",
-              "ca",
               "id"
             ],
             "additionalProperties": {}
