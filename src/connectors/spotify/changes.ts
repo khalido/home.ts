@@ -14,11 +14,24 @@ export function stallText(s: Stall | undefined): string | undefined {
   return s.tried ? `${what}; tried ${s.tried}` : what;
 }
 
-/** The speaker in one word, to switch on. `offline`: not reached (or no part); `waiting`: running, nobody has picked it. A status Soloist sends beyond its four passes through. */
+const PLAYING = new Set(["playing", "buffering"]);
+
+/**
+ * Soloist says playing while it is not the account's active device: the music is on another Spotify device (a phone,
+ * another speaker) and this one is silent (live, 2026-11-10). Soloist doesn't say which. Unknown `active` is not elsewhere.
+ */
+export const playingElsewhere = (s: SpotifyState | undefined): boolean =>
+  s?.active === false && PLAYING.has(s.status ?? "");
+
+/**
+ * The speaker in one word, to switch on. `offline`: not reached (or no part); `waiting`: running, nobody has picked it;
+ * `elsewhere`: the account's music is playing on another Spotify device, not this one. A status Soloist sends beyond its four passes through.
+ */
 export type SpeakerState =
   | "offline"
   | "connecting"
   | "waiting"
+  | "elsewhere"
   | "idle"
   | "playing"
   | "paused"
@@ -32,6 +45,7 @@ export function speakerState(
     return "offline";
   if (part.status === "connecting") return "connecting";
   if (part.state?.loggedIn === false) return "waiting";
+  if (playingElsewhere(part.state)) return "elsewhere";
   return part.state?.status ?? "idle"; // signed in, nothing reported yet: nothing is playing
 }
 
@@ -57,12 +71,12 @@ export type SpotifyEvent = { own?: true } & (
   | { type: "track"; track: Track }
 );
 
-const PLAYING = new Set(["playing", "buffering"]);
-
 /**
  * The events between two reports, for `onChange`'s `before` and `after`: `offline` and `online`; `waiting` (signed out) and
  * `picked` (someone picked the speaker); `started` (from idle), `resumed` (from paused), `paused`, `stopped` (to idle), then
- * `track` for a new track, once it has a name, then `stalled` and `recovered` (Soloist issue #5). Buffering counts as playing. No `before`, or one
+ * `track` for a new track, once it has a name, then `stalled` and `recovered` (Soloist issue #5). Buffering counts as playing.
+ * Music on another Spotify device (`playingElsewhere`) is not playing here: it moving away is `stopped`, it arriving is `started`
+ * then `track`, and nothing fires for its tracks meanwhile. No `before`, or one
  * with no state (createHome's placeholder before the first report, as at a restart): nothing, since nothing was seen to change. No volume or queue events: read the state.
  */
 export function spotifyChanges(
@@ -87,8 +101,11 @@ export function spotifyChanges(
     events.push({ type: "waiting" });
   if (b?.loggedIn === false && a?.loggedIn === true)
     events.push({ type: "picked" });
-  const from = b?.status;
-  const to = a?.status;
+  // What this speaker itself is doing: music on another device is silence here.
+  const here = (s?: SpotifyState) => (playingElsewhere(s) ? "idle" : s?.status);
+  const from = here(b);
+  // Still inactive after playing elsewhere: a pause or stop there is the other device's, not this one's.
+  const to = playingElsewhere(b) && a?.active === false ? "idle" : here(a);
   const playingNow = to !== undefined && PLAYING.has(to);
   const playingThen = from !== undefined && PLAYING.has(from);
   if (playingNow && !playingThen)
@@ -98,7 +115,13 @@ export function spotifyChanges(
     add({ type: "stopped" });
   // Soloist's first report of a new track can have no name yet (seen live): the event waits for it.
   const named = (p?: SpotifyState) => !!p?.track?.name;
-  if (a?.track && named(a) && (a.track.uri !== b?.track?.uri || !named(b)))
+  const heard = playingElsewhere(b) && playingNow ? undefined : b; // a track that was on another device is new here once it plays here
+  if (
+    a?.track &&
+    named(a) &&
+    !playingElsewhere(a) &&
+    (a.track.uri !== heard?.track?.uri || !named(heard))
+  )
     add({ type: "track", track: a.track });
   if (a?.stalled && !b?.stalled)
     events.push({ type: "stalled", stall: a.stalled });
@@ -112,7 +135,10 @@ export function spotifyChanges(
   return events;
 }
 
-/** The speaker in a few words: `Kitchen speaker: playing "Song" by Band · 35%`, or `…: waiting for someone to pick it`. */
+/**
+ * The speaker in a few words: `Kitchen speaker: playing "Song" by Band · 35%`, `…: waiting for someone to pick it`, or,
+ * for music on another Spotify device, `…: silent · "Song" by Band is playing on another Spotify device` (no volume: it isn't this speaker's playing level).
+ */
 export function spotifyText(s: SpotifyState): string {
   const who = s.deviceName ?? "Soloist";
   if (s.loggedIn === false) return `${who}: waiting for someone to pick it`;
@@ -120,6 +146,8 @@ export function spotifyText(s: SpotifyState): string {
   const what = t
     ? `${t.name ? ` "${t.name}"` : ` ${t.uri}`}${t.artists.length ? ` by ${t.artists.join(", ")}` : ""}`
     : "";
+  if (playingElsewhere(s))
+    return `${who}: silent ·${what || " music"} is playing on another Spotify device`;
   const parts = [
     `${s.status ?? "status unknown"}${what}`,
     s.volume === undefined ? "" : `${s.volume}%`,

@@ -34,6 +34,7 @@ const PUBLIC: Record<string, string[]> = {
     "realClock",
     "settle",
     "solarLevel",
+    "spotifyElsewhere",
     "sunNow",
   ],
   "./hue": [
@@ -138,6 +139,7 @@ const PUBLIC: Record<string, string[]> = {
     "DEFAULT_URL",
     "configSchema",
     "manifest",
+    "playingElsewhere",
     "positionMs",
     "speakerState",
     "spotify",

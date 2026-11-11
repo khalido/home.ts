@@ -4,6 +4,14 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Breaking
+
+- **spotify: music on another Spotify device no longer reads as this speaker playing.** When Soloist says `playing` while it isn't the account's active device, `speakerState` now gives `elsewhere` (it gave `playing`), `spotifyText` says `silent · "Song" by Band is playing on another Spotify device`, and `spotifyChanges` treats it as silence: the music leaving is `stopped`, arriving is `started` then `track`, and nothing fires for its tracks or pauses meanwhile (it fired `resumed` with the box silent). `home devices --json` carries the new `state`. What to do: add `elsewhere` wherever you switch on `speakerState`; `state.status` is still what Soloist said.
+
+### Fixed
+
+- **spotify:** the stall watch no longer looks at, or repairs, music playing on another device.
+
 ### Changed
 
 - **cli:** `home room <name> <n>` and `home scene` print the room's line after the write, where they printed nothing; a wrong name is a usage error (exit 2), where it was exit 1. `home scene <name>` no longer takes the first match when several rooms have a scene by that name: it lists them, and `home scene <name> in <room>` picks one.
@@ -16,6 +24,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. Tested on built snapshots only.
 - **hue: lights, rooms and scenes by name.** `client.light(name, change)`, `client.room(name, change)` and `client.scene(name, room?)`, each resolving `{ state, confirmed }` (`HueApplied`). `change` (`LightChange`) is `{ on?, brightness?, color?, kelvin?, transitionMs? }`: a colour as hex or `{ r, g, b }`, sent as `xy` inside the light's own gamut; a white temperature in kelvin, checked against the light's range. An unknown name or a value the light can't take throws `HueError` with `code: "invalid"` before anything is sent, and a light the bridge has lost throws with `code: "offline"`.
 - **hue: colour in the state.** Each light's `kelvin` and `kelvinRange`, and on a colour light its `xy`, `hex` and `gamut`. `colorToXy`, `xyToHex`, `kelvinToMirek`, `mirekToKelvin` and `hueText` are exported.
 - **`home light <name> …`**, and `home room` and `home scene` now take a brightness, a temperature (`2700k`) and a colour (`ff8800`) together, name a scene's room (`in <room>`), and print what the bridge then reported.

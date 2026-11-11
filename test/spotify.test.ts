@@ -5,6 +5,7 @@ import {
   type Applied,
   manifest,
   positionMs,
+  playingElsewhere,
   speakerState,
   spotify,
   spotifyChanges,
@@ -1663,6 +1664,35 @@ describe("speakerState", () => {
       speakerState({ status: "connected", state: state({ loggedIn: true }) }),
     ).toBe("idle");
   });
+
+  test("playing while not the active device is elsewhere: the music is on another Spotify device", () => {
+    const away = state({
+      loggedIn: true,
+      deviceName: "Kitchen",
+      active: false,
+      status: "playing",
+      volume: 62,
+      track: { uri: "spotify:track:x", name: "Song", artists: ["Band"] },
+    });
+    expect(playingElsewhere(away)).toBe(true);
+    expect(speakerState({ status: "connected", state: away })).toBe(
+      "elsewhere",
+    );
+    expect(spotifyText(away)).toBe(
+      'Kitchen: silent · "Song" by Band is playing on another Spotify device',
+    );
+    expect(spotifyText({ ...away, track: undefined })).toBe(
+      "Kitchen: silent · music is playing on another Spotify device",
+    );
+    // Paused while inactive, and active not yet known, stay as Soloist says.
+    for (const s of [
+      { ...away, status: "paused" },
+      { ...away, active: undefined },
+    ]) {
+      expect(playingElsewhere(s)).toBe(false);
+      expect(speakerState({ status: "connected", state: s })).toBe(s.status!);
+    }
+  });
 });
 
 describe("spotifyChanges", () => {
@@ -1688,6 +1718,39 @@ describe("spotifyChanges", () => {
         part("connected", { status: "playing", track: track("t2") }),
       ),
     ).toEqual(["track"]);
+  });
+
+  test("music on another Spotify device is silence here", () => {
+    const here = { status: "playing", active: true, track: track("t1") };
+    const away = { status: "playing", active: false, track: track("t1") };
+    // It moved to another device: this speaker stopped.
+    expect(types(part("connected", here), part("connected", away))).toEqual([
+      "stopped",
+    ]);
+    // Its tracks change there: nothing here.
+    expect(
+      types(
+        part("connected", away),
+        part("connected", { ...away, track: track("t2") }),
+      ),
+    ).toEqual([]);
+    // Another device resumes while this one is paused and inactive: not this speaker's resume.
+    expect(
+      types(
+        part("connected", { ...away, status: "paused" }),
+        part("connected", away),
+      ),
+    ).toEqual(["stopped"]);
+    // A pause or a stop on the other device is not this speaker's, and no track is announced for it.
+    for (const status of ["paused", "idle"])
+      expect(
+        types(part("connected", away), part("connected", { ...away, status })),
+      ).toEqual([]);
+    // It arrives here: started, and the track, though its uri is the one it had there.
+    expect(types(part("connected", away), part("connected", here))).toEqual([
+      "started",
+      "track",
+    ]);
   });
 
   test("nothing at boot: no before, or createHome's bare placeholder", () => {
@@ -2039,6 +2102,29 @@ describe("stalls (Soloist issue #5)", () => {
     });
     await h.advance(19_900);
     await answer(h, sock, 196_000, 0);
+    expect(h.last().state?.stalled).toBeUndefined();
+    await h.stop();
+  });
+
+  test("not looked at while inactive: playing then is another device's music", async () => {
+    const h = setup({ stallCheckMs: 20_000, repairStalls: true });
+    const sock = await h.online({ ...playingAt(80_000), is_active: false });
+    await h.advance(60_000);
+    expect(sock.commands()).toEqual([]);
+    expect(h.last().state?.stalled).toBeUndefined();
+    await h.stop();
+  });
+
+  test("a stall ends when the music moves to another device", async () => {
+    const h = setup({ stallCheckMs: 20_000 });
+    const sock = await h.online(playingAt(80_000));
+    await h.advance(19_900);
+    await answer(h, sock, 99_000, 20_000);
+    await h.advance(20_000);
+    await answer(h, sock, 99_100, 40_000);
+    expect(h.last().state?.stalled).toBeDefined();
+    sock.push({ type: "device_changed", is_active: false });
+    await tick();
     expect(h.last().state?.stalled).toBeUndefined();
     await h.stop();
   });

@@ -4,6 +4,7 @@ import {
   type HomeDevice,
   homeDevices,
   SERVICES,
+  spotifyElsewhere,
 } from "../src/devices.ts";
 import type { Part } from "../src/index.ts";
 import { MANIFESTS } from "../src/manifests.ts";
@@ -357,5 +358,46 @@ describe("homeDevices", () => {
     expect([...Object.keys(DEVICES), ...SERVICES].sort()).toEqual(
       MANIFESTS.map((m) => m.name).sort(),
     );
+  });
+});
+
+describe("spotifyElsewhere", () => {
+  const away: SpotifyState = {
+    ...spotify,
+    active: false,
+    status: "playing",
+    track: { uri: "spotify:track:x", name: "Song", artists: [] },
+  };
+  test("names the Cast device playing that track in Spotify", () => {
+    expect(spotifyElsewhere({ ...snapshot, spotify: ok(away) })).toEqual([
+      "Front room speaker",
+    ]);
+  });
+  test("a group playing it is named, not its members", () => {
+    const playing = { app: "Spotify", playerState: "PLAYING", title: "Song" };
+    const grouped: CastSnapshot = {
+      ...cast,
+      devices: {
+        aa: { ...cast.devices.aa!, ...playing, playingVia: "gg" },
+        bb: { ...cast.devices.bb!, playingVia: "gg" },
+        gg: { ...cast.devices.gg!, ...playing },
+      },
+    };
+    expect(spotifyElsewhere({ cast: ok(grouped), spotify: ok(away) })).toEqual([
+      "Everywhere",
+    ]);
+  });
+  test("empty when it plays here, on another track, or with no Cast part", () => {
+    expect(spotifyElsewhere(snapshot)).toEqual([]);
+    expect(
+      spotifyElsewhere({ ...snapshot, spotify: ok({ ...away, active: true }) }),
+    ).toEqual([]);
+    expect(
+      spotifyElsewhere({
+        ...snapshot,
+        spotify: ok({ ...away, track: { ...away.track!, name: "Other" } }),
+      }),
+    ).toEqual([]);
+    expect(spotifyElsewhere({ spotify: ok(away) })).toEqual([]);
   });
 });

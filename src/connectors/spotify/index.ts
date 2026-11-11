@@ -43,6 +43,7 @@ export {
 } from "./client.ts";
 export {
   type SpeakerState,
+  playingElsewhere,
   speakerState,
   type SpotifyEvent,
   spotifyChanges,
@@ -836,6 +837,7 @@ export function spotify(
       !st ||
       state.aside === "repair" ||
       (state.track?.uri === st.track &&
+        state.active !== false && // moved to another device: no longer this speaker's stall
         (state.status === "playing" || state.status === "buffering"))
     )
       return;
@@ -870,7 +872,12 @@ export function spotify(
     a.track === b.track &&
     b.atMs - a.atMs >= gap &&
     Math.abs(b.ms - a.ms) < 1000;
-  const playing = () => isOpen() && state.status === "playing" && !state.aside;
+  // Not while inactive: "playing" then is another device's music, and a repair's seek or pause would land on it.
+  const playing = () =>
+    isOpen() &&
+    state.status === "playing" &&
+    state.active !== false &&
+    !state.aside;
 
   /** One look while playing: a fresh position, then frozen, overrun, recovered or fine (Soloist issue #5). */
   const checkStall = async () => {
@@ -916,6 +923,7 @@ export function spotify(
     const ours = () =>
       isOpen() &&
       state.status === "playing" &&
+      state.active !== false &&
       state.track?.uri === track &&
       state.stalled?.track === track &&
       (!state.aside || state.aside === "repair");

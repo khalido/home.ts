@@ -1,5 +1,6 @@
 import {
   type CastHomeDevice,
+  type CastSnapshot,
   castHomeDevices,
 } from "./connectors/cast/index.ts";
 import {
@@ -16,7 +17,9 @@ import {
   printersHomeDevices,
 } from "./connectors/printers/index.ts";
 import {
+  playingElsewhere,
   type SpotifyHomeDevice,
+  type SpotifyState,
   spotifyHomeDevices,
 } from "./connectors/spotify/index.ts";
 import type { HomeConfig } from "./config.ts";
@@ -99,4 +102,29 @@ export function homeDevices(
         : d.text;
     return { ...d, name, text, ...(room ? { room } : {}) };
   });
+}
+
+/**
+ * Where the account's Spotify is playing when the Soloist speaker says it is on another device: the names of the Cast
+ * devices and groups playing a track of that name in Spotify. A group is named, not its members. Empty when the music is
+ * on the speaker itself, nothing is playing, or it is on something Cast can't see (a phone, a laptop). Matched by the
+ * track's name, since neither side names the other.
+ */
+export function spotifyElsewhere(
+  snapshot: Record<string, Part | undefined>,
+): string[] {
+  const s = snapshot.spotify?.state as SpotifyState | undefined;
+  const cast = snapshot.cast?.state as CastSnapshot | undefined;
+  const name = s?.track?.name;
+  if (!playingElsewhere(s) || !name || !cast) return [];
+  return Object.values(cast.devices)
+    .filter(
+      (d) =>
+        d.status === "connected" &&
+        !d.playingVia && // its group's music: the group is named
+        d.app === "Spotify" &&
+        d.title === name &&
+        (d.playerState === "PLAYING" || d.playerState === "BUFFERING"),
+    )
+    .map((d) => d.name);
 }

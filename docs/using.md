@@ -103,7 +103,7 @@ if (cast && state) {
 }
 ```
 
-`castStatus(state)` gives each device's and group's `idle`, `restorable`, `busy` or `offline`, with the app and title. For Spotify, `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, stalled, recovered, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.
+`castStatus(state)` gives each device's and group's `idle`, `restorable`, `busy` or `offline`, with the app and title. For Spotify, `speakerState(part)` says the speaker in one word (offline, waiting, idle, playing, paused, or elsewhere when the account's music is on another Spotify device; `spotifyElsewhere(home.snapshot())` names the Cast device when it is one) and `spotifyChanges(change.before, change.after)` turns an `onChange` into events (started, resumed, paused, stopped, track, stalled, recovered, offline, waiting, picked), those from the library's own `duck` or `interrupt` marked `own`.
 
 ## When something is wrong
 

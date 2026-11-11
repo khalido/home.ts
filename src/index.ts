@@ -22,7 +22,7 @@ export {
   PUSH_DOWN_MS,
   STALE_POLLS,
 } from "./health.ts";
-export { type HomeDevice, homeDevices } from "./devices.ts";
+export { type HomeDevice, homeDevices, spotifyElsewhere } from "./devices.ts";
 export { asOf, type Clock, realClock } from "./clock.ts";
 export { type ConnectorCode, ConnectorError } from "./connector.ts";
 export {
