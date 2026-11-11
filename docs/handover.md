@@ -4,7 +4,7 @@
 
 ## Where things stand
 
-- **0.2.0 is tagged and staged on npm** (2026-11-12, stage id `65e09ff8-96c9-4de1-91ab-d9da133d05a9`), waiting for KO's 2FA approval. Once live: `npm view @khalido/home version`, a clean `bun add @khalido/home@0.2.0 --no-cache`, then tell chota-bot. The tarball lags the version record by minutes (`@latest --no-cache` gave the old version after 0.1.3), so tell chota to pin the exact version.
+- **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). A clean `bun add @khalido/home@0.2.0 --no-cache` imported on Bun 1.4.4. chota-bot has been sent the release note (queued in its session, not confirmed read).
 - **What 0.2.0 has:** `CHANGELOG.md`. In short: Hue by name (lights, rooms, scenes, `allOff`, colour, kelvin) with Signify's roots bundled and `pairWhenPressed`; Daikin `power` and `mode` (cool 25, heat 27); dry run on Hue and Daikin writes; `home.add` and `home.remove`; `byRoom` and `photos`; `castFreeSpeakers` and `castFree` `forms`; Spotify `elsewhere` and `spotifyElsewhere`; `home devices`.
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill). Worked for 0.1.1 to 0.2.0.
 - **jaldi** has been told nothing since 0.1.0 (no session open there).
@@ -34,7 +34,6 @@ Decided, don't reopen: the four poll loops stay separate; no `build()` on `Manif
 
 ## Waiting on KO
 
-- Approve 0.2.0 on npm.
 - Enphase: why the gateway refuses connections (since 28 Oct).
 - npm: "Require two-factor authentication and disallow tokens" under Publishing access.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged; keep `pre-squash`.
