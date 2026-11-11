@@ -49,6 +49,7 @@ const VERBS: Record<
 > = {
   hue: {
     verbs: hueVerbs,
+    options: [DRY_RUN],
     usage: `usage: home hue ${Object.values(HUE_HELP)
       .map((h) => h.split(":")[0])
       .join(" | ")}`,

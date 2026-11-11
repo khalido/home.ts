@@ -22,6 +22,13 @@ const home = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("home output contract", () => {
+  test("home hue <verb> takes --dry-run as the short form does; home hue pair refuses it", () => {
+    expect(home(["hue", "pair", "--dry-run"])).toMatchObject({ code: 2 });
+    expect(home(["hue", "room", "--dry-run"]).err).not.toMatch(
+      /unknown option/i,
+    );
+  });
+
   test("--dry-run is refused on a command whose writes don't read it, before anything runs", () => {
     for (const args of [
       ["cast", "volume", "Kitchen", "30"],
