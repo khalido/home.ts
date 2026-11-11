@@ -7,9 +7,12 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import {
   cast,
+  type CastDevice,
   type CastSnapshot,
+  castText,
   resolvedFrom,
 } from "../connectors/cast/index.ts";
+import { findCast } from "../connectors/cast/state.ts";
 import { serveClip } from "../connectors/cast/serve.ts";
 import { tlsConnect } from "../connectors/cast/tls.ts";
 import { addressBook } from "../discover.ts";
@@ -52,7 +55,10 @@ export function castNow() {
 
 /** Open every Cast socket, wait until each has answered (at most 10 s), run one write over them, then close them all. */
 async function withCast<T>(
-  act: (c: ReturnType<typeof castNow>) => Promise<T>,
+  act: (
+    c: ReturnType<typeof castNow>,
+    state: () => CastSnapshot | undefined,
+  ) => Promise<T>,
 ): Promise<T> {
   const c = castNow();
   const stop = new AbortController();
@@ -64,7 +70,7 @@ async function withCast<T>(
       Date.now() < until && (last?.status ?? "connecting") === "connecting";
     )
       await Bun.sleep(50);
-    return await act(c);
+    return await act(c, () => last?.state);
   } finally {
     stop.abort();
     await running;
@@ -105,19 +111,59 @@ export const CAST_OPTIONS: [string, string, { type: unknown[] }?][] = [
   ["--volume <0-100>", "announce: the volume for the clip"],
 ];
 
+/** How long a write waits for the device to report the change before saying it was only sent. */
+const SHOWN_MS = 2000;
+
+/** One write, then the device's line once it reports what was asked, or that it has not yet. */
+const wrote = (
+  name: string,
+  write: (c: ReturnType<typeof castNow>) => Promise<void>,
+  shown: (d: CastDevice) => boolean,
+) =>
+  withCast(async (c, state) => {
+    await write(c);
+    const now = () => {
+      const s = state();
+      const d = s && findCast(s.devices, name);
+      return s && d ? { line: castText(d, s), ok: shown(d) } : undefined;
+    };
+    for (const until = Date.now() + SHOWN_MS; Date.now() < until;) {
+      if (now()?.ok) break;
+      await Bun.sleep(50);
+    }
+    const after = now();
+    console.log(
+      after?.ok
+        ? after.line
+        : `sent; the device has not reported it yet${after ? ` (${after.line})` : ""}`,
+    );
+  });
+
 export const castVerbs: Verbs = {
   async volume([name, value]) {
     if (!name) usage(CAST_USAGE);
     const level = percentLevel(value);
-    await withCast((c) => c.setVolume(name!, level));
+    await wrote(
+      name!,
+      (c) => c.setVolume(name!, level),
+      (d) => d.volume !== undefined && Math.abs(d.volume - level) < 0.006,
+    );
   },
   async mute([name, value]) {
     if (!name || (value !== "on" && value !== "off")) usage(CAST_USAGE);
-    await withCast((c) => c.setMuted(name!, value === "on"));
+    await wrote(
+      name!,
+      (c) => c.setMuted(name!, value === "on"),
+      (d) => d.muted === (value === "on"),
+    );
   },
   async stop([name]) {
     if (!name) usage(CAST_USAGE);
-    await withCast((c) => c.stop(name!));
+    await wrote(
+      name!,
+      (c) => c.stop(name!),
+      (d) => d.idle === true,
+    );
   },
   async announce(_, o) {
     const [say, file] = [text(o.say), text(o.file)];
