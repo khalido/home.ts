@@ -120,7 +120,7 @@ Signify's rules ([Color Conversion Formulas](https://developers.meethue.com/deve
 - A colour given as hue, saturation and value goes to RGB first.
 - White is a colour temperature in mirek (`color_temperature.mirek`, 153 cool to 500 warm on most lights), not an `xy`.
 
-**What this library does: nothing yet.** The schema reads `on` and `dimming.brightness` and no colour. Writes are `client.put(kind, id, body)` with a raw CLIP body, and `recallScene(id)`. The conversions are public maths; Signify's page also carries an iOS SDK extract "as is", which is read for the method and not copied.
+**What this library does: nothing yet.** The schema reads `on` and `dimming.brightness` and no colour. KO's bridge does report it (2026-11-11): each light's `color.xy`, its `gamut` and `gamut_type`, and `color_temperature.mirek` with the light's own `mirek_minimum` and `mirek_maximum`. Writes are `client.put(kind, id, body)` with a raw CLIP body, and `recallScene(id)`. The conversions are public maths; Signify's page also carries an iOS SDK extract "as is", which is read for the method and not copied.
 
 ## Pairing
 
@@ -154,4 +154,4 @@ That is Bun. Under Node, `nodePinnedFetch(bridge.id)` from `@khalido/home/node` 
 
 **What others do:** Home Assistant asks the person to press, then makes one request per click of Submit. openHAB asks every 0.5 s for 5 minutes, Homebridge every 15 s with no limit, openhue-cli every second with no limit. Home Assistant and openHAB leave out `generateclientkey`.
 
-**Live, 2026-11-11, KO's BSB002 (Bun 1.4.4):** `home pair` gave the `link_button` error after its wait with no press, and a key on the next run once the button was pressed. The key has not yet been used for a read.
+**Live, 2026-11-11, KO's BSB002 (Bun 1.4.4):** `home pair` gave the `link_button` error after its wait with no press, and a key on the next run once the button was pressed. The key then read the bridge: 177 resources in 286 ms, all parsed (the connector README has the rest).

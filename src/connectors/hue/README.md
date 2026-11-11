@@ -38,6 +38,16 @@ Unconfirmed: whether the bridge resumes from `Last-Event-ID`; how many streams o
 
 Two write lanes per client (`src/lane.ts`). `grouped_light` and `scene` writes go out 1 s apart, `light` writes 100 ms apart, each lane in order. A write to a resource whose last write is still waiting merges into it (`mergeBody`, the newer field winning), so a burst cannot build a backlog; the merged write keeps the first one's place in the lane. Unverified: which the bridge applies when a merge carries both `color_temperature` and `color`. That is Signify's guidance (about 10 commands a second to lights, 1 a second to groups; its Hue System Performance page, read 2026-11-11; [docs/hue.md](../../../docs/hue.md) has the rest). Prefer one `grouped_light` or scene write over many light writes: the bridge sends it to every light at once.
 
+## First live read (2026-11-11)
+
+KO's BSB002, software 1978545030, Bun 1.4.4, reads only, with the key from `home pair` and the bundled roots.
+
+- `home hue`: connected in 0.47 s. A full read is 177 resources in 286 ms, and every one parsed.
+- 16 lights, 6 rooms, 30 scenes, 2 lights unreachable (shown as not available, reason `offline`). A room with no lights has no on/off and prints its name alone.
+- Every light has `dimming` and `color_temperature`, each with its own mirek range (153–500 on a colour light, 153–454 on a white one). 6 have `color`, with `xy` and their gamut (type C) on the resource, as Signify's page says. `grouped_light` carries `on`, `dimming`, `color_temperature` and `color` too.
+- The event stream: connected at 0.4 s, then nothing from the bridge for 90 s, so the watchdog reconnected and read again at 90.8 s, as designed. With no light changing, that is one full read every 90 s.
+- Untried: any write through the paired key, an event arriving (nothing changed while watching), a move to a new address.
+
 ## Sources
 
 What this folder learned from, and on what terms. No code was copied.
