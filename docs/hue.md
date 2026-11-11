@@ -129,7 +129,7 @@ Signify's rules ([Color Conversion Formulas](https://developers.meethue.com/deve
 **What this library does.**
 
 - `pair({ host, fetch, deviceType })`: one request. Throws `HueError` with `code: "link_button"` until the button is pressed.
-- `pairWhenPressed({ …, timeoutMs?, everyMs?, onWaiting?, signal? })`: asks every 2 s for 30 s, calls `onWaiting` once when the bridge first says the button isn't pressed, and returns the key. After the time it throws the `link_button` error.
+- `pairWhenPressed({ …, timeoutMs?, everyMs?, onWaiting?, signal? })`: asks every 2 s for 30 s and returns `{ key }`. `onWaiting()` takes nothing and is called once, when the bridge first says the button isn't pressed; if it was already pressed, it is never called. After the time it throws the `link_button` error: nothing was changed on the bridge, so tell the person and ask again.
 - `home pair` uses it with 60 s, names the bridge it found, counts down on a terminal, and prints the env lines. With no press it says so and exits 1.
 - The library never stores the key.
 
@@ -149,6 +149,8 @@ const { key } = await pairWhenPressed({
 });
 // store `key` as a secret; then hue({ host: bridge.host, bridgeId: bridge.id, key })
 ```
+
+`FINDERS.hue()` returns every bridge that answers; this takes the first. A home with two should list them by id and let the person choose. To use the key from a home config, pass it in `env` under the name the config gives (`env: { ...process.env, HUE_APPLICATION_KEY: key }`), and build the home again: `createHome` takes its integrations once.
 
 That is Bun. Under Node, `nodePinnedFetch(bridge.id)` from `@khalido/home/node` takes the place of `bunPinnedFetch`.
 

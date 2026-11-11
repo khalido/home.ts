@@ -18,7 +18,7 @@ hue({ host, bridgeId, key, fetch: nodePinnedFetch(bridgeId) }); // or one integr
 
 Checked on Node 24.20 and 26.11 against a local TLS server (2026-10-28): the right CA and CN pass, another certificate or CN is rejected. Not yet against a real bridge.
 
-Pairing, pinning, the event stream and the rate limits are in [`src/connectors/hue/README.md`](../src/connectors/hue/README.md). On the local network the bridge still needs an application key: without one it answers 403. `home pair` gets one with the link button; no cloud account is involved.
+Pairing from code is `pairWhenPressed` ([hue.md](hue.md#pairing) has the whole flow); pinning, the event stream and the rate limits are in [`src/connectors/hue/README.md`](../src/connectors/hue/README.md). On the local network the bridge still needs an application key: without one it answers 403. `home pair` gets one with the link button; no cloud account is involved.
 
 ## One home
 
@@ -74,17 +74,23 @@ A write changes someone's house: make one only when a person asked for it. Write
 - **Use the returned state.** The Daikin's part in the snapshot is from its last poll and can be 120 s behind, unless you call `home.refresh("daikin")`.
 - **Daikin defaults.** `mode("cool")` is 25 °C and `mode("heat")` 27 (`DEFAULT_TARGET_C`); `mode("cool", 23)` for another. `power(true)` brings the unit back as it was last left.
 - **A target** for Cast is a device's or group's name or id. A clip is `{ url, type? }` or `{ bytes, type }`; bytes need `castServe`.
+- **Clips: MP3 or AAC.** A 24 kHz mono WAV played on the displays and failed on the audio-only speakers (2026-11-09), so convert a WAV from a text-to-speech engine first.
+- **A new integration needs a new home.** `createHome` takes its integrations once: after pairing Hue while the app runs, abort the signal and build the home again with the key. Every socket reconnects (Cast, Spotify, Hue's stream) and `lastGoodAt` starts over; the address cache keeps discovery short. The same goes for an `unavailable` part once its key is fixed.
 - **Volume scales differ:** Cast 0–1, Spotify 0–100.
 
 Announce only where nothing is playing, with the music on this machine turned down meanwhile:
 
 ```ts
-import { castFree } from "@khalido/home/cast";
+import { castFree, castHomeDevices } from "@khalido/home/cast";
 
 const cast = home.integration("cast");
 const state = home.part("cast")?.state;
 if (cast && state) {
-  const { free, skipped } = castFree(state, ["Kitchen", "Bedroom"]); // skipped: { name, why }
+  // Every speaker and display, not the TVs: an idle TV is free too, and would play it.
+  const targets = castHomeDevices(home.part("cast"))
+    .filter((d) => d.kind === "speaker" || d.kind === "display")
+    .map((d) => d.name);
+  const { free, skipped } = castFree(state, targets); // skipped: { name, why }
   const announce = () =>
     cast.announceAll(free, { url: clipUrl }, { volume: 0.3 });
   const speaker = home.integration("spotify");

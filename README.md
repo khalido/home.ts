@@ -13,7 +13,7 @@ Small, typed home automation for TypeScript, starting with the devices in my hou
 bun add @khalido/home     # or: npm install @khalido/home
 ```
 
-The library runs on Bun 1.4+ and Node 24+, and is ESM only. The `home` command needs Bun.
+The library runs on Bun 1.4+ and Node 24+, and is ESM only. The `home` command needs Bun on your `PATH`; in a project that added the package, run it as `bunx home`.
 
 Pointing a coding agent at it? Give it [llms.txt](llms.txt): what to call and where each doc is. [Using it from an app](docs/using.md) is the same for people.
 

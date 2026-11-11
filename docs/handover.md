@@ -33,6 +33,15 @@ In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device
 
 **Consumer docs, 2026-11-11:** a Sonnet audit wrote each consumer task from the shipped docs alone; its findings are fixed (`llms.txt`, `docs/using.md`'s write table and error section, `docs/config.md`'s full `loadHome` call), and the examples were type-checked against the exports. Not done from it: typed Hue writes in the table (none exist), a per-connector guide to message-only errors.
 
+**chota's asks after reading the consumer docs (2026-11-11), for KO to decide; the doc gaps in the same message are fixed:**
+
+- `home.add(integration)`, so a bot that pairs Hue while running needn't rebuild the home. Today the docs say to build it again.
+- Hue writes by name, as the CLI has: `room(name, { on?, brightness? })` and `scene(name)` resolving `{ state, confirmed }`, a miss listing what exists. Part of the typed light writes below; without it each consumer copies `src/cli/hue.ts`.
+- `castFree` with a `forms` option, or the docs' filter (now shown): an idle TV is free, so "announce everywhere" plays on it.
+- For the home map: a `byRoom(homeDevices(snapshot, config))` helper with "no data" for a room whose connector is down; a documented `photos` field on a room; whether a walkthrough video is a source for `draw-home`.
+- Still open: `spotifyText` says "playing" while `active` is false; the two cap gaps.
+- For the next release note to consumers: `bun add @khalido/home@latest --no-cache` resolved 0.1.2 minutes after 0.1.3 went live; the exact version worked.
+
 **Hue, unreleased (2026-11-11):** both of Signify's roots are in the package (`HUE_BRIDGE_ROOT_CA`, identical to Signify's page, pinned live against KO's BSB002 with reads only), `ca` is optional everywhere, and `pairWhenPressed` waits for the button. `docs/hue.md` has Signify's rules and what other projects do. `home pair` worked live for KO on 2026-11-11 and waits 60 s with a countdown. The key is in this repo's `.env` (git-ignored), and Hue reads live: `home hue`, `home devices`, a 177-resource read with every schema parsing, and the stream holding through a watchdog reconnect. No write has gone through the paired key. Next for Hue: typed light writes (on, brightness, colour as hex or RGB pulled into the light's gamut, temperature in kelvin within its mirek range, transition), and colour in the state; the bridge reports gamut and mirek range per light, so no model table is needed. chota-bot wants to pair from a chat message and is waiting on a release with this.
 
 Hue's device records are from the docs' shapes, like the rest of Hue. `home devices` is built and unreleased (2026-11-11): it listed KO's Cast devices and printer live; Hue, the Daikin and the Soloist were not set up on that machine, so their lines are still from fixtures. From chota's feedback, for the writes-in-one-shape work in 0.2.0: the actions a device accepts, a common 0–100 `level`, Cast volume 0–1 against Soloist 0–100, where writes hang and what they return, helpers taking a Part or a state, ids or names.
