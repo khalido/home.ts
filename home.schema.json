@@ -82,6 +82,14 @@
           "hueRoom": {
             "description": "the Hue room, zone or grouped_light id whose lights this room's marker shows",
             "type": "string"
+          },
+          "photos": {
+            "description": "photos of the room, as paths relative to the config or from ~/; the library never reads them, a drawing agent or an app does",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [

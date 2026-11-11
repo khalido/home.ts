@@ -67,7 +67,7 @@ Make a **room table** first, in the SVG's header comment: each room, its floor, 
 }
 ```
 
-Room ids start with `room-`; names are what the person calls them (an unlabelled room keeps `""` until they say). No `room` on whole-house devices (solar, prices). The solar array is drawn on the roof with its own marker; set the Enphase device's `marker` to its id, and `capacityW` only when the person gives the rated size. Lights are placed through the room's `hueRoom`, not as devices. `marker` in the config always means an SVG marker id.
+Room ids start with `room-`; names are what the person calls them (an unlabelled room keeps `""` until they say). No `room` on whole-house devices (solar, prices). The solar array is drawn on the roof with its own marker; set the Enphase device's `marker` to its id, and `capacityW` only when the person gives the rated size. Lights are placed through the room's `hueRoom`, not as devices. A room's `photos` lists the pictures it was drawn from, as paths relative to the config, when the person wants them kept. `marker` in the config always means an SVG marker id.
 
 ## 5. Check before hand-over
 

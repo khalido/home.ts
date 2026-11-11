@@ -7,6 +7,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 ### Breaking
 
 - **spotify: music on another Spotify device no longer reads as this speaker playing.** When Soloist says `playing` while it isn't the account's active device, `speakerState` now gives `elsewhere` (it gave `playing`), `spotifyText` says `silent · "Song" by Band is playing on another Spotify device`, and `spotifyChanges` treats it as silence: the music leaving is `stopped`, arriving is `started` then `track`, and nothing fires for its tracks or pauses meanwhile (it fired `resumed` with the box silent). `home devices --json` carries the new `state`. What to do: add `elsewhere` wherever you switch on `speakerState`; `state.status` is still what Soloist said.
+- **cast: `CastSkipped.why` can be `form`**, only when `castFree` is given `forms`. What to do: add it to a switch that lists every `why`.
 
 ### Fixed
 
@@ -25,6 +26,9 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **`byRoom(snapshot, config)`** from `@khalido/home`, for a map of the home: each room of the config with its devices, `noData` for a connector the config places there that has nothing to list, and `unplaced` for the rest.
+- **config: `photos` on a room**, a list of paths. The library carries them and reads nothing.
+- **cast: `castFree(state, targets, { forms })`**: with `forms: ["speaker", "display"]` a TV is left out, and a group holding one becomes its other free members.
 - **`home.add(integration)` and `home.remove(name)`** on the home `createHome` returns: add one while the rest keep running (a bridge paired just now), replace one by name (the old run has ended before the new one starts; how an `unavailable` part comes back after a re-key), or stop one and drop its part. `start` now also waits for those added.
 - **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. `homeDevices` and `home devices` put it in the speaker's line (`silent · "Song" is playing on Front room speaker`), and `spotifyText(state, on)` takes it. Tested on built snapshots only.
 - **hue: lights, rooms and scenes by name.** `client.light(name, change)`, `client.room(name, change)` and `client.scene(name, room?)`, each resolving `{ state, confirmed }` (`HueApplied`). `change` (`LightChange`) is `{ on?, brightness?, color?, kelvin?, transitionMs? }`: a colour as hex or `{ r, g, b }`, sent as `xy` inside the light's own gamut; a white temperature in kelvin, checked against the light's range. An unknown name or a value the light can't take throws `HueError` with `code: "invalid"` before anything is sent, and a light the bridge has lost throws with `code: "offline"`.

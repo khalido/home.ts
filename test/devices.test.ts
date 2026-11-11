@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  byRoom,
   DEVICES,
   type HomeDevice,
   homeDevices,
@@ -404,5 +405,67 @@ describe("spotifyElsewhere", () => {
       }),
     ).toEqual([]);
     expect(spotifyElsewhere({ spotify: ok(away) })).toEqual([]);
+  });
+});
+
+describe("byRoom", () => {
+  const config = {
+    rooms: [
+      {
+        id: "room-living",
+        name: "Living",
+        floor: "ground",
+        hueRoom: "gl-living",
+      },
+      { id: "room-kitchen", name: "Kitchen" },
+      { id: "room-shed", name: "Shed" },
+    ],
+    devices: [
+      {
+        connector: "daikin" as const,
+        id: "ac",
+        name: "Lounge AC",
+        room: "room-living",
+        host: "192.0.2.20",
+        mac: "00:11:22:33:44:55",
+      },
+      {
+        connector: "spotify" as const,
+        id: "music",
+        name: "Kitchen speaker",
+        room: "room-kitchen",
+      },
+    ],
+  };
+  test("each room of the config with its devices, in the config's order; the rest unplaced", () => {
+    const { rooms, unplaced } = byRoom(snapshot, config);
+    expect(rooms.map((r) => [r.id, r.name, r.floor, r.noData])).toEqual([
+      ["room-living", "Living", "ground", []],
+      ["room-kitchen", "Kitchen", undefined, []],
+      ["room-shed", "Shed", undefined, []],
+    ]);
+    expect(rooms[0]!.devices.map((d) => d.connector)).toContain("daikin");
+    expect(rooms[0]!.devices.some((d) => d.connector === "hue")).toBe(true);
+    expect(rooms[1]!.devices.map((d) => d.id)).toEqual(["spotify"]);
+    expect(rooms[2]!.devices).toEqual([]);
+    // The printer places itself in a room this config doesn't have.
+    expect(unplaced.map((d) => d.id)).toContain("p1");
+    expect(unplaced.some((d) => d.room === "room-living")).toBe(false);
+  });
+  test("a connector the config places in a room that has nothing to list is noData; one that is down but read before still lists", () => {
+    const { rooms } = byRoom(
+      {
+        ...snapshot,
+        hue: { status: "connecting" },
+        daikin: { status: "disconnected", state: daikin },
+        spotify: undefined,
+      },
+      config,
+    );
+    expect(rooms[0]!.noData).toEqual(["hue"]);
+    expect(rooms[0]!.devices).toMatchObject([
+      { connector: "daikin", available: false },
+    ]);
+    expect(rooms[1]!.noData).toEqual(["spotify"]);
   });
 });

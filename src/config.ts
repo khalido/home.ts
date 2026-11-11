@@ -70,6 +70,12 @@ export const Room = z.looseObject({
     .describe(
       "the Hue room, zone or grouped_light id whose lights this room's marker shows",
     ),
+  photos: z
+    .array(filePath)
+    .optional()
+    .describe(
+      "photos of the room, as paths relative to the config or from ~/; the library never reads them, a drawing agent or an app does",
+    ),
 });
 
 /** JSONC (comments and trailing commas) through jsonc-parser, which runs on Node too; a syntax error throws rather than parsing to part of the file. */

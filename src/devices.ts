@@ -137,3 +137,46 @@ export function spotifyElsewhere(
     )
     .map((d) => d.name);
 }
+
+/** A room of the home config with the devices placed in it. `noData`: device connectors the config places here that listed nothing in it (never reached, not set up, or a `hueRoom` the bridge doesn't have), so the room isn't empty, it is unread. Per connector, not per device. */
+export type RoomDevices = {
+  id: string;
+  name: string;
+  floor?: string;
+  devices: HomeDevice[];
+  noData: string[];
+};
+
+/**
+ * `homeDevices` room by room, in the config's order, for a map of the home. A connector that is down but has read before
+ * still lists its devices, `available: false`; `noData` names one the config places in the room (a device's `room`, or
+ * `hueRoom`) that has nothing to list. `unplaced`: devices with no room, or one the config doesn't have.
+ */
+export function byRoom(
+  snapshot: Record<string, Part | undefined>,
+  config: Pick<HomeConfig, "devices" | "rooms">,
+): { rooms: RoomDevices[]; unplaced: HomeDevice[] } {
+  const all = homeDevices(snapshot, config);
+  const ids = new Set((config.rooms ?? []).map((r) => r.id));
+  return {
+    rooms: (config.rooms ?? []).map((r) => {
+      const devices = all.filter((d) => d.room === r.id);
+      const expected = new Set([
+        ...(config.devices ?? [])
+          .filter((d) => d.room === r.id)
+          .map((d) => d.connector),
+        ...(r.hueRoom === undefined ? [] : ["hue"]),
+      ]);
+      return {
+        id: r.id,
+        name: r.name,
+        ...(r.floor === undefined ? {} : { floor: r.floor }),
+        devices,
+        noData: [...expected].filter(
+          (c) => c in DEVICES && !devices.some((d) => d.connector === c),
+        ),
+      };
+    }),
+    unplaced: all.filter((d) => !d.room || !ids.has(d.room)),
+  };
+}

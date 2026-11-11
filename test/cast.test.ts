@@ -895,6 +895,42 @@ describe("castStatus and castFree", () => {
     ]);
   });
 
+  test("castFree: with forms, a TV is left out and a group holding one becomes its other members", () => {
+    const s = home({
+      a: { form: "display" },
+      b: { form: "speaker" },
+      c: { form: "tv" },
+    });
+    const forms = ["speaker", "display"] as const;
+    expect(castFree(s, ["Everywhere"], { forms })).toEqual({
+      free: ["Kitchen", "Bedroom"],
+      skipped: [{ name: "Front room", why: "form" }],
+    });
+    // A group is skipped for its own reason, never for its form.
+    expect(
+      castFree(home({ g: spotifyOn }), ["Everywhere"], { forms }).skipped,
+    ).toEqual([{ name: "Everywhere", why: "busy", app: "Spotify" }]);
+    // A member the snapshot doesn't have may be a TV: the group becomes the members it knows.
+    const missing = home({ a: { form: "speaker" }, b: { form: "speaker" } });
+    delete missing.devices.c;
+    expect(castFree(missing, ["Everywhere"], { forms }).free).toEqual([
+      "Kitchen",
+      "Bedroom",
+    ]);
+    expect(
+      castFree(s, ["Front room", "Kitchen"], { forms: ["display"] }),
+    ).toEqual({
+      free: ["Kitchen"],
+      skipped: [{ name: "Front room", why: "form" }],
+    });
+    // A model this library doesn't know has no form: with forms given it is left out.
+    expect(
+      castFree(home(), ["Kitchen"], { forms: ["speaker"] }).skipped,
+    ).toEqual([{ name: "Kitchen", why: "form" }]);
+    // Without forms, nothing changes: the group stays whole.
+    expect(castFree(s, ["Everywhere"]).free).toEqual(["Everywhere"]);
+  });
+
   test("castFree: a group with a busy member becomes its free members, and says who was skipped", () => {
     const s = home({ b: spotifyOn, c: { standby: true } });
     expect(castFree(s, ["Everywhere", "Kitchen", "Hallway"])).toEqual({

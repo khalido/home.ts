@@ -325,10 +325,10 @@ export function castStatus(s: CastSnapshot): CastStatus[] {
   return castDevices(s).map(one);
 }
 
-/** A target `castFree` left out: `standby` is a TV that is off, which a clip may wake. */
+/** A target `castFree` left out: `standby` is a TV that is off, which a clip may wake; `form` is one whose form wasn't asked for. */
 export type CastSkipped = {
   name: string;
-  why: "busy" | "offline" | "standby" | "unknown";
+  why: "busy" | "offline" | "standby" | "unknown" | "form";
   app?: string;
 };
 
@@ -340,11 +340,21 @@ export type CastSkipped = {
  *   becomes its free members, named one by one (they then play out of step with each other).
  * - A device is never named beside a free group that holds it, nor two groups that share a member: the second becomes its
  *   members not yet covered.
+ * - With `forms` (`["speaker", "display"]` keeps an announcement off TVs), a device of another form, or of a model this
+ *   library doesn't know, is skipped with `why: "form"`, and a group holding one (or a member the snapshot doesn't have)
+ *   becomes its other free members. An empty list leaves every device out.
  */
 export function castFree(
   s: CastSnapshot,
   targets: string[],
+  options: { forms?: readonly CastForm[] } = {},
 ): { free: string[]; skipped: CastSkipped[] } {
+  /** A device of a form asked for. A group has no form of its own: its members decide. */
+  const wanted = (id: string) => {
+    const d = s.devices[id];
+    if (!options.forms || d?.kind === "group") return true;
+    return d?.form !== undefined && options.forms.includes(d.form);
+  };
   const status = new Map(castStatus(s).map((c) => [c.id, c]));
   const free = new Map<string, CastStatus>();
   const covered = new Set<string>(); // members of the groups in `free`
@@ -354,15 +364,17 @@ export function castFree(
   const skip = (c: CastStatus) =>
     skipped.set(c.id, {
       name: c.name,
-      why:
-        c.state === "offline"
+      why: !wanted(c.id)
+        ? "form"
+        : c.state === "offline"
           ? "offline"
           : c.standby && c.state !== "busy"
             ? "standby"
             : "busy",
       ...(c.app ? { app: c.app } : {}),
     });
-  const device = (c: CastStatus) => (ok(c) ? free.set(c.id, c) : skip(c));
+  const device = (c: CastStatus) =>
+    ok(c) && wanted(c.id) ? free.set(c.id, c) : skip(c);
   for (const target of targets) {
     const d = findCast(s.devices, target);
     const c = d && status.get(d.id);
@@ -376,6 +388,7 @@ export function castFree(
       else if (
         own !== "offline" &&
         up.every(ok) &&
+        (d.members ?? []).every(wanted) &&
         !members.some((m) => covered.has(m.id))
       ) {
         free.set(c.id, c);

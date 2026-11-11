@@ -56,6 +56,8 @@ for (const d of homeDevices(home.snapshot(), config)) {
 
 Below that is the connector's snapshot, exactly as the device sent it (`home.part("hue")?.state`). One connector alone: `castHomeDevices(home.part("cast"))`, and likewise `hueHomeDevices`, `daikinHomeDevices`, `enphaseHomeDevices`, `printersHomeDevices`, `spotifyHomeDevices`. The list is for reading; a write goes to the device's connector, with `d.id` where it takes one.
 
+For a map of the home, `byRoom(home.snapshot(), config)` gives `{ rooms, unplaced }`: each room of the config in order (`id`, `name`, `floor`, `devices`), and `noData`, the connectors the config places in that room that have nothing to list yet, so an unread room isn't drawn as an empty one. A connector that is down but has read before still lists its devices, `available: false`.
+
 ## Writes
 
 A write changes someone's house: make one only when a person asked for it. Writes hang off the integration, `home.integration(name)`, and each goes through the device's write lane: spaced, and a burst to one light or the AC merges so the last value lands.
@@ -104,11 +106,11 @@ import { castFree, castHomeDevices } from "@khalido/home/cast";
 const cast = home.integration("cast");
 const state = home.part("cast")?.state;
 if (cast && state) {
-  // Every speaker and display, not the TVs: an idle TV is free too, and would play it.
-  const targets = castHomeDevices(home.part("cast"))
-    .filter((d) => d.kind === "speaker" || d.kind === "display")
-    .map((d) => d.name);
-  const { free, skipped } = castFree(state, targets); // skipped: { name, why }
+  // Every device and group, but not the TVs: an idle TV is free too, and would play it. A group holding a TV becomes its other members.
+  const targets = castHomeDevices(home.part("cast")).map((d) => d.name);
+  const { free, skipped } = castFree(state, targets, {
+    forms: ["speaker", "display"],
+  }); // skipped: { name, why }
   const announce = () =>
     cast.announceAll(free, { url: clipUrl }, { volume: 0.3 });
   const speaker = home.integration("spotify");

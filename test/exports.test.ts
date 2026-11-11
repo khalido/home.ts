@@ -17,6 +17,7 @@ const PUBLIC: Record<string, string[]> = {
     "asOf",
     "bestWindow",
     "blockText",
+    "byRoom",
     "checkHome",
     "checkPlan",
     "createHome",

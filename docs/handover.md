@@ -37,8 +37,8 @@ In it: `homeDevices` and `DeviceRecord` (`src/devices.ts`, a function per device
 
 - `home.add(integration)` and `home.remove(name)`: built 2026-11-11, unreleased.
 - Hue writes by name: built (below).
-- `castFree` with a `forms` option, or the docs' filter (now shown): an idle TV is free, so "announce everywhere" plays on it.
-- For the home map: a `byRoom(homeDevices(snapshot, config))` helper with "no data" for a room whose connector is down; a documented `photos` field on a room; whether a walkthrough video is a source for `draw-home`.
+- `castFree`'s `forms` option, `byRoom(snapshot, config)` and `photos` on a room: built 2026-11-11, unreleased.
+- Not done: whether a walkthrough video is a source for `draw-home` (a skill change; try it on a real video first).
 - Still open: `spotifyText` says "playing" while `active` is false; the two cap gaps.
 - For the next release note to consumers: `bun add @khalido/home@latest --no-cache` resolved 0.1.2 minutes after 0.1.3 went live; the exact version worked.
 
