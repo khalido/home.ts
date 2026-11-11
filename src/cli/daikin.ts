@@ -9,7 +9,7 @@ import {
   setTarget,
 } from "../connectors/daikin/index.ts";
 import { findDaikins } from "../finders.ts";
-import { env, fail, usage, type Verbs } from "./context.ts";
+import { env, fail, type Options, usage, type Verbs } from "./context.ts";
 
 export const DAIKIN_USAGE = `usage: home daikin on | off | cool [°C] | heat [°C] | auto [°C] | dry | fan  (cool ${DEFAULT_TARGET_C.cool} and heat ${DEFAULT_TARGET_C.heat} when no °C is given)`;
 
@@ -27,22 +27,26 @@ async function unit() {
   return daikinClient({ host, fetch });
 }
 
-/** What a write left, in a line: the unit as it then reported, or that it has not reported the change yet. */
-const said = ({ state, confirmed }: DaikinApplied) =>
+/** What a write left, in a line: the unit as it then reported, that it has not reported the change yet, or what a dry run would send. */
+const said = ({ state, confirmed, wouldSend }: DaikinApplied) =>
   console.log(
-    confirmed
-      ? acText(state)
-      : `sent; the unit has not reported it yet (${acText(state)})`,
+    wouldSend
+      ? `dry run, nothing sent: would set ${JSON.stringify(wouldSend.sets)} (now ${acText(state)})`
+      : confirmed
+        ? acText(state)
+        : `sent; the unit has not reported it yet (${acText(state)})`,
   );
 
 const power =
   (on: boolean) =>
-  async ([extra]: string[]) =>
-    extra ? usage(DAIKIN_USAGE) : said(await (await unit()).power(on));
+  async ([extra]: string[], o: Options) =>
+    extra
+      ? usage(DAIKIN_USAGE)
+      : said(await (await unit()).power(on, { dryRun: !!o.dryRun }));
 
 const mode =
   (m: Mode) =>
-  async ([value, extra]: string[]) => {
+  async ([value, extra]: string[], o: Options) => {
     if (extra || (value !== undefined && !/^\d+(\.\d+)?$/.test(value)))
       usage(DAIKIN_USAGE);
     const c = value === undefined ? undefined : Number(value);
@@ -53,7 +57,7 @@ const mode =
       } catch (e) {
         usage(`${(e as Error).message}; ${DAIKIN_USAGE}`);
       }
-    said(await (await unit()).mode(m, c));
+    said(await (await unit()).mode(m, c, { dryRun: !!o.dryRun }));
   };
 
 export const daikinVerbs: Verbs = {

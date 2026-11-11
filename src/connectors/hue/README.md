@@ -76,6 +76,10 @@ KO's BSB002 at his request, Bun 1.4.4, every light put back as it was.
 - **A group's brightness is the bridge's own average:** after a room write to 40%, one light read 46% and the group 42%. Passed through as reported.
 - Untried: zones, a white temperature on a room that mixes ranges, an event arriving on the stream after a write, effects and gradients (not built).
 
+## Dry run (2026-11-12)
+
+`light`, `room`, `scene` and `allOff` take `{ dryRun: true }` last: the read, every check before sending, and `wouldSend` (`{ method, path, body }`); nothing sent. On KO's bridge (Bun 1.4.4): `home room "Living room" 40 2700k --dry-run`, `home lights off --dry-run` and `home scene Relax --dry-run` (which listed the three rooms with a Relax) printed their requests and changed no light.
+
 ## Sources
 
 What this folder learned from, and on what terms. No code was copied.

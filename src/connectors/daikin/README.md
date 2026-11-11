@@ -75,6 +75,10 @@ Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, 
 
 `home daikin` on 0.1.2 (Bun 1.4.4; chota-bot's session): "connected · off · dry · room 26 °C · outdoor unit 28 °C". `home discover` found the unit by UDP. No write was sent.
 
+## Dry run (2026-11-12)
+
+`power` and `mode` take `{ dryRun: true }`: the checks, one read, and `wouldSend` with what it would set; nothing sent. `home daikin cool --dry-run` and `heat --dry-run` on KO's unit (Bun 1.4.4) read it and printed 25 and 27; the unit stayed off.
+
 ## Sources
 
 Both Daikin protocol sources are GPL-3.0, so they are read for facts only (endpoints, field paths, value maps) and no code is copied; that keeps this package MIT.

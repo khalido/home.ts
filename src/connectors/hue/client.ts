@@ -42,8 +42,20 @@ export type LightChange = {
   transitionMs?: number;
 };
 
-/** What a write left: the light or group once the bridge reported the change (`confirmed`), or as it stood when `CONFIRM_MS` ran out. */
-export type HueApplied<V> = { state: V; confirmed: boolean };
+/**
+ * What a write left: the light or group once the bridge reported the change (`confirmed`), or as it stood when
+ * `CONFIRM_MS` ran out. With `{ dryRun: true }` nothing is sent: `wouldSend` is the request the write would make, `state`
+ * is how things stand now, and `confirmed` is false. Check `wouldSend` first.
+ */
+export type HueApplied<V> = {
+  state: V;
+  confirmed: boolean;
+  wouldSend?: HueRequest;
+};
+/** One CLIP v2 write: `PUT /clip/v2/resource/<path>` with this body. */
+export type HueRequest = { method: "PUT"; path: string; body: object };
+/** `dryRun`: every check a write makes before sending (the name, the range, a lost light) and nothing sent. For testing a bot with people home. */
+export type HueWriteOptions = { dryRun?: boolean };
 /** How long `light`, `room` and `scene` wait for the bridge to report what was asked, reading every half second. */
 export const CONFIRM_MS = 3000;
 
@@ -266,12 +278,34 @@ export function hueClient(options: HueOptions) {
       );
     };
 
+  /** Send, or with `dryRun` say what would be sent and how `now` stands. */
+  async function send<V>(
+    options: HueWriteOptions | undefined,
+    kind: Kind,
+    id: string,
+    body: object,
+    now: V | undefined,
+    after: () => Promise<HueApplied<V>>,
+  ): Promise<HueApplied<V>> {
+    if (options?.dryRun) {
+      if (now === undefined)
+        throw new HueError("its room or zone is not on the bridge");
+      return {
+        state: now,
+        confirmed: false,
+        wouldSend: { method: "PUT", path: `${kind}/${id}`, body },
+      };
+    }
+    await put(kind, id, body);
+    return after();
+  }
   return {
     ...base,
     /** Change one light, by name or id. Only when a person asks. Resolves with the light as the bridge then reported it. */
     async light(
       target: string,
       change: LightChange,
+      options?: HueWriteOptions,
     ): Promise<HueApplied<LightView>> {
       const l = pick(lights(await read()), target, "light");
       // The bridge takes a write to a light it has lost and answers "may not have effect": say so before sending.
@@ -281,23 +315,32 @@ export function hueClient(options: HueOptions) {
           { code: "offline" },
         );
       const body = bodyFor(change, l.name ?? l.id, [l], l.on);
-      await put("light", l.id, body);
-      return confirm(
-        async () => lights(await read()).find((x) => x.id === l.id),
-        shows(body, true),
+      return send(options, "light", l.id, body, l, () =>
+        confirm(
+          async () => lights(await read()).find((x) => x.id === l.id),
+          shows(body, true),
+        ),
       );
     },
     /**
      * Every light in the home off, with one write to the bridge's home group. Only when a person asks. Resolves with
      * every light as the bridge then reported it, `confirmed` once none it can reach is on.
      */
-    async allOff(): Promise<HueApplied<LightView[]>> {
-      const id = homeGroupedLightId(await read());
+    async allOff(options?: HueWriteOptions): Promise<HueApplied<LightView[]>> {
+      const s = await read();
+      const id = homeGroupedLightId(s);
       if (!id) throw invalid("the bridge has no home group");
-      await put("grouped_light", id, { on: { on: false } });
-      return confirm(
-        async () => lights(await read()),
-        (all) => all.every((l) => !l.on || l.reachable === false),
+      return send(
+        options,
+        "grouped_light",
+        id,
+        { on: { on: false } },
+        lights(s),
+        () =>
+          confirm(
+            async () => lights(await read()),
+            (all) => all.every((l) => !l.on || l.reachable === false),
+          ),
       );
     },
     /**
@@ -308,6 +351,7 @@ export function hueClient(options: HueOptions) {
     async room(
       target: string,
       change: LightChange,
+      options?: HueWriteOptions,
     ): Promise<HueApplied<GroupView>> {
       const s = await read();
       const g = pick(groups(s), target, "room or zone");
@@ -315,17 +359,22 @@ export function hueClient(options: HueOptions) {
       if (!g.groupedLightId) throw invalid(`${name} has no lights`);
       const members = lights(s).filter((l) => g.lightIds.includes(l.id));
       const body = bodyFor(change, name, members, undefined);
-      await put("grouped_light", g.groupedLightId, body);
-      return confirm(
-        async () => groups(await read()).find((x) => x.id === g.id),
-        shows(body, false),
+      return send(options, "grouped_light", g.groupedLightId, body, g, () =>
+        confirm(
+          async () => groups(await read()).find((x) => x.id === g.id),
+          shows(body, false),
+        ),
       );
     },
     /**
      * Recall a scene by name or id. A name several rooms use ("Relax") needs `room`. Only when a person asks. Resolves
      * with the scene's room or zone, `confirmed` once the bridge reports the scene active.
      */
-    async scene(target: string, room?: string): Promise<HueApplied<GroupView>> {
+    async scene(
+      target: string,
+      room?: string,
+      options?: HueWriteOptions,
+    ): Promise<HueApplied<GroupView>> {
       const s = await read();
       const all = groups(s);
       const within =
@@ -338,15 +387,22 @@ export function hueClient(options: HueOptions) {
         "scene",
         (x) => `${x.name ?? x.id} in ${roomName(x.groupId)}`,
       );
-      await put("scene", sc.id, { recall: { action: "active" } });
       let active = false;
-      return confirm(
-        async () => {
-          const now = await read();
-          active = scenes(now).find((x) => x.id === sc.id)?.active === true;
-          return groups(now).find((x) => x.id === sc.groupId);
-        },
-        () => active,
+      return send(
+        options,
+        "scene",
+        sc.id,
+        { recall: { action: "active" } },
+        all.find((g) => g.id === sc.groupId),
+        () =>
+          confirm(
+            async () => {
+              const now = await read();
+              active = scenes(now).find((x) => x.id === sc.id)?.active === true;
+              return groups(now).find((x) => x.id === sc.groupId);
+            },
+            () => active,
+          ),
       );
     },
   };

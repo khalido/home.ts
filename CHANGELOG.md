@@ -26,6 +26,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **Dry run on Hue's and the Daikin's writes**: `{ dryRun: true }` as the last argument of `light`, `room`, `scene`, `allOff`, `power` and `mode`. Every check runs and nothing is sent; the result's `wouldSend` is the request it would make (`HueRequest`, `DaikinRequest` with `sets`), `state` how things stand, `confirmed: false`. `home … --dry-run` on the same commands.
 - **hue: `client.allOff()`**: every light in the home off with one write, resolving `{ state, confirmed }` with every light as the bridge then reported it. `home lights off` uses it and now prints the result.
 - **`byRoom(snapshot, config)`** from `@khalido/home`, for a map of the home: each room of the config with its devices, `noData` for a connector the config places there that has nothing to list, and `unplaced` for the rest.
 - **config: `photos` on a room**, a list of paths. The library carries them and reads nothing.

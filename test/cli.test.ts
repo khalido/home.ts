@@ -22,6 +22,19 @@ const home = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("home output contract", () => {
+  test("--dry-run is refused on a command whose writes don't read it, before anything runs", () => {
+    for (const args of [
+      ["cast", "volume", "Kitchen", "30"],
+      ["spotify", "pause"],
+      ["discover", "--write", "x.jsonc"],
+      ["pair"],
+    ]) {
+      const r = home([...args, "--dry-run"]);
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(/dryRun|dry run/i);
+    }
+  });
+
   describe("home <connector> --config needs only that connector", () => {
     const config = join(mkdtempSync(join(tmpdir(), "home-")), "home.jsonc");
     writeFileSync(

@@ -287,6 +287,29 @@ describe("power and mode", () => {
     expect(u.sent).toEqual([]);
   });
 
+  test("dryRun sends nothing: the request and what it sets, the unit as it reads now, and the same checks", async () => {
+    const u = fakeUnit();
+    const before = (await u.client.read()).mode;
+    const dry = await u.client.mode("heat", undefined, { dryRun: true });
+    expect(dry).toMatchObject({
+      confirmed: false,
+      state: { mode: before },
+      wouldSend: {
+        method: "POST",
+        path: "/dsiot/multireq",
+        sets: { on: true, mode: "heat", targetC: 27 },
+      },
+    });
+    expect(JSON.stringify(dry.wouldSend!.body)).toContain('"pv":"36"'); // 27 °C × 2, in hex
+    expect(
+      (await u.client.power(false, { dryRun: true })).wouldSend?.sets,
+    ).toEqual({ on: false });
+    await expect(u.client.mode("cool", 12, { dryRun: true })).rejects.toThrow(
+      "18–32",
+    );
+    expect(u.sent).toEqual([]);
+  });
+
   test("power resolves with what the unit then reported", async () => {
     const u = fakeUnit();
     expect(await u.client.power(true)).toMatchObject({

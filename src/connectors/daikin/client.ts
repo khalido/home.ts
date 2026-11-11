@@ -90,8 +90,25 @@ export const DEFAULT_TARGET_C = {
   heat: 27,
 } as const satisfies Partial<Record<Mode, number>>;
 
-/** What a write left: the state once the unit reported the change (`confirmed`), or as it stood when `CONFIRM_MS` ran out without it. */
-export type DaikinApplied = { state: DaikinState; confirmed: boolean };
+/**
+ * What a write left: the state once the unit reported the change (`confirmed`), or as it stood when `CONFIRM_MS` ran out
+ * without it. With `{ dryRun: true }` nothing is sent: `wouldSend` is the request and what it sets, `state` the unit as it
+ * reads now, and `confirmed` is false. Check `wouldSend` first.
+ */
+export type DaikinApplied = {
+  state: DaikinState;
+  confirmed: boolean;
+  wouldSend?: DaikinRequest;
+};
+/** One write: `POST /dsiot/multireq` with `body`; `sets` is what it changes, in this library's words. */
+export type DaikinRequest = {
+  method: "POST";
+  path: "/dsiot/multireq";
+  body: WriteRequest;
+  sets: { on?: boolean; mode?: Mode; targetC?: number };
+};
+/** `dryRun`: every check a write makes (the mode, the setpoint's range), one read for the state, and nothing sent. */
+export type DaikinWriteOptions = { dryRun?: boolean };
 /** How long `power` and `mode` wait for the unit to report what was asked, reading once a second. */
 export const CONFIRM_MS = 5000;
 
@@ -310,8 +327,21 @@ export function daikinClient(options: {
   /** Send `request`, then read once a second until the unit reports `asked` or `CONFIRM_MS` passes. Rejects if the write is refused, or if no read after it succeeds. */
   async function apply(
     request: WriteRequest,
+    sets: DaikinRequest["sets"],
     asked: (s: DaikinState) => boolean,
+    options: DaikinWriteOptions | undefined,
   ): Promise<DaikinApplied> {
+    if (options?.dryRun)
+      return {
+        state: await client.read(),
+        confirmed: false,
+        wouldSend: {
+          method: "POST",
+          path: "/dsiot/multireq",
+          body: request,
+          sets,
+        },
+      };
     await client.write(request);
     const until = clock.now() + CONFIRM_MS;
     let state: DaikinState | undefined;
@@ -333,24 +363,33 @@ export function daikinClient(options: {
   return {
     ...client,
     /** Turn the unit on or off, as it was last left. Only when a person asks. Resolves with what the unit then reported. */
-    power: (on: boolean): Promise<DaikinApplied> =>
-      apply(setPower(on), (s) => s.on === on),
+    power: (
+      on: boolean,
+      options?: DaikinWriteOptions,
+    ): Promise<DaikinApplied> =>
+      apply(setPower(on), { on }, (s) => s.on === on, options),
     /**
      * Select a mode, turn the unit on and set its setpoint, in one request: `targetC`, else `DEFAULT_TARGET_C` (cool 25,
      * heat 27), else (auto) the unit's own. Dry and fan take none, and a `targetC` for them throws before anything is
      * sent, as one off the unit's range does. Only when a person asks. Resolves with what the unit then reported.
      */
-    async mode(mode: Mode, targetC?: number): Promise<DaikinApplied> {
+    async mode(
+      mode: Mode,
+      targetC?: number,
+      options?: DaikinWriteOptions,
+    ): Promise<DaikinApplied> {
       const c =
         targetC ?? (DEFAULT_TARGET_C as Partial<Record<Mode, number>>)[mode];
       return apply(
         c === undefined
           ? setMode(mode)
           : mergeWrites(setMode(mode), setTarget(c, mode)),
+        { on: true, mode, ...(c === undefined ? {} : { targetC: c }) },
         (s) =>
           s.on === true &&
           s.mode === mode &&
           (c === undefined || s.targetC === c),
+        options,
       );
     },
   };

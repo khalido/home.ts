@@ -6,6 +6,7 @@ import {
   bunPinnedFetch,
   type GroupView,
   type HueApplied,
+  type HueRequest,
   HueError,
   hue,
   hueClient,
@@ -51,12 +52,20 @@ async function client() {
 }
 
 /** What a write left, in a line: the light or room as the bridge then reported it, or that it has not reported the change yet. */
-const said = ({ state, confirmed }: HueApplied<LightView | GroupView>) =>
+const said = ({
+  state,
+  confirmed,
+  wouldSend,
+}: HueApplied<LightView | GroupView>) =>
   console.log(
-    confirmed
-      ? hueText(state)
-      : `sent; the bridge has not reported it yet (${hueText(state)})`,
+    wouldSend
+      ? dryLine(wouldSend, hueText(state))
+      : confirmed
+        ? hueText(state)
+        : `sent; the bridge has not reported it yet (${hueText(state)})`,
   );
+const dryLine = (r: HueRequest, now: string) =>
+  `dry run, nothing sent: would PUT ${r.path} ${JSON.stringify(r.body)} (now ${now})`;
 
 export const CHANGE_USAGE = "[on|off] [<1-100>] [<kelvin>k] [<hex colour>]";
 /** The words after a name as a change: `on`, `off`, `40` (brightness), `2700k` (white), `ff8800` (colour), in any order. */
@@ -90,38 +99,57 @@ const orUsage = (e: unknown): never => {
 const PAIR_WAIT_MS = 60_000;
 
 export const hueVerbs: Verbs = {
-  async lights([word]) {
+  async lights([word], o) {
     if (word !== "off") usage("usage: home lights off");
-    const { state, confirmed } = await (await client()).allOff().catch(orUsage);
+    const { state, confirmed, wouldSend } = await (
+      await client()
+    )
+      .allOff({ dryRun: !!o.dryRun })
+      .catch(orUsage);
     const on = state.filter((l) => l.on && l.reachable !== false).length;
     console.log(
-      confirmed
-        ? `${state.length} lights off`
-        : `sent; the bridge still reports ${on} of ${state.length} on`,
+      wouldSend
+        ? dryLine(wouldSend, `${on} of ${state.length} on`)
+        : confirmed
+          ? `${state.length} lights off`
+          : `sent; the bridge still reports ${on} of ${state.length} on`,
     );
   },
 
-  async light([name, ...words]) {
+  async light([name, ...words], o) {
     const line = `usage: home light <name> ${CHANGE_USAGE}`;
     if (!name) usage(line);
     const change = changeFrom(words, line);
-    said(await (await client()).light(name!, change).catch(orUsage));
+    said(
+      await (
+        await client()
+      )
+        .light(name!, change, { dryRun: !!o.dryRun })
+        .catch(orUsage),
+    );
   },
 
-  async room([name, ...words]) {
+  async room([name, ...words], o) {
     const line = `usage: home room <name> ${CHANGE_USAGE}`;
     if (!name) usage(line);
     const change = changeFrom(words, line);
-    said(await (await client()).room(name!, change).catch(orUsage));
+    said(
+      await (
+        await client()
+      )
+        .room(name!, change, { dryRun: !!o.dryRun })
+        .catch(orUsage),
+    );
   },
 
-  async scene(words) {
+  async scene(words, o) {
     const line = "usage: home scene <name> [in <room>]";
     if (!words.length) usage(line);
     const c = await client();
     // "Relax in Bedroom" is the scene Relax in that room, unless a scene is named all of it.
     const at = words.lastIndexOf("in");
-    const whole = () => c.scene(words.join(" "));
+    const dry = { dryRun: !!o.dryRun };
+    const whole = () => c.scene(words.join(" "), undefined, dry);
     said(
       await (
         at > 0 && at < words.length - 1
@@ -129,6 +157,7 @@ export const hueVerbs: Verbs = {
               c.scene(
                 words.slice(0, at).join(" "),
                 words.slice(at + 1).join(" "),
+                dry,
               ),
             )
           : whole()
@@ -136,7 +165,8 @@ export const hueVerbs: Verbs = {
     );
   },
 
-  async pair() {
+  async pair(_, o) {
+    if (o.dryRun) usage("home pair has no dry run");
     const b = await bridge();
     console.error(`Hue bridge ${b.id.slice(-6).toUpperCase()} at ${b.host}.`);
     // The countdown redraws one line on a terminal; piped, it is one line said once.

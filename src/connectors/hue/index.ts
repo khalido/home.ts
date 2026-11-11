@@ -39,6 +39,8 @@ export {
   bunPinnedFetch,
   CONFIRM_MS,
   type HueApplied,
+  type HueRequest,
+  type HueWriteOptions,
   type LightChange,
   type HueClient,
   HueError,

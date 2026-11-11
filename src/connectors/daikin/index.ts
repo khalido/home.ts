@@ -19,6 +19,8 @@ import {
 export {
   CONFIRM_MS,
   type DaikinApplied,
+  type DaikinRequest,
+  type DaikinWriteOptions,
   DaikinError,
   type DaikinState,
   DEFAULT_TARGET_C,

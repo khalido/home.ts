@@ -33,6 +33,12 @@ const HUE_HELP: Record<string, string> = {
 };
 
 /** Each connector's verbs beyond its status, the usage a wrong one prints, and any options of its own. */
+/** Only where a write reads it: on any other command cac refuses it, so `--dry-run` never lets a real write through. */
+const DRY_RUN: [string, string] = [
+  "--dry-run",
+  "check the write and print what would be sent; send nothing",
+];
+
 const VERBS: Record<
   string,
   {
@@ -47,7 +53,7 @@ const VERBS: Record<
       .map((h) => h.split(":")[0])
       .join(" | ")}`,
   },
-  daikin: { verbs: daikinVerbs, usage: DAIKIN_USAGE },
+  daikin: { verbs: daikinVerbs, usage: DAIKIN_USAGE, options: [DRY_RUN] },
   enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
   cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
   up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
@@ -132,10 +138,11 @@ for (const m of MANIFESTS) {
   );
 }
 // Hue's verbs also stand alone, as typed before the CLI had `home hue`: `home lights off`, `home room …`, `home scene …`, `home pair`.
-for (const [verb, run] of Object.entries(hueVerbs))
-  cli
-    .command(`${verb} [...args]`, `Hue: ${HUE_HELP[verb]}`)
-    .action((args: string[], o: Options) => run(args, o));
+for (const [verb, run] of Object.entries(hueVerbs)) {
+  const c = cli.command(`${verb} [...args]`, `Hue: ${HUE_HELP[verb]}`);
+  if (verb !== "pair") c.option(...DRY_RUN);
+  c.action((args: string[], o: Options) => run(args, o));
+}
 
 cli.help();
 

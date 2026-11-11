@@ -451,6 +451,41 @@ describe("light, room and scene by name", () => {
     ]);
   });
 
+  test("dryRun sends nothing: the request it would make, how things stand, and every check", async () => {
+    const b = fakeBridge();
+    const dry = { dryRun: true };
+    expect(
+      await b.c.light("Floor lamp", { brightness: 30 }, dry),
+    ).toMatchObject({
+      confirmed: false,
+      state: { id: "light-1", brightness: 60 },
+      wouldSend: {
+        method: "PUT",
+        path: "light/light-1",
+        body: { dimming: { brightness: 30 } },
+      },
+    });
+    expect((await b.c.room("Living", { on: false }, dry)).wouldSend).toEqual({
+      method: "PUT",
+      path: "grouped_light/gl-living",
+      body: { on: { on: false } },
+    });
+    expect((await b.c.scene("Relax", undefined, dry)).wouldSend?.path).toBe(
+      "scene/scene-relax",
+    );
+    expect((await b.c.allOff(dry)).wouldSend?.path).toBe(
+      "grouped_light/gl-home",
+    );
+    await expect(b.c.light("Nope", { on: true }, dry)).rejects.toThrow(
+      "no light",
+    );
+    b.lose("light-2");
+    await expect(b.c.light("Shelf", { on: true }, dry)).rejects.toMatchObject({
+      code: "offline",
+    });
+    expect(b.puts).toEqual([]);
+  });
+
   test("allOff is one write to the home group, confirmed once no light the bridge reaches is on", async () => {
     const b = fakeBridge();
     const done = await b.c.allOff();
