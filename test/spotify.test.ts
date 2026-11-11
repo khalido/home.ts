@@ -984,10 +984,18 @@ describe("the first play's volume (Soloist issue #23)", () => {
     sock.push({ type: "volume_changed", volume: 60 });
     await tick();
     expect(h.last().anomaly).toBe(
-      "started at volume 100, above maxVolume 60; lowered it (Soloist issue #23)",
+      "started at volume 100, above maxVolume 60; lowered it to 60 (Soloist issue #23)",
     );
-    sock.push({ type: "volume_changed", volume: 95 }); // someone turned it up inside the window: theirs to keep
+    // Back above the cap inside the window (Soloist putting its level back, live 2026-11-11, or a person): kept, and said.
+    sock.push({ type: "volume_changed", volume: 95 });
     expect(sock.commands()).toEqual(["set_volume"]);
+    expect(h.last().anomaly).toBe(
+      "started at volume 100, above maxVolume 60; lowered it to 60 (Soloist issue #23); it is back at 95",
+    );
+    sock.push({ type: "volume_changed", volume: 80 });
+    expect(h.last().anomaly).toEndWith("(Soloist issue #23); it is back at 80");
+    sock.push({ type: "volume_changed", volume: 60 });
+    expect(h.last().anomaly).toEndWith("lowered it to 60 (Soloist issue #23)");
     sock.push({ type: "playback_changed", status: "idle" });
     expect(h.last().anomaly).toBeUndefined();
     await h.stop();

@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+
+- **spotify:** after the first-play lowering (Soloist issue #23), `anomaly` no longer says only "lowered it" when the volume is back above `maxVolume`: it adds `it is back at <n>`. Soloist puts its own level back about 90 ms after `playing` when it goes active (live, 2026-11-11), and the cap leaves that level alone.
+
 ## [0.2.0] - 2026-11-12
 
 ### Breaking

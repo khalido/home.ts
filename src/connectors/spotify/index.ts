@@ -390,6 +390,17 @@ export function spotify(
    * one raised before it is reported can't be told from the start's own jump, so it is lowered too.
    */
   const applyCap = () => {
+    // Lowered, then above the cap again in the same window: Soloist putting its own level back (seen live) or a person.
+    // The note says where it is now, not only that it was lowered.
+    if (capped && capNote && cap !== undefined && state.volume !== undefined) {
+      const base = capNote.replace(/; it is back at \d+$/, "");
+      const note =
+        state.volume > cap + VOLUME_SLACK
+          ? `${base}; it is back at ${state.volume}`
+          : base;
+      if (note !== capNote) ((capNote = note), publish());
+      return;
+    }
     if (
       cap === undefined ||
       capped ||
@@ -410,7 +421,7 @@ export function spotify(
         if (confirmed) {
           capped = true;
           if (state.status === "idle") return;
-          capNote = `started at volume ${from}, above maxVolume ${cap}; lowered it (Soloist issue #23)`;
+          capNote = `started at volume ${from}, above maxVolume ${cap}; lowered it to ${cap} (Soloist issue #23)`;
           note = undefined;
           return publish();
         }
