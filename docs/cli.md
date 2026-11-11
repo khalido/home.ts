@@ -3,7 +3,7 @@
 ```sh
 home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, printers, spotify, up, weather
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
-home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), and why when it isn't available
+home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), why when it isn't available, and for a Spotify speaker whose music is elsewhere, the Cast device playing it
 home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
 home lights off               # one write to the whole-home group
 home light <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]  # one light: `home light "Desk lamp" 40 2700k`, `home light Shelf ff8800`

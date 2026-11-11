@@ -13,7 +13,12 @@ import {
 } from "../connectors/weather/index.ts";
 import { ftpFetch } from "../connectors/weather/ftp.ts";
 import { HomeConfig, loadHome } from "../config.ts";
-import { DEVICES, type HomeDevice, homeDevices } from "../devices.ts";
+import {
+  DEVICES,
+  type HomeDevice,
+  homeDevices,
+  spotifyElsewhere,
+} from "../devices.ts";
 import { energyNow, gridText } from "../energy.ts";
 import { FINDERS } from "../finders.ts";
 import { type Integration, type Part, type Status, settle } from "../home.ts";
@@ -258,13 +263,17 @@ export async function devices(o: Options): Promise<void> {
           .join(" · "),
       );
   if (o.json) return printJson(list);
-  for (const d of list) console.log(deviceLine(d));
+  // Soloist doesn't say where its music went; a Cast device playing that track does.
+  const on = spotifyElsewhere(parts);
+  for (const d of list)
+    console.log(deviceLine(d, d.connector === "spotify" ? on : []));
 }
 
-/** A device's line: "connector  text · in room · not available: reason". */
-export const deviceLine = (d: HomeDevice): string =>
+/** A device's line: "connector  text · on where · in room · not available: reason". `on`: the devices its music is playing on. */
+export const deviceLine = (d: HomeDevice, on: string[] = []): string =>
   [
     `${d.connector.padEnd(9)}${d.text}`,
+    on.length ? `on ${on.join(", ")}` : "",
     d.room ? `in ${d.room}` : "",
     d.available === false ? `not available: ${d.reason}` : "",
   ]
