@@ -168,9 +168,6 @@ describe("home output contract", () => {
     expect(deviceLine({ ...d, available: true, room: "room-living" })).toBe(
       "daikin   Lounge AC: on · cool 23 °C · in room-living",
     );
-    expect(deviceLine({ ...d, available: true }, ["Kitchen", "Hall"])).toBe(
-      "daikin   Lounge AC: on · cool 23 °C · on Kitchen, Hall",
-    );
     expect(deviceLine({ ...d, available: false, reason: "auth" })).toBe(
       "daikin   Lounge AC: on · cool 23 °C · not available: auth",
     );

@@ -369,9 +369,14 @@ describe("spotifyElsewhere", () => {
     track: { uri: "spotify:track:x", name: "Song", artists: [] },
   };
   test("names the Cast device playing that track in Spotify", () => {
-    expect(spotifyElsewhere({ ...snapshot, spotify: ok(away) })).toEqual([
-      "Front room speaker",
-    ]);
+    const there = { ...snapshot, spotify: ok(away) };
+    expect(spotifyElsewhere(there)).toEqual(["Front room speaker"]);
+    expect(
+      homeDevices(there).find((d) => d.connector === "spotify"),
+    ).toMatchObject({
+      state: "elsewhere",
+      text: 'Chota: silent · "Song" is playing on Front room speaker',
+    });
   });
   test("a group playing it is named, not its members", () => {
     const playing = { app: "Spotify", playerState: "PLAYING", title: "Song" };

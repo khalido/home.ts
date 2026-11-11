@@ -21,6 +21,7 @@ import {
   type SpotifyHomeDevice,
   type SpotifyState,
   spotifyHomeDevices,
+  spotifyText,
 } from "./connectors/spotify/index.ts";
 import type { HomeConfig } from "./config.ts";
 import { IDENTITY, sameId } from "./discover.ts";
@@ -62,9 +63,17 @@ export function homeDevices(
   snapshot: Record<string, Part | undefined>,
   config?: Pick<HomeConfig, "devices" | "rooms">,
 ): HomeDevice[] {
-  const all = Object.entries(DEVICES).flatMap(([name, devices]): HomeDevice[] =>
-    devices(snapshot[name] as never),
-  );
+  // Soloist doesn't say where its music went; a Cast device playing that track does, so the speaker's line names it.
+  const on = spotifyElsewhere(snapshot);
+  const all = Object.entries(DEVICES)
+    .flatMap(([name, devices]): HomeDevice[] =>
+      devices(snapshot[name] as never),
+    )
+    .map((d) =>
+      d.connector === "spotify" && on.length
+        ? { ...d, text: spotifyText(d.detail, on) }
+        : d,
+    );
   if (!config) return all;
   const entries = config.devices ?? [];
   const hueRooms = new Map<string, string>(); // a Hue group's or light's id → the config room showing it
