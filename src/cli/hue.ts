@@ -7,7 +7,6 @@ import {
   type GroupView,
   type HueApplied,
   HueError,
-  homeGroupedLightId,
   hue,
   hueClient,
   hueText,
@@ -15,7 +14,6 @@ import {
   type LightView,
   pairWhenPressed,
 } from "../connectors/hue/index.ts";
-import { snapshotFrom } from "../connectors/hue/state.ts";
 import { FINDERS } from "../finders.ts";
 import { env, fail, usage, type Verbs } from "./context.ts";
 
@@ -92,13 +90,15 @@ const orUsage = (e: unknown): never => {
 const PAIR_WAIT_MS = 60_000;
 
 export const hueVerbs: Verbs = {
-  async lights([state]) {
-    if (state !== "off") usage("usage: home lights off");
-    const c = await client();
-    const id =
-      homeGroupedLightId(snapshotFrom(await c.get(), "")) ??
-      fail("the bridge has no home group");
-    await c.put("grouped_light", id, { on: { on: false } });
+  async lights([word]) {
+    if (word !== "off") usage("usage: home lights off");
+    const { state, confirmed } = await (await client()).allOff().catch(orUsage);
+    const on = state.filter((l) => l.on && l.reachable !== false).length;
+    console.log(
+      confirmed
+        ? `${state.length} lights off`
+        : `sent; the bridge still reports ${on} of ${state.length} on`,
+    );
   },
 
   async light([name, ...words]) {

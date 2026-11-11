@@ -6,6 +6,7 @@ import {
   type CastDevice,
   castForm,
   castFree,
+  castFreeSpeakers,
   castStatus,
   type CastConnect,
   type CastSnapshot,
@@ -929,6 +930,33 @@ describe("castStatus and castFree", () => {
     ).toEqual([{ name: "Kitchen", why: "form" }]);
     // Without forms, nothing changes: the group stays whole.
     expect(castFree(s, ["Everywhere"]).free).toEqual(["Everywhere"]);
+  });
+
+  test("castFreeSpeakers: every free speaker and display in one call, a whole group where it can, never a TV", () => {
+    const all = { a: { form: "display" }, b: { form: "speaker" } } as const;
+    expect(castFreeSpeakers(home({ ...all, c: { form: "speaker" } }))).toEqual({
+      free: ["Everywhere"],
+      skipped: [],
+    });
+    expect(castFreeSpeakers(home({ ...all, c: { form: "tv" } }))).toEqual({
+      free: ["Bedroom", "Kitchen"],
+      skipped: [{ name: "Front room", why: "form" }],
+    });
+    expect(
+      castFreeSpeakers(
+        home({
+          ...all,
+          b: { form: "speaker", ...spotifyOn },
+          c: { form: "tv" },
+        }),
+      ),
+    ).toEqual({
+      free: ["Kitchen"],
+      skipped: [
+        { name: "Bedroom", why: "busy", app: "Spotify" },
+        { name: "Front room", why: "form" },
+      ],
+    });
   });
 
   test("castFree: a group with a busy member becomes its free members, and says who was skipped", () => {

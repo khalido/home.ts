@@ -5,7 +5,7 @@ home <connector> [--json]     # one connector's lines: amber, cast, daikin, enph
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
 home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), and why when it isn't available
 home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
-home lights off               # one write to the whole-home group
+home lights off               # one write to the whole-home group; prints how many lights are off, or how many the bridge still reports on
 home light <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]  # one light: `home light "Desk lamp" 40 2700k`, `home light Shelf ff8800`
 home room <name> [on|off] [<1-100>] [<kelvin>k] [<hex colour>]   # every light in a room or zone, one write
 home scene <name> [in <room>]  # a scene; name the room when several have one by that name

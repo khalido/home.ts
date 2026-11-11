@@ -26,8 +26,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **hue: `client.allOff()`**: every light in the home off with one write, resolving `{ state, confirmed }` with every light as the bridge then reported it. `home lights off` uses it and now prints the result.
 - **`byRoom(snapshot, config)`** from `@khalido/home`, for a map of the home: each room of the config with its devices, `noData` for a connector the config places there that has nothing to list, and `unplaced` for the rest.
 - **config: `photos` on a room**, a list of paths. The library carries them and reads nothing.
+- **cast: `castFreeSpeakers(state)`**: every free speaker and display in one call, a whole group where all of it is free, never a TV; `free` goes straight to `announceAll`.
 - **cast: `castFree(state, targets, { forms })`**: with `forms: ["speaker", "display"]` a TV is left out, and a group holding one becomes its other free members.
 - **`home.add(integration)` and `home.remove(name)`** on the home `createHome` returns: add one while the rest keep running (a bridge paired just now), replace one by name (the old run has ended before the new one starts; how an `unavailable` part comes back after a re-key), or stop one and drop its part. `start` now also waits for those added.
 - **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. `homeDevices` and `home devices` put it in the speaker's line (`silent · "Song" is playing on Front room speaker`), and `spotifyText(state, on)` takes it. Tested on built snapshots only.

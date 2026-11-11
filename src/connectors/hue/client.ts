@@ -8,6 +8,7 @@ import {
   lights,
   scenes,
   snapshotFrom,
+  homeGroupedLightId,
 } from "./state.ts";
 import { HUE_BRIDGE_ROOT_CA } from "./ca.ts";
 import { type Clock, realClock } from "../../clock.ts";
@@ -284,6 +285,19 @@ export function hueClient(options: HueOptions) {
       return confirm(
         async () => lights(await read()).find((x) => x.id === l.id),
         shows(body, true),
+      );
+    },
+    /**
+     * Every light in the home off, with one write to the bridge's home group. Only when a person asks. Resolves with
+     * every light as the bridge then reported it, `confirmed` once none it can reach is on.
+     */
+    async allOff(): Promise<HueApplied<LightView[]>> {
+      const id = homeGroupedLightId(await read());
+      if (!id) throw invalid("the bridge has no home group");
+      await put("grouped_light", id, { on: { on: false } });
+      return confirm(
+        async () => lights(await read()),
+        (all) => all.every((l) => !l.on || l.reachable === false),
       );
     },
     /**

@@ -120,6 +120,7 @@ const PUBLIC: Record<string, string[]> = {
     "castDevices",
     "castForm",
     "castFree",
+    "castFreeSpeakers",
     "castHomeDevices",
     "castStatus",
     "castText",

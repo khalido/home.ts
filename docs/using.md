@@ -95,22 +95,19 @@ A write changes someone's house: make one only when a person asked for it. Write
 
   A replaced part starts over from `connecting`, with no state and no `lastGoodAt`, and no `onChange` until its first report. The second `loadHome` keeps its own copy of the address cache, so pass the same `cache` and expect the last writer to win.
 
-- **Hue by name.** `room("Bedroom", { brightness: 40, kelvin: 2700 })`, `light("Desk lamp", { color: "#ff8800" })`, `scene("Relax", "Bedroom")`. A change is `{ on?, brightness?, color?, kelvin?, transitionMs? }`; an unknown name throws with the names that exist.
+- **Hue by name.** `room("Bedroom", { brightness: 40, kelvin: 2700 })`, `light("Desk lamp", { color: "#ff8800" })`, `scene("Relax", "Bedroom")`, and `allOff()` for every light in the home. A change is `{ on?, brightness?, color?, kelvin?, transitionMs? }`; an unknown name throws with the names that exist.
 - **Volume scales differ:** Cast 0–1, Spotify 0–100.
 
 Announce only where nothing is playing, with the music on this machine turned down meanwhile:
 
 ```ts
-import { castFree, castHomeDevices } from "@khalido/home/cast";
+import { castFreeSpeakers } from "@khalido/home/cast";
 
 const cast = home.integration("cast");
 const state = home.part("cast")?.state;
 if (cast && state) {
-  // Every device and group, but not the TVs: an idle TV is free too, and would play it. A group holding a TV becomes its other members.
-  const targets = castHomeDevices(home.part("cast")).map((d) => d.name);
-  const { free, skipped } = castFree(state, targets, {
-    forms: ["speaker", "display"],
-  }); // skipped: { name, why }
+  // Every free speaker and display, a whole group where all of it is free, never a TV.
+  const { free, skipped } = castFreeSpeakers(state); // skipped: { name, why }
   const announce = () =>
     cast.announceAll(free, { url: clipUrl }, { volume: 0.3 });
   const speaker = home.integration("spotify");

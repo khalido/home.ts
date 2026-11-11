@@ -402,6 +402,9 @@ describe("light, room and scene by name", () => {
       puts.push({ path, body });
       const r = one(path.split("/")[1]!);
       if (!deaf) {
+        if (path === "grouped_light/gl-home")
+          for (const l of data.filter((x) => x.type === "light"))
+            l.on = { ...l.on, ...body.on };
         if (body.recall) r.status = { active: "static" };
         else
           for (const [k, v] of Object.entries(body))
@@ -446,6 +449,17 @@ describe("light, room and scene by name", () => {
         },
       },
     ]);
+  });
+
+  test("allOff is one write to the home group, confirmed once no light the bridge reaches is on", async () => {
+    const b = fakeBridge();
+    const done = await b.c.allOff();
+    expect(done.confirmed).toBe(true);
+    expect(done.state.map((l) => l.on)).toEqual(done.state.map(() => false));
+    expect(b.puts).toEqual([
+      { path: "grouped_light/gl-home", body: { on: { on: false } } },
+    ]);
+    expect((await fakeBridge(true).c.allOff()).confirmed).toBe(false);
   });
 
   test("a colour goes out as xy inside the light's gamut; off is one field", async () => {

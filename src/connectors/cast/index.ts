@@ -37,7 +37,13 @@ import {
 } from "./writes.ts";
 
 export type { CastConnect } from "./codec.ts";
-export { castDevices, castForm, castFree, castStatus } from "./state.ts";
+export {
+  castDevices,
+  castForm,
+  castFree,
+  castFreeSpeakers,
+  castStatus,
+} from "./state.ts";
 export type {
   CastDevice,
   CastForm,

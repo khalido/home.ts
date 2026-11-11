@@ -403,3 +403,17 @@ export function castFree(
     skipped: [...skipped.values()],
   };
 }
+
+/**
+ * Where an announcement can play right now, in one call: every speaker and display that is free, a whole group where all
+ * of it is, and never a TV. `castFree` over everything Cast has found, with `forms: ["speaker", "display"]`; `free` goes
+ * straight to `announceAll`.
+ */
+export const castFreeSpeakers = (
+  s: CastSnapshot,
+): { free: string[]; skipped: CastSkipped[] } =>
+  castFree(
+    s,
+    castDevices(s).map((d) => d.id),
+    { forms: ["speaker", "display"] },
+  );
