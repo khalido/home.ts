@@ -4,10 +4,12 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Breaking
 
-- **spotify: music on another Spotify device no longer reads as this speaker playing.** When Soloist says `playing` while it isn't the account's active device, `speakerState` now gives `elsewhere` (it gave `playing`), `spotifyText` says `silent · "Song" by Band is playing on another Spotify device`, and `spotifyChanges` treats it as silence: the music leaving is `stopped`, arriving is `started` then `track`, and nothing fires for its tracks or pauses meanwhile (it fired `resumed` with the box silent). `home devices --json` carries the new `state`. What to do: add `elsewhere` wherever you switch on `speakerState`; `state.status` is still what Soloist said.
-- **cast: `CastSkipped.why` can be `form`**, only when `castFree` is given `forms`. What to do: add it to a switch that lists every `why`.
+- **spotify: music on another Spotify device no longer reads as this speaker playing.** When Soloist says `playing` (or `buffering`) while it isn't the account's active device, `speakerState` now gives `elsewhere` (it gave `playing`), `spotifyText` says `silent · "Song" by Band is playing on another Spotify device`, and `spotifyChanges` treats it as silence: music moving off this speaker is `stopped`, music moving onto it is `started` then `track`, and nothing fires for its tracks or pauses meanwhile (it fired `resumed` with the box silent). `home devices --json` carries the new `state`. What to do: add `elsewhere` wherever you switch on `speakerState`; `state.status` is still what Soloist said.
+- **cli: `home scene <name>` no longer takes the first match** when several rooms have a scene by that name: it lists them and exits 2, and `home scene <name> in <room>` picks one. A wrong or shared room or scene name is a usage error (exit 2), where it was exit 1. What to do: a script that recalls a shared scene name adds `in <room>`.
 
 ### Fixed
 
@@ -15,10 +17,9 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Changed
 
-- **cli:** `home room <name> <n>` and `home scene` print the room's line after the write, where they printed nothing; a wrong name is a usage error (exit 2), where it was exit 1. `home scene <name>` no longer takes the first match when several rooms have a scene by that name: it lists them, and `home scene <name> in <room>` picks one.
+- **cli:** `home room <name> <n>` and `home scene` print the room's line after the write, where they printed nothing.
 - **hue:** a light's line shows its white temperature or colour when on (`Desk: on · 40% · 2700 K`), in `home hue`, `home devices` and `homeDevices`.
 - **docs, for a consumer:** `docs/using.md` has each write and what it resolves with in one table, an announce-where-free example, and what a part's `status` and `reason` and an error's `code` mean. `docs/config.md`'s `loadHome` call now passes what Cast needs (`finders`, `castConnect`). `llms.txt` says what to call.
-- **`MissingTool`** is exported from `@khalido/home/finders`: thrown when the discovery tool (`avahi-browse` on Linux) isn't installed.
 - **docs:** `castStatus` and `castFree` take the Cast part's state (`home.part("cast")?.state`), which the docs called "the snapshot".
 - **cli:** `home` and `home daikin` find the Daikin by UDP broadcast when `DAIKIN_HOST` is unset, as the write commands do, so `DAIKIN_HOST` is optional. With no unit on the network it reads "not set up".
 - **cli:** `home cast volume | mute | stop` print the device's line once it reports the change, where they printed nothing; after 2 s without it, "sent; the device has not reported it yet".
@@ -26,12 +27,12 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
-- **Dry run on Hue's and the Daikin's writes**: `{ dryRun: true }` as the last argument of `light`, `room`, `scene`, `allOff`, `power` and `mode`. Every check runs and nothing is sent; the result's `wouldSend` is the request it would make (`HueRequest`, `DaikinRequest` with `sets`), `state` how things stand, `confirmed: false`. `home … --dry-run` on the same commands.
+- **Dry run on Hue's and the Daikin's writes**: `{ dryRun: true }` as the last argument of `light`, `room`, `scene`, `allOff`, `power` and `mode`. The read and every check made before sending run, and no write is sent; the result's `wouldSend` is the request it would make (`HueRequest`, `DaikinRequest` with `sets`), `state` how things stand, `confirmed: false`. `--dry-run` on the same commands (`home light | room | scene | lights off`, `home hue …`, `home daikin …`); every other command refuses the flag.
 - **hue: `client.allOff()`**: every light in the home off with one write, resolving `{ state, confirmed }` with every light as the bridge then reported it. `home lights off` uses it and now prints the result.
 - **`byRoom(snapshot, config)`** from `@khalido/home`, for a map of the home: each room of the config with its devices, `noData` for a connector the config places there that has nothing to list, and `unplaced` for the rest.
 - **config: `photos` on a room**, a list of paths. The library carries them and reads nothing.
 - **cast: `castFreeSpeakers(state)`**: every free speaker and display in one call, a whole group where all of it is free, never a TV; `free` goes straight to `announceAll`.
-- **cast: `castFree(state, targets, { forms })`**: with `forms: ["speaker", "display"]` a TV is left out, and a group holding one becomes its other free members.
+- **cast: `castFree(state, targets, { forms })`**: with `forms: ["speaker", "display"]` a TV is left out (`why: "form"`, only when `forms` is given), and a group holding one becomes its other free members.
 - **`home.add(integration)` and `home.remove(name)`** on the home `createHome` returns: add one while the rest keep running (a bridge paired just now), replace one by name (the old run has ended before the new one starts; how an `unavailable` part comes back after a re-key), or stop one and drop its part. `start` now also waits for those added.
 - **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. `homeDevices` and `home devices` put it in the speaker's line (`silent · "Song" is playing on Front room speaker`), and `spotifyText(state, on)` takes it. Tested on built snapshots only.
 - **hue: lights, rooms and scenes by name.** `client.light(name, change)`, `client.room(name, change)` and `client.scene(name, room?)`, each resolving `{ state, confirmed }` (`HueApplied`). `change` (`LightChange`) is `{ on?, brightness?, color?, kelvin?, transitionMs? }`: a colour as hex or `{ r, g, b }`, sent as `xy` inside the light's own gamut; a white temperature in kelvin, checked against the light's range. An unknown name or a value the light can't take throws `HueError` with `code: "invalid"` before anything is sent, and a light the bridge has lost throws with `code: "offline"`.
@@ -41,6 +42,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 - **hue: `pairWhenPressed`**: `pair`, asked every 2 s for 30 s until the bridge's button is pressed, with `onWaiting` for the moment to prompt. `pair` takes a `signal`. `home pair` now waits 60 s for the button, counting down, and says when no press was detected.
 - **daikin: `client.power(on)` and `client.mode(mode, targetC?)`**, resolving with `{ state, confirmed }` (`DaikinApplied`) once the unit reports what was asked, or after 5 s (`CONFIRM_MS`) without it. `mode` sends the mode, power on and the setpoint as one request: the one given, else the library's defaults, `DEFAULT_TARGET_C` (cool 25, heat 27).
 - **`home daikin on | off`** (power only, as it was last left) and **`home daikin cool | heat | auto [°C] | dry | fan`**, each printing what the unit then reports.
+- **`MissingTool`** from `@khalido/home/finders`: thrown when the discovery tool (`dns-sd` on macOS, `avahi-browse` on Linux) isn't installed.
 - **`home devices`:** every device the connectors read, one line each from `homeDevices`: its state, its room and name from the config when there is one, and why when it isn't available. `--json` prints the records. A connector that isn't connected is named on stderr.
 
 ## [0.1.3] - 2026-11-10
