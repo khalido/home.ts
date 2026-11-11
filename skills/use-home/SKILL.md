@@ -9,7 +9,7 @@ description: Use the `home` command and the @khalido/home library to see and run
 
 ## Rules
 
-- **Reads are free.** `home`, `home <connector>`, `home devices`, `home discover`, `home probe`, `home up spend` and every `--json` read touch nothing.
+- **Reads are free.** `home`, `home <connector>` with no verb, `home devices`, `home discover`, `home probe`, `home up spend` and every `--json` read touch nothing.
 - **Writes only on request.** Lights, AC, speakers, Up categories and tags, webhooks: run one only when the person asked for that change, then read back and report the state it left. Never write to "test" something.
 - **Never print a key, token or password**, not even part of one. Say "set" or "unset". Env names are fine; values are not.
 - **Nothing private into a public repo**: no IPs, MACs, serials, device or room names, Up transactions or balances. A real `home.jsonc`, `home.svg` and floor plan live in a private folder.

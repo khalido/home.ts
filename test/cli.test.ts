@@ -93,6 +93,18 @@ describe("home output contract", () => {
     });
   });
 
+  test("home daikin: a wrong verb is usage, and an unreachable unit is a network error before any line prints", () => {
+    const wrong = home(["daikin", "sideways"]);
+    expect(wrong.err).toContain("usage: home daikin on | off");
+    expect(wrong.code).toBe(2);
+    const down = home(["daikin", "on", "--json"], {
+      DAIKIN_HOST: "127.0.0.1:1",
+    });
+    expect(down.out).toBe("");
+    expect(JSON.parse(down.err).code).toBe("network");
+    expect(down.code).toBe(1);
+  });
+
   test("a wrong command is a usage error: exit 2, one line on stderr, nothing on stdout", () => {
     expect(home(["nope"])).toEqual({
       out: "",

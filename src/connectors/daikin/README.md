@@ -4,7 +4,7 @@ Reads one Daikin AC over its local JSON `dsiot` API. `iot_class`: **local_pollin
 
 - `client.ts`: `daikinClient({ host, fetch }).read()` returns `DaikinState` (power, mode, the selected mode's setpoint and fan speed, room °C, humidity, outside °C, `anomaly`). `setPower`, `setMode`, `setTarget`, `setFan` build write requests; `client.write(request)` sends one, through a write lane: 1 s apart and at most 20 a minute (guesses), a waiting write merging the next one field by field (`mergeWrites`). Every request times out at 10 s.
 - `index.ts`: `daikin({ host, fetch, clock })` reads now, then every **120 s** (Home Assistant's `update_interval`). A failed poll is `disconnected` and keeps the last reading with `asOf`; a 404 on `/dsiot/multireq` is a failed read too, saying "not a dsiot Daikin": the address may now be another device's, so discovery looks for the unit. There is no key, so nothing is terminal. Writes go through `daikin().client.write(…)`: one client for the integration's life, at the unit's current address.
-- `home status` reads `DAIKIN_HOST`, or a home config's address, with discovery by `mac` if the unit moves. There is no CLI command that writes.
+- `home status` reads `DAIKIN_HOST`, or a home config's address, with discovery by `mac` if the unit moves. `home daikin on | off` is the one CLI write: power only, at `DAIKIN_HOST` or the first unit to answer the UDP broadcast, printing what the unit then reports.
 
 ## The protocol
 
@@ -39,7 +39,7 @@ One read-only request, saved with the MAC, SSID, `edid` and the unit's ASCII ids
 ## Unconfirmed
 
 - **The write lane's rates** (1 s apart, 20 a minute) are guesses. One client lives as long as the integration and reads the unit's address at each send, so a move keeps the lane's count, and a write still waiting goes to the new address.
-- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16 and 2026-11-11, see below); mode, setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
+- **Writes other than power.** Only `setPower(true)` has been sent to KO's unit (2026-10-16 and 2026-11-11, see below); a mode write was accepted but changed nothing (it was already in that mode), and setpoint and fan writes are untried. The encodings come from pydaikin, which reports verified live writes on other BRP084 units. The two sources disagree in three places, plus one choice of our own, settled here as follows:
   - Setpoint width: pydaikin sends one byte, Alira two (`3200`). One byte, because the live field is one byte (`p_02` `mi 24`, `mx 40`).
   - Method: pydaikin POSTs, Alira PUTs. POST, the method reads already use.
   - Field: Alira always writes `p_03` and `p_0A`. Those are pydaikin's heat-mode setpoint and fan, and Alira reads by list position (its `[2]` and `[8]` are `p_03` and `p_0A`), so it appears written on a unit in heat. Per-mode fields here.
@@ -65,7 +65,7 @@ Unmapped and unread: `p_27` (`0A00`, like auto), `p_34` (one signed byte, `00`, 
 
 ## Second write (2026-11-11)
 
-`setPower(true)` at KO's request, through `daikinClient().write` and the rewritten write lane (Bun 1.4.4, from a Mac): accepted in 280 ms, and reads at once, 2 s and 5 s later all showed `on` (before: off, dry, room 25 °C). The unit was found by the UDP broadcast. `home probe` shows 404 on the three old `/common` and `/aircon` paths and an answer on `dsiot`, as expected for this unit.
+`setPower(true)` at KO's request, through `daikinClient().write` and the rewritten write lane (Bun 1.4.4, from a Mac): accepted in 280 ms, and reads at once, 2 s and 5 s later all showed `on` (before: off, dry, room 25 °C). The unit was found by the UDP broadcast. Then `setMode("dry")` at KO's request: accepted in 291 ms and the unit read `on`, dry. It was already in dry, so this shows the write is accepted, not that a mode changes. `home daikin on` on the running unit printed its line and exited 0. `home probe` shows 404 on the three old `/common` and `/aircon` paths and an answer on `dsiot`, as expected for this unit.
 
 ## Read from a Pi (2026-11-10)
 

@@ -14,6 +14,7 @@ import {
   usage,
   type Verbs,
 } from "./context.ts";
+import { DAIKIN_USAGE, daikinVerbs } from "./daikin.ts";
 import { discover } from "./discover.ts";
 import { enphaseVerbs } from "./enphase.ts";
 import { hueVerbs } from "./hue.ts";
@@ -45,6 +46,7 @@ const VERBS: Record<
       .map((h) => h.split(":")[0])
       .join(" | ")}`,
   },
+  daikin: { verbs: daikinVerbs, usage: DAIKIN_USAGE },
   enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
   cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
   up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
