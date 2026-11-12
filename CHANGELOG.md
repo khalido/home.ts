@@ -4,10 +4,11 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-12
+
 ### Added
 
-- **cast:** WAV speech. `announce` rewrites a clip of WAV bytes as 48 kHz, 16-bit, stereo PCM before serving it, in plain TypeScript, so a bot's TTS WAV needs no ffmpeg; a dry run says so. A 24 kHz mono WAV failed on audio-only Nest speakers (2026-11-09); rewritten, it played on a Nest Audio, a Nest Mini, a Google Home speaker, a Nest Hub and a Nest Hub Max (2026-11-12). `castWav` and `CAST_WAV` are exported for a clip served by URL.
-
+- **cast:** WAV speech. `announce` rewrites a clip of WAV bytes as 48 kHz, 16-bit, stereo PCM before serving it, in plain TypeScript, so a bot's TTS WAV needs no ffmpeg; a dry run says so. A 24 kHz mono WAV failed on audio-only Nest speakers (2026-11-09); rewritten, it played on a Nest Audio, a Nest Mini, a Google Home speaker, a Nest Hub and a Nest Hub Max (2026-11-12). `castWav`, `CAST_WAV` and the `WavFormat` type are exported for a clip served by URL; a clip given as a URL is sent as it is.
 - **cast, spotify:** dry run. Every Cast and Spotify write takes `{ dryRun: true }`: it checks as a real write does, sends nothing, and says what it would send (`wouldSend`). Cast's `setVolume`, `setMuted` and `stop` now resolve `{ wouldSend }` under a dry run and `undefined` otherwise; a dry `announce` also names in `notRestored` the app it would interrupt, and serves nothing. Spotify's `duck` and `interrupt` run `fn` and say in `why` what they would have done. `home cast …` and `home spotify …` take `--dry-run`. New types: `CastRequest`, `CastDryRun`, `CastWriteOptions`, `SpotifyRequest`, `SpotifyWriteOptions`.
 
 ## [0.2.1] - 2026-11-12
@@ -157,7 +158,8 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/khalido/home.ts/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/khalido/home.ts/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/khalido/home.ts/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/khalido/home.ts/compare/v0.1.2...v0.1.3
