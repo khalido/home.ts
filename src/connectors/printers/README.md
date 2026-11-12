@@ -1,8 +1,8 @@
 # Printers
 
-AirPrint printers, found by mDNS and read over IPP on the local network. `iot_class`: **local_polling** (one Get-Printer-Attributes per printer every 120 s). Built read-only; first read of a live printer 2026-11-10 (see Live findings).
+AirPrint printers, found by mDNS and read over IPP on the local network, and a PDF printed on one. `iot_class`: **local_polling** (one Get-Printer-Attributes per printer every 120 s). Reads live since 2026-11-10; a print live on 2026-11-12 (see Live findings).
 
-Try it: `home printers`
+Try it: `home printers`, `home printers print page.pdf --dry-run`
 
 ## Built
 
@@ -12,7 +12,10 @@ Try it: `home printers`
 - **Odd values pass through.** A `printer-state` outside 3 to 5 leaves `state` out, keeps `stateCode`, and is named in `anomaly`. A marker level outside 0 to 100 stays as sent and is named (PWG 5100.13 reserves negative levels for "unknown" kinds; read it before treating one as empty). Marker lists of different lengths are named too.
 - **Identity check.** The printer's `printer-uuid` must match the entry's UUID, or the read fails with "the address answers as another printer", so a recycled address never shows one printer's toner under another's name.
 - **Discovery** is one shared scan, as Cast's is, not a relocator per printer (the relocator is one device and one scan each; three printers down would be three `dns-sd` runs). It runs at start, after a failed read at 1, 5 and 15 minutes then hourly (`rescanDelay`), hourly for new printers, and a `refresh()` resets the backoff. A moved printer is found by its UUID and read again at once; `detail` says "not found by discovery" only after a scan looked and missed it (`lostDetail`).
-- `home discover` lists printers and `--write` adds them (`uuid`, `name`, `host`, `port`); `home probe` reads each once. No writes. The place for them is marked `TODO(writes…)` in `client.ts`.
+- `home discover` lists printers and `--write` adds them (`uuid`, `name`, `host`, `port`); `home probe` reads each once.
+- **Writes** (`client.ts`, exported): `identifyPrinter` (the printer shows or sounds; no paper), `validateJob` (checks a job, prints nothing), `printJob` (attributes and document in one request; resolves the job's id and state) and `cancelJob`. Each takes the printer's address (`host`, `port`, `rp` and `ipps` are in the snapshot) and bytes already in a format the printer lists. A job is `one-sided` unless it says otherwise, so a printer's duplex default never applies. A Print-Job that times out (60 s) is a `timeout` error that says it may still print: never resend it blindly.
+- **PWG Raster** (`raster.ts`): `pwgRaster(pages, media, total?)` packs 8-bit grey pages, an array or one at a time from a generator, into `image/pwg-raster` (PWG 5102.4), for a printer that lists no PDF. `mediaPixels` gives a page's size at a resolution. Only `sgray_8`.
+- **`home printers print <file.pdf> [printer]`**: sends the PDF as is when the printer lists `application/pdf`; otherwise renders each page with poppler's `pdftoppm` at the printer's raster resolution, fitted to the loaded media and centred (a page's `/Rotate` applied; a landscape page shrunk to fit, not turned), then Validate-Job, then Print-Job. One page is held at a time. `--dry-run` renders and has the printer validate the job (Validate-Job prints nothing), and sends no job. `home printers identify [printer]` and `cancel <job> [printer]`. The printer can be left out when there is one.
 
 ## Protocol
 
@@ -30,9 +33,11 @@ Discovery is mDNS `_ipp._tcp` and `_ipps._tcp` ([Apple's AirPrint TXT keys](http
 
 ## Unverified
 
-Everything, until a real printer answers: the request bytes (the codec is checked against RFC 8010's layout and a fixture of invented values, not a printer), the default path `ipp/print`, that `printer-uuid` equals TXT `UUID` on a Brother, that a sleeping printer wakes for the request, what a Brother sends for `marker-levels` and `printer-alert` (the sample uses invented values), Bun's `fetch` on port 631, and the macOS local-network prompt on first use.
+`printer-uuid` against TXT `UUID` on a Brother, a sleeping printer waking for a request, what `printer-alert` means on it, and the macOS local-network prompt on first use. For printing: a printer that takes PDF, a document of more than one page, two-sided, a colour printer, and the Node CLI (only Bun has run it).
 
 ## Live findings
+
+**2026-11-12, from a Mac (Bun 1.4.4), Brother HL-L2350DW.** It lists `application/octet-stream`, `image/urf` and `image/pwg-raster`, no PDF; PWG Raster at 600 dpi, `sgray_8` only, `pwg-raster-document-sheet-back` `rotated`; operations include Validate-Job, Cancel-Job and Identify-Printer. Identify-Printer and Validate-Job answered OK. Two one-page jobs printed: first a raster macOS's own filters made (`cupsfilter` with the AirPrint PPD; now `test/fixtures/printers/macos-a4-600.pwg`), then one from `home printers print` and `pwgRaster`, 60 kB for a page of text. Each answered `job-state` 5 (processing), both pages came out right (two lines of text, A4), and the printer was idle again within 30 s.
 
 **2026-11-10, from a Pi (Bun 1.4.4, 0.1.2; chota-bot's session).** `home discover` found the Brother by mDNS and `home printers` read it: "Brother HL-L2350DW series: idle · BK 80% · A4 ready". So discovery, the request, the default path, a real `marker-levels` and `media-ready` work on this model. Still unverified from the list above: `printer-uuid` against TXT `UUID`, a sleeping printer waking, `printer-alert`, and the macOS local-network prompt.
 

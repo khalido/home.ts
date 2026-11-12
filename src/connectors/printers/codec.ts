@@ -29,8 +29,14 @@ export const TAG = {
   mimeMediaType: 0x49,
 } as const;
 
-/** The operation ids this package sends. Identify-Printer (0x003C) and Print-Job (0x0002) are the writes that come later. */
-export const OPERATION = { getPrinterAttributes: 0x000b } as const;
+/** The operation ids this package sends (RFC 8011; Identify-Printer from PWG 5100.13). */
+export const OPERATION = {
+  printJob: 0x0002,
+  validateJob: 0x0004,
+  cancelJob: 0x0008,
+  getPrinterAttributes: 0x000b,
+  identifyPrinter: 0x003c,
+} as const;
 
 const STRING_TAGS: ReadonlySet<number> = new Set([
   TAG.textWithoutLanguage,
@@ -138,19 +144,30 @@ export function encodeMessage(m: IppMessage): Uint8Array<ArrayBuffer> {
       });
   }
   out.push(TAG.end);
-  return Uint8Array.from([...out, ...(m.data ?? [])]);
+  const bytes = new Uint8Array(out.length + (m.data?.length ?? 0));
+  bytes.set(out);
+  if (m.data) bytes.set(m.data, out.length);
+  return bytes;
 }
 
-/** The Get-Printer-Attributes request: IPP 2.0, utf-8, English, the printer's `ipp://` URI, and the attributes wanted. */
-export function getPrinterAttributesRequest(
+/**
+ * A request to one printer: IPP 2.0, utf-8, English, the printer's `ipp://` URI, then `attributes` in the operation
+ * group, `job` (when given) in a job group, and `data` (a document) after the end tag.
+ */
+export function operationRequest(
+  code: number,
   printerUri: string,
-  requested: string[],
-  requestId = 1,
+  options: {
+    attributes?: IppAttribute[];
+    job?: IppAttribute[];
+    data?: Uint8Array;
+    requestId?: number;
+  } = {},
 ): Uint8Array<ArrayBuffer> {
   return encodeMessage({
     version: [2, 0],
-    code: OPERATION.getPrinterAttributes,
-    requestId,
+    code,
+    requestId: options.requestId ?? 1,
     groups: [
       {
         tag: TAG.operation,
@@ -162,12 +179,29 @@ export function getPrinterAttributesRequest(
             values: ["en"],
           },
           { name: "printer-uri", tag: TAG.uri, values: [printerUri] },
-          { name: "requested-attributes", tag: TAG.keyword, values: requested },
+          ...(options.attributes ?? []),
         ],
       },
+      ...(options.job?.length
+        ? [{ tag: TAG.job, attributes: options.job }]
+        : []),
     ],
+    data: options.data,
   });
 }
+
+/** The Get-Printer-Attributes request: the attributes wanted. */
+export const getPrinterAttributesRequest = (
+  printerUri: string,
+  requested: string[],
+  requestId = 1,
+) =>
+  operationRequest(OPERATION.getPrinterAttributes, printerUri, {
+    requestId,
+    attributes: [
+      { name: "requested-attributes", tag: TAG.keyword, values: requested },
+    ],
+  });
 
 const fail = (why: string): never => {
   throw new Error(`ipp: ${why}`);

@@ -39,6 +39,21 @@ export {
   type PrinterStatus,
   printerText,
 } from "./state.ts";
+export {
+  cancelJob,
+  identifyPrinter,
+  type PrintedJob,
+  type PrinterAddress,
+  type PrintJob,
+  printJob,
+  validateJob,
+} from "./client.ts";
+export {
+  type GreyPage,
+  mediaPixels,
+  pwgRaster,
+  type RasterMedia,
+} from "./raster.ts";
 
 /** One printer in a home config. Everything the printer reports about itself (model, markers, state) comes live; `host` and `port` are only where it last answered. */
 export const configSchema = z.looseObject({
@@ -184,6 +199,8 @@ export function printers(
       name: t.name,
       model: good.model ?? t.foundModel,
       host: t.host,
+      port: t.port,
+      rp: t.rp,
       room: t.room,
       ...(offline ? { state: "offline" as const } : {}),
       ipps: t.ipps,

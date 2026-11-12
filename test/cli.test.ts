@@ -22,8 +22,14 @@ const home = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("home output contract", () => {
-  test("home hue <verb> takes --dry-run as the short form does; home hue pair refuses it", () => {
+  test("home hue <verb> takes --dry-run as the short form does; pair, identify and cancel refuse it", () => {
     expect(home(["hue", "pair", "--dry-run"])).toMatchObject({ code: 2 });
+    expect(home(["printers", "identify", "--dry-run"])).toMatchObject({
+      code: 2,
+    });
+    expect(home(["printers", "cancel", "7", "--dry-run"])).toMatchObject({
+      code: 2,
+    });
     expect(home(["hue", "room", "--dry-run"]).err).not.toMatch(
       /unknown option/i,
     );

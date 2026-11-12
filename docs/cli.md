@@ -18,6 +18,8 @@ home discover [--json] [--passes n]  # which smart-home devices answer here (mDN
 home cache [clear]            # the addresses kept between runs, or delete them so the next run discovers afresh
 home config check [path]      # validate a home config: what it would set up, secrets as set or unset by name, every problem
 home discover --write [path]  # with a config (the path, else --config or HOME_CONFIG): match what answers by identity, add new devices, update moved hosts and renamed Cast names in place
+home printers print <file.pdf> [printer]   # PDF as is, or rendered to PWG Raster with pdftoppm when the printer takes no PDF; --dry-run
+home printers identify | cancel <job>       # the printer shows itself; stop a job
 home probe                    # read-only, no keys: Hue's public config, Daikin by UDP broadcast, the IQ Gateway's /info, each weather source, each Cast device's and printer's status
 home locate "<street address>" [--write [path]]  # latitude and longitude from OpenStreetMap's Nominatim; --write sets them in the config's location (and timezone, when absent, to this machine's)
 home cast announce --to <name> [--to <name>…] (--say "<text>" | --file <path>) [--volume 0-100]  # exit 1 if any didn't play; play a clip, then put back what was playing and the volume

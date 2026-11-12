@@ -4,7 +4,7 @@ import { ConnectorError, getJson } from "../../connector.ts";
 // Amber Electric's public API v1 (https://app.amber.com.au/developers; the published spec is 1.0, there is no v2). Shapes checked against live replies,
 // 2026-10-13; every field optional so a change degrades a reading rather than throwing.
 
-/** A failed Amber call. `status` 401 means the key is wrong or revoked; 429 means the rate limit (50 per 5 min). */
+/** A failed Amber call. `status` 401 or 403 (`isRejectedKey`) means the key is wrong or revoked; 429 means the rate limit (50 per 5 min). */
 export class AmberError extends ConnectorError {}
 
 /** One 5-minute price interval on one channel. Prices are c/kWh including GST, as a cost: negative feed-in means you are paid. */

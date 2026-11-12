@@ -130,12 +130,18 @@ const PUBLIC: Record<string, string[]> = {
   ],
   "./printers": [
     "POLL_MS",
+    "cancelJob",
     "configSchema",
+    "identifyPrinter",
     "manifest",
+    "mediaPixels",
+    "printJob",
     "printerList",
     "printerText",
     "printers",
     "printersHomeDevices",
+    "pwgRaster",
+    "validateJob",
   ],
   "./spotify": [
     "DEFAULT_URL",

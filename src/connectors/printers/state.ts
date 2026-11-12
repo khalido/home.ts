@@ -21,6 +21,8 @@ export type Printer = {
   name: string;
   model?: string;
   host?: string;
+  port?: number; // where it last answered, with `rp`: what a write needs to reach it
+  rp?: string; // the IPP path from discovery's TXT; absent is `ipp/print`
   room?: string;
   state?: PrinterStatus; // absent when the printer sent a code outside 3 to 5; `stateCode` has it
   stateCode?: number;

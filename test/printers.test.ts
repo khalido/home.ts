@@ -22,10 +22,18 @@ import {
   TAG,
 } from "../src/connectors/printers/codec.ts";
 import {
+  cancelJob,
   getPrinterAttributes,
   printerUrl,
+  printJob,
   REQUESTED,
+  validateJob,
 } from "../src/connectors/printers/client.ts";
+import {
+  mediaPixels,
+  pwgRaster,
+  readPwgRaster,
+} from "../src/connectors/printers/raster.ts";
 import {
   mediaName,
   printerKey,
@@ -548,6 +556,141 @@ describe("client", () => {
     await expect(getPrinterAttributes(ipp, { host: "h" })).rejects.toThrow(
       "IPP client-error-not-found: no such printer",
     );
+  });
+});
+
+describe("jobs", () => {
+  /** A printer that records each request and answers Print-Job with a job id. */
+  function jobPrinter() {
+    const sent: IppMessage[] = [];
+    const fetcher = (async (_url: string, init: RequestInit) => {
+      const m = decodeMessage(init.body as Uint8Array);
+      sent.push(m);
+      return new Response(
+        encodeMessage({
+          version: [2, 0],
+          code: 0,
+          requestId: m.requestId,
+          groups: [
+            { tag: TAG.operation, attributes: [] },
+            {
+              tag: TAG.job,
+              attributes: [
+                { name: "job-id", tag: TAG.integer, values: [346] },
+                { name: "job-state", tag: TAG.enum, values: [5] },
+                {
+                  name: "job-state-reasons",
+                  tag: TAG.keyword,
+                  values: ["job-printing"],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    }) as unknown as typeof fetch;
+    return { sent, fetcher };
+  }
+  const job = { format: "image/pwg-raster", media: "iso_a4_210x297mm" };
+
+  test("Print-Job sends the job's attributes and the document after them; one-sided unless asked", async () => {
+    const p = jobPrinter();
+    const doc = Uint8Array.of(1, 2, 3);
+    expect(await printJob(p.fetcher, { host: "h" }, job, doc)).toEqual({
+      jobId: 346,
+      state: 5,
+      reasons: ["job-printing"],
+    });
+    const m = p.sent[0]!;
+    expect(m.code).toBe(0x0002);
+    expect(attributesOf(m, TAG.operation)["document-format"]).toEqual([
+      "image/pwg-raster",
+    ]);
+    expect(attributesOf(m, TAG.job)).toEqual({
+      sides: ["one-sided"],
+      media: ["iso_a4_210x297mm"],
+    });
+    expect(m.data).toEqual(doc);
+  });
+
+  test("Validate-Job carries the same attributes and no document; Cancel-Job names the job", async () => {
+    const p = jobPrinter();
+    await validateJob(p.fetcher, { host: "h" }, job);
+    await cancelJob(p.fetcher, { host: "h" }, 346);
+    expect(p.sent[0]!.code).toBe(0x0004);
+    expect(p.sent[0]!.data?.length ?? 0).toBe(0);
+    expect(attributesOf(p.sent[0]!, TAG.job).sides).toEqual(["one-sided"]);
+    expect(p.sent[1]!.code).toBe(0x0008);
+    expect(attributesOf(p.sent[1]!, TAG.operation)["job-id"]).toEqual([346]);
+  });
+
+  test("a Print-Job that times out says it may still print", async () => {
+    const slow = (async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    }) as unknown as typeof fetch;
+    await expect(
+      printJob(slow, { host: "h" }, job, Uint8Array.of(1)),
+    ).rejects.toMatchObject({ code: "timeout" });
+  });
+});
+
+describe("PWG raster", () => {
+  // Made by macOS's own filters (cupsfilter, the Brother's AirPrint PPD) from a one-line text page; it printed on an HL-L2350DW.
+  const macos = async () =>
+    new Uint8Array(
+      await Bun.file(
+        new URL("./fixtures/printers/macos-a4-600.pwg", import.meta.url),
+      ).arrayBuffer(),
+    );
+  const A4 = { name: "iso_a4_210x297mm", dpi: 600 };
+
+  test("a page macOS made decodes: A4 at 600 dpi, 8-bit grey, some black on white", async () => {
+    const [page, more] = readPwgRaster(await macos());
+    expect(more).toBeUndefined();
+    expect(page).toMatchObject({
+      width: 4960,
+      height: 7015,
+      dpi: 600,
+      colorSpace: 18,
+      bitsPerPixel: 8,
+    });
+    expect(mediaPixels(A4)).toEqual({ width: 4960, height: 7015 });
+    const ink = page!.pixels.filter((p) => p < 128).length;
+    expect(ink).toBeGreaterThan(1000);
+    expect(ink).toBeLessThan(page!.pixels.length / 50);
+  });
+
+  test("its pixels encoded here decode to the same pixels, with the header PWG 5102.4 asks for", async () => {
+    const [page] = readPwgRaster(await macos());
+    const ours = pwgRaster([page!], A4);
+    const [back] = readPwgRaster(ours);
+    expect(back).toMatchObject({
+      width: 4960,
+      height: 7015,
+      dpi: 600,
+      colorSpace: 18,
+      bitsPerPixel: 8,
+      pageSizeName: "iso_a4_210x297mm",
+    });
+    expect(back!.pixels).toEqual(page!.pixels);
+    expect(ours.length).toBeLessThan(80_000); // a mostly white page packs small
+  });
+
+  test("runs, literals and lone pixels round-trip, and a short page is refused", () => {
+    const width = 300;
+    const row = Uint8Array.from({ length: width }, (_, i) =>
+      i < 140 ? 255 : i < 200 ? i % 256 : i % 3 ? 0 : 7,
+    );
+    const pixels = new Uint8Array(width * 4);
+    pixels.set(row, 0);
+    pixels.set(row, width); // a repeated line
+    pixels.set(row.toReversed(), width * 2);
+    pixels.fill(9, width * 3);
+    const [back] = readPwgRaster(pwgRaster([{ width, height: 4, pixels }], A4));
+    expect(back!.pixels).toEqual(pixels);
+    expect(() =>
+      pwgRaster([{ width, height: 4, pixels: new Uint8Array(3) }], A4),
+    ).toThrow("needs 1200 bytes");
   });
 });
 

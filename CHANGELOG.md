@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+
+- **printers:** printing. `identifyPrinter`, `validateJob`, `printJob` and `cancelJob` over IPP, and `pwgRaster` for a printer that takes no PDF (8-bit grey PWG Raster). The snapshot's `Printer` gains `port` and `rp`, so a write can reach it. `home printers print <file.pdf> [printer]` (with `--dry-run`), `identify` and `cancel`; a printer with no PDF needs poppler's `pdftoppm`. Live on a Brother HL-L2350DW.
+
 ### Fixed
 
 - **amber, enphase, up:** a 403 is a rejected key (`unavailable`, `reason: "auth"`), as a 401 already was and as Hue and Google weather already read both. It was `disconnected` and retried forever. One check, `isRejectedKey` in `src/connector.ts`, now serves every connector and the CLI.

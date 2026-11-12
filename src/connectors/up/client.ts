@@ -6,7 +6,7 @@ import { ConnectorError, fetchTimeout, getJson } from "../../connector.ts";
 
 const BASE = "https://api.up.com.au/api/v1";
 
-/** A failed Up call. `status` 401 means the token is wrong or revoked; 429 the rate limit (unpublished: read `X-RateLimit-Remaining`). */
+/** A failed Up call. `status` 401 or 403 (`isRejectedKey`) means the token is wrong or revoked; 429 the rate limit (unpublished: read `X-RateLimit-Remaining`). */
 export class UpError extends ConnectorError {}
 
 const Money = z.looseObject({

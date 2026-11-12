@@ -8,7 +8,7 @@ import {
   type Measurement,
 } from "./schemas.ts";
 
-/** A failed Enphase call. `status` 401 means the token is wrong or expired. */
+/** A failed Enphase call. `status` 401 or 403 (`isRejectedKey`) means the token is wrong or expired. */
 export class EnphaseError extends ConnectorError {}
 
 /** Solar right now and today. Watts and watt-hours as the gateway reports them, negatives included. */

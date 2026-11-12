@@ -19,6 +19,7 @@ import { discover } from "./discover.ts";
 import { enphaseVerbs } from "./enphase.ts";
 import { CHANGE_USAGE, hueVerbs } from "./hue.ts";
 import { locate } from "./locate.ts";
+import { PRINTERS_USAGE, printersVerbs } from "./printers.ts";
 import { probe } from "./probe.ts";
 import { SPOTIFY_USAGE, spotifyVerbs } from "./spotify.ts";
 import { devices, status } from "./status.ts";
@@ -59,6 +60,11 @@ const VERBS: Record<
   cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
   up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
   spotify: { verbs: spotifyVerbs, usage: SPOTIFY_USAGE },
+  printers: {
+    verbs: printersVerbs,
+    usage: PRINTERS_USAGE,
+    options: [DRY_RUN],
+  },
 };
 
 const cli = cac("home");

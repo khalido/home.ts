@@ -4,9 +4,10 @@
 
 ## Where things stand
 
-- **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). A clean `bun add @khalido/home@0.2.0 --no-cache` imported on Bun 1.4.4. chota-bot has been sent the release note (queued in its session, not confirmed read).
-- **What 0.2.0 has:** `CHANGELOG.md`. In short: Hue by name (lights, rooms, scenes, `allOff`, colour, kelvin) with Signify's roots bundled and `pairWhenPressed`; Daikin `power` and `mode` (cool 25, heat 27); dry run on Hue and Daikin writes; `home.add` and `home.remove`; `byRoom` and `photos`; `castFreeSpeakers` and `castFree` `forms`; Spotify `elsewhere` and `spotifyElsewhere`; `home devices`.
-- **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill). Worked for 0.1.1 to 0.2.0.
+- **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). chota-bot has been sent the release note (queued in its session, not confirmed read).
+- **On main since 0.2.0, unreleased** (`CHANGELOG.md` `[Unreleased]`): printing (`printJob` and friends, `pwgRaster`, `home printers print | identify | cancel`); 401 or 403 is `auth` in every connector (`isRejectedKey`); the Spotify cap note. Printing adds exports, so the next release is a patch: 0.2.1.
+- **Issues:** five long-lived drafts in `drafts/issues.md` (git-ignored): Soloist upstream tracking, Spotify account (playlists and library), draw-home from a floor plan to a live view, the Enphase gateway, untried on a real device. Not posted; KO approves the text first.
+- **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
 - **jaldi** has been told nothing since 0.1.0 (no session open there).
 
 ## Live on KO's devices (2026-11-11 and 12, Bun 1.4.4)
@@ -14,6 +15,7 @@
 - **Hue:** paired; reads; light, room and scene writes on two rooms, each put back; dry runs of a room, a scene and all off. `allOff` has not run live.
 - **Daikin:** on; dry to cool at 25; dry runs of cool and heat. Untried: off, heat, auto, fan mode, fan speed.
 - **Cast:** an announce to a Nest Hub from the Mac; `castFreeSpeakers` read 8 devices and groups, gave one free group, and skipped two TVs plus one device whose model wasn't reported (as `form`). `home cast volume | mute | stop` printing the line is untried.
+- **Printers (2026-11-12, Mac):** identify, validate, and two one-page A4 prints on the Brother (one macOS-made raster, one from `home printers print`); KO saw both come out right. Cancel, several pages, and the Pi are untried; the Pi needs `apt install poppler-utils`.
 - **Spotify `elsewhere`** and `spotifyElsewhere` are tested on built snapshots only: they need music playing on a phone and on a Cast speaker.
 
 ## chota-bot
@@ -22,12 +24,12 @@ On Bun on a Pi 5, one long-lived `loadHome`; four chat tools planned: `home_stat
 
 ## Next, each KO's call
 
-1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. The two gaps chota found live: Soloist restores its own level 90 ms after `playing`, after the cap's lowering confirmed (and `anomaly` still says "lowered it"); a resume while already active is never capped.
-2. **Dry run on Cast and Spotify writes**, so chota's announce tool can be tested without a sound.
-3. **`draw-home` from a walkthrough video**: a skill change; try it on a real video first.
-4. **Auth consistency:** one 401-or-403 check in `connector.ts` (Hue and Google take either; Enphase, Amber and Up 401 only). `home pair` prints the key to stdout.
-5. **`fx.yml`:** the gate is who triggers, not whose text is read; put a spend cap on the gateway key.
-6. **Printers:** print a PDF on the Brother over IPP, with KO's say-so.
+1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. A resume while already active is never capped.
+2. **Dry run on Cast and Spotify writes**, so chota's announce tool can be tested without a sound. Not an issue: next work.
+3. **Spotify account** (the drafted issue): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.
+4. **Auth leftovers:** an `auth` detail that names the env variable to fix; the `use-home` skill saying to `home.add` again after a re-key.
+5. **`fx.yml`:** the gate is who triggers, not whose text is read; put a spend cap on the gateway key. Private: never a public issue.
+6. **Printing from a long-running app:** the writes are one-shot calls on an address; put them on the integration with a lane (slot per job) when chota prints.
 7. **Small:** `withSpotify` and `withCast` in the CLI are near-copies; no CLI write verb has a test against a fake device; the cast `home … volume` line waits 2 s with no test.
 
 Decided, don't reopen: the four poll loops stay separate; no `build()` on `Manifest`; search lives in chota-bot.
