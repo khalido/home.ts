@@ -7,8 +7,16 @@ import {
   tokenExpiry,
 } from "../connectors/enphase/index.ts";
 import { daysLeft } from "../connectors/enphase/client.ts";
-import { writePrivate } from "../finders.ts";
-import { env, fail, homeTimeZone, TOKEN_FILE, type Verbs } from "./context.ts";
+import { addressBook } from "../discover.ts";
+import { FINDERS, writePrivate } from "../finders.ts";
+import {
+  addresses,
+  env,
+  fail,
+  homeTimeZone,
+  TOKEN_FILE,
+  type Verbs,
+} from "./context.ts";
 
 /** The cached Enphase token, or undefined if `home enphase login` has not run. A corrupt file throws, naming it. */
 export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
@@ -31,12 +39,30 @@ export function enphaseToken(): { token: string; expiresAt: Date } | undefined {
   }
 }
 
-/** Enphase as an integration from IQ_GATEWAY_HOST and the token file, for `home status`. */
-export function enphaseFromEnv() {
+/**
+ * Enphase as an integration for `home status`: IQ_GATEWAY_HOST, else the address cache, else the first gateway mDNS finds.
+ * With the gateway's serial from the cache, a read that fails is followed by discovery at once, so an IQ_GATEWAY_HOST left
+ * behind by a DHCP move still reads, and its detail says where the gateway went.
+ */
+export async function enphaseFromEnv() {
   const t =
     enphaseToken() ?? fail("no Enphase token", "auth", "home enphase login");
+  const book = addressBook(addresses.cache);
+  const serial = Object.keys(book.entries())
+    .find((k) => k.startsWith("enphase:"))
+    ?.slice("enphase:".length);
+  const cached = serial ? book.fresh("enphase", serial) : undefined;
+  const host =
+    env.IQ_GATEWAY_HOST ??
+    cached?.host ??
+    (await FINDERS.enphase())[0]?.host ??
+    fail("no gateway found by mDNS; set IQ_GATEWAY_HOST", "network");
   return enphase({
-    host: env.IQ_GATEWAY_HOST!,
+    host,
+    serial,
+    find: FINDERS.enphase,
+    seen: (h) => book.seen("enphase", serial, { host: h }),
+    hostCached: true, // an env address is as likely stale as a cached one: look again after one failure
     token: t.token,
     fetch: bunGatewayFetch(),
     timeZone: homeTimeZone(),

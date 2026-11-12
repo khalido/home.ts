@@ -10,6 +10,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Fixed
 
+- **cli, enphase:** a stale `IQ_GATEWAY_HOST` no longer leaves `home enphase` refused for good: with the gateway's serial from the address cache, a failed read is followed by mDNS discovery, and the line says where the gateway moved. Without `IQ_GATEWAY_HOST` the address comes from the cache, then from mDNS.
 - **amber, enphase, up:** a 403 is a rejected key (`unavailable`, `reason: "auth"`), as a 401 already was and as Hue and Google weather already read both. It was `disconnected` and retried forever. One check, `isRejectedKey` in `src/connector.ts`, now serves every connector and the CLI.
 - **spotify:** after the first-play lowering (Soloist issue #23), `anomaly` no longer says only "lowered it" when the volume is back above `maxVolume`: it adds `it is back at <n>`. Soloist puts its own level back about 90 ms after `playing` when it goes active (live, 2026-11-11), and the cap leaves that level alone.
 

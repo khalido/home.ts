@@ -6,7 +6,7 @@
 
 - **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). chota-bot has been sent the release note (queued in its session, not confirmed read).
 - **On main since 0.2.0, unreleased** (`CHANGELOG.md` `[Unreleased]`): printing (`printJob` and friends, `pwgRaster`, `home printers print | identify | cancel`); 401 or 403 is `auth` in every connector (`isRejectedKey`); the Spotify cap note. Printing adds exports, so the next release is a patch: 0.2.1.
-- **Issues:** five long-lived drafts in `drafts/issues.md` (git-ignored): Soloist upstream tracking, Spotify account (playlists and library), draw-home from a floor plan to a live view, the Enphase gateway, untried on a real device. Not posted; KO approves the text first.
+- **Issues:** five long-lived drafts in `drafts/issues.md` (git-ignored): Soloist upstream tracking, Spotify account (playlists and library), draw-home from a floor plan to a live view, the untried on a real device. The Enphase draft is dropped: the gateway had moved address (fixed 2026-11-12).
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
 - **jaldi** has been told nothing since 0.1.0 (no session open there).
 
@@ -36,7 +36,7 @@ Decided, don't reopen: the four poll loops stay separate; no `build()` on `Manif
 
 ## Waiting on KO
 
-- Enphase: why the gateway refuses connections (since 28 Oct).
+- Enphase: `IQ_GATEWAY_HOST` in `~/.zshrc.local` names the gateway's old address; delete it (the cache and mDNS find it) or update it. The CLI now copes either way.
 - npm: "Require two-factor authentication and disallow tokens" under Publishing access.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged; keep `pre-squash`.
 

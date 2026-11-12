@@ -13,6 +13,8 @@ Reads an IQ Gateway (Envoy) on the LAN: production, consumption and grid flow. `
 - The token's days left ride in the snapshot; under 30 the status says to run `home enphase login`. A 401 or 403 marks Enphase unavailable and stops polling.
 - `home enphase login` mints the token (below) and writes `~/.config/home/enphase-token.json` (0600, directory 0700), printing only the days left. `home status` shows solar now, consumption and the token's days left.
 
+**Live, 2026-11-12 (Bun 1.4.4).** From late October `home enphase` said ECONNREFUSED. The gateway had not changed: DHCP had given it a new address, mDNS and the address cache had the new one, and an `IQ_GATEWAY_HOST` in the shell still named the old one, which the CLI trusted without a fallback. The CLI now takes the serial from the address cache and runs discovery after one failed read, so the status line reads and says "moved from a to b". The owner token was fine throughout (338 days left).
+
 **Live, KO's gateway, 2026-10-13 (D8.3.5528, owner token).** `/info` answers without a token; everything else answers 401 without one. With the token, one GET each:
 
 - `/ivp/meters`: `production` and `net-consumption` **enabled**, `meteringStatus normal`; `storage`, `backfeed`, `load`, `evse`, `pv3p` disabled. So both CTs are fitted.
