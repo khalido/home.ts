@@ -138,7 +138,7 @@ export function spotifyChanges(
 /**
  * The speaker in a few words: `Kitchen speaker: playing "Song" by Band · 35%`, `…: waiting for someone to pick it`, or,
  * for music on another Spotify device, `…: silent · "Song" by Band is playing on another Spotify device` (no volume: it isn't this speaker's playing level).
- * `on` names where, when the caller knows (`spotifyElsewhere`): `… is playing on Front room speaker`.
+ * `on` names where, when the caller knows (`spotifyElsewhere`): `… is playing on Den speaker`.
  */
 export function spotifyText(s: SpotifyState, on: string[] = []): string {
   const who = s.deviceName ?? "Soloist";

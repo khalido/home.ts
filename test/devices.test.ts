@@ -57,7 +57,7 @@ const castDevice = (
 const cast: CastSnapshot = {
   devices: {
     aa: castDevice("aa", "Kitchen display", { form: "display" }),
-    bb: castDevice("bb", "Front room speaker", {
+    bb: castDevice("bb", "Den speaker", {
       form: "speaker",
       idle: false,
       app: "Spotify",
@@ -147,7 +147,7 @@ describe("homeDevices", () => {
       "hue | group | zone-reading | Reading | - | - | - | light-2",
       "daikin | ac | daikin | Daikin | true | cool | - | -",
       "enphase | solar | enphase | Enphase IQ Gateway | true | producing | - | -",
-      "cast | speaker | bb | Front room speaker | true | busy | - | -",
+      "cast | speaker | bb | Den speaker | true | busy | - | -",
       "cast | display | aa | Kitchen display | true | idle | - | -",
       "cast | group | gg | Everywhere | true | busy | - | aa+bb",
       "printers | printer | p1 | Brother | true | idle | room-hall | -",
@@ -164,9 +164,9 @@ describe("homeDevices", () => {
       "Reading",
       "Daikin: on · cool 23 °C · room 25 °C",
       "Enphase IQ Gateway: solar 2.4 kW, using 0.9 kW · token 200 days left",
-      'Front room speaker: Spotify · playing "Song" · 40%',
+      'Den speaker: Spotify · playing "Song" · 40%',
       "Kitchen display: idle · 40%",
-      "Everywhere: idle · 40% · 2 members: Kitchen display, Front room speaker",
+      "Everywhere: idle · 40% · 2 members: Kitchen display, Den speaker",
       "Brother: idle",
       "Old inkjet: offline, never seen",
       "Chota: paused · 60%",
@@ -226,7 +226,7 @@ describe("homeDevices", () => {
       "Reading false -",
       "Daikin false cool",
       "Enphase IQ Gateway false producing",
-      "Front room speaker false busy",
+      "Den speaker false busy",
       "Kitchen display false idle",
       "Everywhere false busy",
       "Brother false idle",
@@ -371,12 +371,12 @@ describe("spotifyElsewhere", () => {
   };
   test("names the Cast device playing that track in Spotify", () => {
     const there = { ...snapshot, spotify: ok(away) };
-    expect(spotifyElsewhere(there)).toEqual(["Front room speaker"]);
+    expect(spotifyElsewhere(there)).toEqual(["Den speaker"]);
     expect(
       homeDevices(there).find((d) => d.connector === "spotify"),
     ).toMatchObject({
       state: "elsewhere",
-      text: 'Chota: silent · "Song" is playing on Front room speaker',
+      text: 'Chota: silent · "Song" is playing on Den speaker',
     });
   });
   test("a group playing it is named, not its members", () => {

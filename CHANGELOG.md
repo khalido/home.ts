@@ -4,15 +4,17 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-12
+
 ### Added
 
-- **printers:** printing. `identifyPrinter`, `validateJob`, `printJob` and `cancelJob` over IPP, and `pwgRaster` for a printer that takes no PDF (8-bit grey PWG Raster). The snapshot's `Printer` gains `port` and `rp`, so a write can reach it. `home printers print <file.pdf> [printer]` (with `--dry-run`), `identify` and `cancel`; a printer with no PDF needs poppler's `pdftoppm`. Live on a Brother HL-L2350DW.
+- **printers:** printing. `identifyPrinter`, `validateJob`, `printJob` and `cancelJob` over IPP, and `pwgRaster` for a printer that takes no PDF (8-bit grey PWG Raster). The snapshot's `Printer` gains `port` and `rp`, so a write can reach it. `home printers print <file.pdf> [printer]`, `identify` and `cancel`; `print --dry-run` has the printer validate the job and sends no job; a printer with no PDF needs poppler's `pdftoppm`. Live on a Brother HL-L2350DW.
 
 ### Fixed
 
 - **cli, enphase:** a stale `IQ_GATEWAY_HOST` no longer leaves `home enphase` refused for good: with the gateway's serial from the address cache, a failed read is followed by mDNS discovery, and the line says where the gateway moved. Without `IQ_GATEWAY_HOST` the address comes from the cache, then from mDNS.
 - **amber, enphase, up:** a 403 is a rejected key (`unavailable`, `reason: "auth"`), as a 401 already was and as Hue and Google weather already read both. It was `disconnected` and retried forever. One check, `isRejectedKey` in `src/connector.ts`, now serves every connector and the CLI.
-- **spotify:** after the first-play lowering (Soloist issue #23), `anomaly` no longer says only "lowered it" when the volume is back above `maxVolume`: it adds `it is back at <n>`. Soloist puts its own level back about 90 ms after `playing` when it goes active (live, 2026-11-11), and the cap leaves that level alone.
+- **spotify:** after the first-play lowering ([spotify/soloist#23](https://github.com/spotify/soloist/issues/23)), `anomaly` no longer says only "lowered it" when the volume is back above `maxVolume`: it adds `it is back at <n>`. Soloist puts its own level back about 90 ms after `playing` when it goes active (live, 2026-11-11), and the cap leaves that level alone.
 
 ## [0.2.0] - 2026-11-12
 
@@ -44,7 +46,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 - **cast: `castFreeSpeakers(state)`**: every free speaker and display in one call, a whole group where all of it is free, never a TV; `free` goes straight to `announceAll`.
 - **cast: `castFree(state, targets, { forms })`**: with `forms: ["speaker", "display"]` a TV is left out (`why: "form"`, only when `forms` is given), and a group holding one becomes its other free members.
 - **`home.add(integration)` and `home.remove(name)`** on the home `createHome` returns: add one while the rest keep running (a bridge paired just now), replace one by name (the old run has ended before the new one starts; how an `unavailable` part comes back after a re-key), or stop one and drop its part. `start` now also waits for those added.
-- **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. `homeDevices` and `home devices` put it in the speaker's line (`silent · "Song" is playing on Front room speaker`), and `spotifyText(state, on)` takes it. Tested on built snapshots only.
+- **spotify: `playingElsewhere(state)`**, and **`spotifyElsewhere(snapshot)`** from `@khalido/home`: the names of the Cast devices and groups playing that track in Spotify, matched by the track's name since Soloist doesn't say where the music is. Empty for a phone or a laptop. `homeDevices` and `home devices` put it in the speaker's line (`silent · "Song" is playing on Den speaker`), and `spotifyText(state, on)` takes it. Tested on built snapshots only.
 - **hue: lights, rooms and scenes by name.** `client.light(name, change)`, `client.room(name, change)` and `client.scene(name, room?)`, each resolving `{ state, confirmed }` (`HueApplied`). `change` (`LightChange`) is `{ on?, brightness?, color?, kelvin?, transitionMs? }`: a colour as hex or `{ r, g, b }`, sent as `xy` inside the light's own gamut; a white temperature in kelvin, checked against the light's range. An unknown name or a value the light can't take throws `HueError` with `code: "invalid"` before anything is sent, and a light the bridge has lost throws with `code: "offline"`.
 - **hue: colour in the state.** Each light's `kelvin` and `kelvinRange`, and on a colour light its `xy`, `hex` and `gamut`. `colorToXy`, `xyToHex`, `kelvinToMirek`, `mirekToKelvin` and `hueText` are exported.
 - **`home light <name> …`**, and `home room` and `home scene` now take a brightness, a temperature (`2700k`) and a colour (`ff8800`) together, name a scene's room (`in <room>`), and print what the bridge then reported.
@@ -149,7 +151,9 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/khalido/home.ts/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/khalido/home.ts/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/khalido/home.ts/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/khalido/home.ts/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/khalido/home.ts/compare/v0.1.0...v0.1.1
