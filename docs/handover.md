@@ -4,11 +4,10 @@
 
 ## Where things stand
 
-- **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). chota-bot has been sent the release note (queued in its session, not confirmed read).
-- **On main since 0.2.0, unreleased** (`CHANGELOG.md` `[Unreleased]`): printing (`printJob` and friends, `pwgRaster`, `home printers print | identify | cancel`); 401 or 403 is `auth` in every connector (`isRejectedKey`); the Spotify cap note. Printing adds exports, so the next release is a patch: 0.2.1.
+- **0.2.1 is live on npm as `latest`** (2026-11-12, approved by KO; a clean `bun add @khalido/home@0.2.1 --no-cache` imports the printing exports). chota-bot and jaldi were told the same day (jaldi also about 0.2.0's breaking changes).
 - **Issues posted 2026-11-12:** [#1](https://github.com/khalido/home.ts/issues/1) Soloist upstream tracking, [#2](https://github.com/khalido/home.ts/issues/2) Spotify account, [#3](https://github.com/khalido/home.ts/issues/3) draw-home. The "untried on a real device" draft is in `drafts/issues.md`, not posted; the Enphase one was dropped (the gateway had moved address).
+- **Addresses:** Eero reservations (2026-11-12) for the gateway, Hue bridge, Daikin and printer; `IQ_GATEWAY_HOST` in `~/.zshrc.local` names the reserved address.
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
-- **jaldi** has been told nothing since 0.1.0 (no session open there).
 
 ## Live on KO's devices (2026-11-11 and 12, Bun 1.4.4)
 
@@ -36,7 +35,6 @@ Decided, don't reopen: the four poll loops stay separate; no `build()` on `Manif
 
 ## Waiting on KO
 
-- Enphase: `IQ_GATEWAY_HOST` in `~/.zshrc.local` names the gateway's old address; delete it (the cache and mDNS find it) or update it. The CLI now copes either way.
 - npm: "Require two-factor authentication and disallow tokens" under Publishing access.
 - Four old agent worktrees under `.claude/worktrees/`, clean and merged; keep `pre-squash`.
 
