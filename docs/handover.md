@@ -4,7 +4,7 @@
 
 ## Where things stand
 
-- **0.2.1 is live on npm as `latest`** (2026-11-12, approved by KO; a clean `bun add @khalido/home@0.2.1 --no-cache` imports the printing exports). chota-bot and jaldi were told the same day (jaldi also about 0.2.0's breaking changes).
+- **0.2.2 is live on npm as `latest`** (2026-11-12, approved by KO; a clean install imports `castWav`): Cast and Spotify dry run, WAV speech for Cast. chota told; it will run `home spotify pause --dry-run` on the Pi and send the output.
 - **Issues posted 2026-11-12:** [#1](https://github.com/khalido/home.ts/issues/1) Soloist upstream tracking, [#2](https://github.com/khalido/home.ts/issues/2) Spotify account, [#3](https://github.com/khalido/home.ts/issues/3) draw-home. The "untried on a real device" draft is in `drafts/issues.md`, not posted; the Enphase one was dropped (the gateway had moved address).
 - **Addresses:** Eero reservations (2026-11-12) for the gateway, Hue bridge, Daikin and printer; `IQ_GATEWAY_HOST` in `~/.zshrc.local` names the reserved address.
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
