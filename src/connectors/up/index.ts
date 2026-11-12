@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { asOf, type Clock, realClock } from "../../clock.ts";
-import { errorText } from "../../connector.ts";
+import { errorText, isRejectedKey } from "../../connector.ts";
 import { envName, type Integration } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { poller } from "../../poll.ts";
@@ -288,7 +288,7 @@ export function up(config: UpConfig): Integration<UpSnapshot, "up"> & {
           });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
-          if (error instanceof UpError && error.status === 401)
+          if (isRejectedKey(error))
             return update({
               status: "unavailable",
               reason: "auth",

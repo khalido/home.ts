@@ -693,13 +693,15 @@ describe("the integration", () => {
   });
 
   test("a rejected token stops for good; a page cap marks the snapshot truncated", async () => {
-    const bad = run({ "GET /api/v1/categories": () => json({}, 401) });
-    await bad.done;
-    expect(bad.parts[0]).toMatchObject({
-      status: "unavailable",
-      reason: "auth",
-      detail: "Up rejected the token",
-    });
+    for (const status of [401, 403]) {
+      const bad = run({ "GET /api/v1/categories": () => json({}, status) });
+      await bad.done;
+      expect(bad.parts[0]).toMatchObject({
+        status: "unavailable",
+        reason: "auth",
+        detail: "Up rejected the token",
+      });
+    }
     const snap = toSnapshot([], categories, {
       now: NOW,
       asOf: "x",

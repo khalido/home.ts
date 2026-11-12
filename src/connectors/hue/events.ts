@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Clock, realClock } from "../../clock.ts";
+import { isRejectedKey } from "../../connector.ts";
 import { HueError, type HueOptions } from "./client.ts";
 import { HueEvent } from "./schemas.ts";
 
@@ -55,10 +56,6 @@ const safeJson = (text: string): unknown => {
     return undefined;
   }
 };
-
-/** A 401 or 403: the key is wrong or revoked. */
-export const isRejectedKey = (error: unknown) =>
-  error instanceof HueError && (error.status === 401 || error.status === 403);
 
 /** What the stream yields: a (re)connection, a batch of events, or a drop with the wait before the next try. */
 export type StreamItem =

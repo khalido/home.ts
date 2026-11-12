@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { ConnectorError, fetchTimeout } from "../../connector.ts";
+import {
+  ConnectorError,
+  fetchTimeout,
+  isRejectedKey,
+} from "../../connector.ts";
 import { RAIN_INTENSITIES } from "./rain.ts";
 import { sunDisagrees } from "./sun.ts";
 import {
@@ -434,7 +438,7 @@ export function google(options: GoogleOptions): WeatherSource {
             ? error
             : ({} as { status?: number; why?: string });
         const said = `HTTP ${status}${why ? ` ${why}` : ""}`;
-        if (status === 401 || status === 403 || why?.startsWith("API_KEY_"))
+        if (isRejectedKey(error) || why?.startsWith("API_KEY_"))
           return {
             stop: `google: the key was rejected (${said})`,
             stopReason: "auth",

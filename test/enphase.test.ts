@@ -337,14 +337,20 @@ describe("client and home", () => {
     });
   });
 
-  test("a rejected token marks Enphase unavailable and stops polling", async () => {
-    const home = createHome([
-      enphase({ host: "h", token: jwt(4_000_000_000), fetch: gateway(401).f }),
-    ]);
-    await home.start(new AbortController().signal);
-    expect(home.snapshot().enphase).toMatchObject({
-      status: "unavailable",
-      reason: "auth",
-    });
+  test("a rejected token (401 or 403) marks Enphase unavailable and stops polling", async () => {
+    for (const status of [401, 403]) {
+      const home = createHome([
+        enphase({
+          host: "h",
+          token: jwt(4_000_000_000),
+          fetch: gateway(status).f,
+        }),
+      ]);
+      await home.start(new AbortController().signal);
+      expect(home.snapshot().enphase).toMatchObject({
+        status: "unavailable",
+        reason: "auth",
+      });
+    }
   });
 });

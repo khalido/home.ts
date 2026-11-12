@@ -351,13 +351,15 @@ describe("amber integration", () => {
     });
   });
 
-  test("a rejected key marks Amber unavailable and stops", async () => {
-    const home = createHome([amber({ key: "k", fetch: amberApi(401).f })]);
-    await home.start(new AbortController().signal);
-    expect(home.snapshot().amber).toMatchObject({
-      status: "unavailable",
-      reason: "auth",
-    });
+  test("a rejected key (401 or 403) marks Amber unavailable and stops", async () => {
+    for (const status of [401, 403]) {
+      const home = createHome([amber({ key: "k", fetch: amberApi(status).f })]);
+      await home.start(new AbortController().signal);
+      expect(home.snapshot().amber).toMatchObject({
+        status: "unavailable",
+        reason: "auth",
+      });
+    }
   });
 
   test("stopping the run cancels a read in flight; a refresh does not", async () => {

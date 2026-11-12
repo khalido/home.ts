@@ -10,7 +10,7 @@ Reads an IQ Gateway (Envoy) on the LAN: production, consumption and grid flow. `
 - `host` may be pasted with a scheme or a trailing slash (`https://…/`); `gatewayHost` reduces it to the bare host for requests, discovery and the address cache.
 - In the home config the device may carry `marker` (the plan's marker where the array is drawn, on the roof outside any room) and `capacityW` (the array's rated watts from the installer's paperwork, never guessed from the gateway). Neither reaches the gateway; they are for drawing.
 - A meter counts only when `/ivp/meters` says `enabled` **and** its reading has `activeCount > 0`; otherwise production comes from the inverters and Wh today is left out, since pyenphase found the inverter daily total unreliable.
-- The token's days left ride in the snapshot; under 30 the status says to run `home enphase login`. A 401 marks Enphase unavailable and stops polling.
+- The token's days left ride in the snapshot; under 30 the status says to run `home enphase login`. A 401 or 403 marks Enphase unavailable and stops polling.
 - `home enphase login` mints the token (below) and writes `~/.config/home/enphase-token.json` (0600, directory 0700), printing only the days left. `home status` shows solar now, consumption and the token's days left.
 
 **Live, KO's gateway, 2026-10-13 (D8.3.5528, owner token).** `/info` answers without a token; everything else answers 401 without one. With the token, one GET each:

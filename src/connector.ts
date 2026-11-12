@@ -51,6 +51,11 @@ export class ConnectorError extends Error {
   }
 }
 
+/** A 401 or 403 from a device or service: the key or token is wrong or revoked. Every connector reads it as `reason: "auth"`. */
+export const isRejectedKey = (error: unknown) =>
+  error instanceof ConnectorError &&
+  (error.status === 401 || error.status === 403);
+
 /** `fetch` that gives up after `timeoutMs`, or as soon as `signal` (a run's) aborts. Returns the response whatever its status. */
 export function fetchTimeout(
   fetcher: typeof fetch,

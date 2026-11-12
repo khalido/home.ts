@@ -1,4 +1,5 @@
 import { type Clock, localDay, realClock } from "../../clock.ts";
+import { isRejectedKey } from "../../connector.ts";
 import { z } from "zod";
 import {
   type DeviceRecord,
@@ -180,7 +181,7 @@ export function enphase(
           });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
-          if (error instanceof EnphaseError && error.status === 401)
+          if (isRejectedKey(error))
             return update({
               status: "unavailable",
               reason: "auth",

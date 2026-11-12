@@ -1,5 +1,5 @@
 import { asOf, type Clock, realClock } from "../../clock.ts";
-import { errorText } from "../../connector.ts";
+import { errorText, isRejectedKey } from "../../connector.ts";
 import { z } from "zod";
 import { type Finder, lostDetail, relocator } from "../../discover.ts";
 import {
@@ -13,7 +13,7 @@ import {
 } from "../../home.ts";
 import type { Manifest } from "../../manifest.ts";
 import { bunPinnedFetch, type HueClient, hueClient } from "./client.ts";
-import { hueEvents, isRejectedKey } from "./events.ts";
+import { hueEvents } from "./events.ts";
 import type { HueEvent } from "./schemas.ts";
 import {
   type GroupView,

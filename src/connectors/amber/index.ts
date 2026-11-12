@@ -1,5 +1,5 @@
 import { asOf, type Clock, realClock } from "../../clock.ts";
-import { errorText } from "../../connector.ts";
+import { errorText, isRejectedKey } from "../../connector.ts";
 import { z } from "zod";
 import { envName, type Integration } from "../../home.ts";
 import { energyNow } from "../../energy.ts";
@@ -62,7 +62,7 @@ export function amber(
           update({ status: "connected", anomaly: last.anomaly, state: last });
         } catch (error) {
           if (signal.aborted) return; // stopped mid-read: not a failure
-          if (error instanceof AmberError && error.status === 401)
+          if (isRejectedKey(error))
             return update({
               status: "unavailable",
               reason: "auth",

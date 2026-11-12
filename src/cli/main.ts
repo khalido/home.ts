@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // `home`: the terminal layer. Commands come from cac; one `home <connector>` per manifest, its verbs from src/cli/<connector>.ts.
 import { cac } from "cac";
-import { ConnectorError, errorText } from "../connector.ts";
+import { errorText, isRejectedKey } from "../connector.ts";
 import { MANIFESTS } from "../manifests.ts";
 import { cacheCommand } from "./cache.ts";
 import { CAST_OPTIONS, CAST_USAGE, castVerbs } from "./cast.ts";
@@ -157,8 +157,7 @@ function describe(e: unknown): {
   if (e instanceof CliError) return { error, code: e.code, fix: e.fix };
   if (e instanceof Error && e.name === "CACError")
     return { error, code: "usage" }; // cac: a missing argument or an unknown option
-  if (e instanceof ConnectorError && (e.status === 401 || e.status === 403))
-    return { error, code: "auth" };
+  if (isRejectedKey(e)) return { error, code: "auth" };
   // A timeout, or a socket error Bun and Node tag with a code (ECONNREFUSED, ENOTFOUND). A bare TypeError is more likely a bug.
   const socket =
     typeof (e as { code?: unknown })?.code === "string" &&

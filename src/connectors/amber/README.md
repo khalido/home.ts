@@ -9,7 +9,7 @@ Amber Electric's live wholesale-linked prices, read through Amber's public API. 
 - `forecast`: the current interval, then each forecast one, both channels on one row (`PriceInterval`). `next=96` asks for more than Amber has, so the reply runs as far as Amber forecasts: on 2026-10-28 at 3 pm, 12 five-minute intervals then 14 half-hours, to 11 pm. Amber's `startTime` is a second past the interval's start, so `start` is taken to the minute.
 - `estimate: true` means the current interval's price can still move; it is shown as "(estimate)", never as an anomaly.
 - The Amber line in `home status` shows the descriptor, "(estimate)", a spike other than `none`, and a negative price. `energyNow` combines the prices with Enphase; see Energy below.
-- A 401 marks Amber unavailable and stops polling.
+- A 401 or 403 marks Amber unavailable and stops polling.
 
 ## Energy
 
