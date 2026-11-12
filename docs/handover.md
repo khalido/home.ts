@@ -13,7 +13,7 @@
 
 - **Hue:** paired; reads; light, room and scene writes on two rooms, each put back; dry runs of a room, a scene and all off. `allOff` has not run live.
 - **Daikin:** on; dry to cool at 25; dry runs of cool and heat. Untried: off, heat, auto, fan mode, fan speed.
-- **Cast:** an announce to a Nest Hub from the Mac; `castFreeSpeakers` read 8 devices and groups, gave one free group, and skipped two TVs plus one device whose model wasn't reported (as `form`). `home cast volume | mute | stop` printing the line is untried.
+- **Cast:** an announce to a Nest Hub from the Mac; `castFreeSpeakers` read 8 devices and groups, gave one free group, and skipped two TVs plus one device whose model wasn't reported (as `form`). `home cast volume` printed the speaker's line live (2026-11-12); `mute` and `stop` untried.
 - **Printers (2026-11-12, Mac):** identify, validate, and two one-page A4 prints on the Brother (one macOS-made raster, one from `home printers print`); KO saw both come out right. Cancel, several pages, and the Pi are untried; the Pi needs `apt install poppler-utils`.
 - **Spotify `elsewhere`** and `spotifyElsewhere` are tested on built snapshots only: they need music playing on a phone and on a Cast speaker.
 
