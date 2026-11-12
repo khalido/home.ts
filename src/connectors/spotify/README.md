@@ -58,6 +58,8 @@ Not built: `deactivate`, `available_actions`. An ad (`entity_type: "ad"`) shows 
 
 ## Unverified
 
+What Soloist does that this connector works around, and the upstream issues to watch: [khalido/home.ts#1](https://github.com/khalido/home.ts/issues/1).
+
 Writes through this connector, and what a live read hasn't shown. In particular:
 
 - **Stalls:** whether the reported position freezes in one (if not, only an overrun is caught), whether `get_state` re-anchors the position, and whether a seek or a pause and play restarts it.

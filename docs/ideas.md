@@ -61,6 +61,8 @@ Two ideas from KO, 2026-10-14, not yet decided:
 
 ## Spotify search and library (KO, 2026-11-08)
 
+A signed-in account's playlists and library are now [khalido/home.ts#2](https://github.com/khalido/home.ts/issues/2).
+
 Soloist plays URIs; it can't search or read a library. Starting music by name ("play some Seal", "my Soft 90s playlist") needs Spotify's cloud Web API beside it: search returns a URI, and the spotify connector's `play(uri)` plays it. **KO's call, 2026-11-08: search lives in chota-bot, not here.** This library turns a box into a speaker; the bot owns its music search tool. chota-bot checked live that catalogue search works with client credentials, no user sign-in, on a development-mode app, and that Soloist played the URI it found. The notes below stay as the research.
 
 - **Search without a user** (catalogue only): the Client Credentials flow reaches "only endpoints that do not access user information" ([client credentials](https://developer.spotify.com/documentation/web-api/tutorials/client-credentials-flow)). The search reference names no flow, but the scopes page lists search under `user-read-private`, so whether an app-only token can search is unsettled: one test call answers it. Search needs a `market`. Since February 2026 a development-mode app gets at most 10 results per search ([migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide)).

@@ -6,7 +6,7 @@
 
 - **0.2.0 is live on npm as `latest`** (2026-11-12, approved by KO). chota-bot has been sent the release note (queued in its session, not confirmed read).
 - **On main since 0.2.0, unreleased** (`CHANGELOG.md` `[Unreleased]`): printing (`printJob` and friends, `pwgRaster`, `home printers print | identify | cancel`); 401 or 403 is `auth` in every connector (`isRejectedKey`); the Spotify cap note. Printing adds exports, so the next release is a patch: 0.2.1.
-- **Issues:** five long-lived drafts in `drafts/issues.md` (git-ignored): Soloist upstream tracking, Spotify account (playlists and library), draw-home from a floor plan to a live view, the untried on a real device. The Enphase draft is dropped: the gateway had moved address (fixed 2026-11-12).
+- **Issues posted 2026-11-12:** [#1](https://github.com/khalido/home.ts/issues/1) Soloist upstream tracking, [#2](https://github.com/khalido/home.ts/issues/2) Spotify account, [#3](https://github.com/khalido/home.ts/issues/3) draw-home. The "untried on a real device" draft is in `drafts/issues.md`, not posted; the Enphase one was dropped (the gateway had moved address).
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
 - **jaldi** has been told nothing since 0.1.0 (no session open there).
 
@@ -26,7 +26,7 @@ On Bun on a Pi 5, one long-lived `loadHome`; four chat tools planned: `home_stat
 
 1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. A resume while already active is never capped.
 2. **Dry run on Cast and Spotify writes**, so chota's announce tool can be tested without a sound. Not an issue: next work.
-3. **Spotify account** (the drafted issue): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.
+3. **Spotify account** (#2): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.
 4. **Auth leftovers:** an `auth` detail that names the env variable to fix; the `use-home` skill saying to `home.add` again after a re-key.
 5. **`fx.yml`:** the gate is who triggers, not whose text is read; put a spend cap on the gateway key. Private: never a public issue.
 6. **Printing from a long-running app:** the writes are one-shot calls on an address; put them on the integration with a lane (slot per job) when chota prints.

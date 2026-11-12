@@ -1,5 +1,7 @@
 # draw-home: references
 
+Where the skill is going, from a floor plan PDF to a live view: [khalido/home.ts#3](https://github.com/khalido/home.ts/issues/3).
+
 Good drawing references to read before drawing a home, newest idea first. All are skills or kits for coding agents; read for craft, keep this skill's contract (`SKILL.md` section 3) where they disagree.
 
 | Reference                                                                                                                                                     | What it is                                                                                                                                                                                                                                                                                                                                         | Use it for                                                                                                                                                                          | Licence                                                          |
