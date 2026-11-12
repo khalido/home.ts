@@ -1,6 +1,7 @@
 import type { Clock } from "../../clock.ts";
 import { errorText } from "../../connector.ts";
 import { type WriteLane, writeLane } from "../../lane.ts";
+import { CAST_WAV, castWav, isWav, type WavFormat, wavText } from "./wav.ts";
 import { NS } from "./codec.ts";
 import {
   type Application,
@@ -450,6 +451,17 @@ export function castActions(ctx: WriteContext): CastActions {
     };
   };
 
+  /** Each WAV clip made here, and the format it came from, so a dry run can say what was converted. */
+  const fromWav = new WeakMap<Uint8Array, WavFormat>();
+  /** WAV bytes as 48 kHz 16-bit stereo, which audio-only speakers play (`wav.ts`); any other clip as it is. */
+  const playable = (clip: CastClip): CastClip => {
+    if ("url" in clip || !isWav(clip.type) || fromWav.has(clip.bytes))
+      return clip;
+    const r = castWav(clip.bytes);
+    if (r.converted) fromWav.set(r.bytes, r.from);
+    return { bytes: r.bytes, type: "audio/wav" };
+  };
+
   const actions: CastActions = {
     async setVolume(target, level, options) {
       checkLevel(level);
@@ -480,12 +492,14 @@ export function castActions(ctx: WriteContext): CastActions {
      * device gets STOP, then the volume (a group's own first, then member by member through each member's own socket). Another app
      * (Spotify, YouTube) is interrupted and cannot be resumed from here; the result says so. Throws only before anything changed.
      */
-    async announce(target, clip, options = {}) {
+    async announce(target, given, options = {}) {
       if (options.volume !== undefined) checkLevel(options.volume);
-      if (!("url" in clip) && !ctx.serve)
+      if (!("url" in given) && !ctx.serve)
         throw new Error(
           "a clip of bytes needs serve: serveClip from @khalido/home/cast/serve",
         );
+      const clip = playable(given); // a bad WAV throws here, before anything changed
+      const wavFrom = "url" in clip ? undefined : fromWav.get(clip.bytes);
       let d = find(target);
       const s = d.kind === "group" ? await regroup(d) : live(d);
       d = ctx.devices()[d.id] ?? d; // a group's host as discovery gives it now, for serving the clip on its network
@@ -581,7 +595,7 @@ export function castActions(ctx: WriteContext): CastActions {
               contentId:
                 "url" in clip
                   ? clip.url
-                  : `(${clip.bytes.length} bytes of ${clip.type}, served on the LAN)`,
+                  : `(${clip.bytes.length} bytes of ${clip.type}${wavFrom ? `, converted from ${wavText(wavFrom)} to ${wavText(CAST_WAV)}` : ""}, served on the LAN)`,
               contentType: clip.type ?? "audio/mpeg",
               streamType: "BUFFERED",
             },
@@ -731,13 +745,14 @@ export function castActions(ctx: WriteContext): CastActions {
       }
     },
 
-    async announceAll(targets, clip, options = {}) {
+    async announceAll(targets, given, options = {}) {
       // A caller's mistake is one error, not a failure per speaker.
       if (options.volume !== undefined) checkLevel(options.volume);
-      if (!("url" in clip) && !ctx.serve)
+      if (!("url" in given) && !ctx.serve)
         throw new Error(
           "a clip of bytes needs serve: serveClip from @khalido/home/cast/serve",
         );
+      const clip = playable(given); // converted once, for every target
       const id = (t: string) => {
         try {
           return find(t).id;

@@ -504,6 +504,70 @@ describe("announce", () => {
     await h.done();
   });
 
+  test("WAV bytes are served as 48 kHz 16-bit stereo WAV; a bad WAV is refused before anything is sent", async () => {
+    const served: Uint8Array[] = [];
+    const serve = async (bytes: Uint8Array, type: string) => (
+      served.push(bytes),
+      expect(type).toBe("audio/wav"),
+      { url: CLIP, close() {} }
+    );
+    const h = await connected(home(), {}, { serve });
+    // 24 kHz mono 16-bit, 100 frames of silence
+    const speech = new Uint8Array(44 + 200);
+    const v = new DataView(speech.buffer);
+    const text = (at: number, t: string) =>
+      [...t].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+    text(0, "RIFF");
+    v.setUint32(4, speech.length - 8, true);
+    text(8, "WAVE");
+    text(12, "fmt ");
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true);
+    v.setUint32(24, 24_000, true);
+    v.setUint32(28, 48_000, true);
+    v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true);
+    text(36, "data");
+    v.setUint32(40, 200, true);
+    const dry = await h.c.announce(
+      "Kitchen",
+      { bytes: speech, type: "audio/wav" },
+      { dryRun: true },
+    );
+    expect(JSON.stringify(dry.wouldSend)).toContain(
+      "converted from 24000 Hz mono 16-bit to 48000 Hz stereo 16-bit",
+    );
+    expect(served).toEqual([]);
+    expect(
+      (await h.c.announce("Kitchen", { bytes: speech, type: "audio/wav" }))
+        .played,
+    ).toBe(true);
+    const out = new DataView(served[0]!.buffer);
+    expect([out.getUint32(24, true), out.getUint16(22, true)]).toEqual([
+      48_000, 2,
+    ]);
+    expect(served[0]!.length).toBe(44 + 200 * 4); // twice the frames, two channels
+    await expect(
+      h.c.announceAll(["Kitchen", "Lounge"], {
+        bytes: new Uint8Array(8),
+        type: "audio/wav",
+      }),
+    ).rejects.toThrow("not a RIFF WAVE file"); // one error, not one per speaker
+    const before = h.net.sent.length;
+    await expect(
+      h.c.announce("Kitchen", { bytes: new Uint8Array(8), type: "audio/wav" }),
+    ).rejects.toThrow("not a RIFF WAVE file");
+    expect(
+      h.net.sent
+        .slice(before)
+        .filter((x) =>
+          ["SET_VOLUME", "LAUNCH", "LOAD", "STOP"].includes(x.p.type),
+        ),
+    ).toEqual([]);
+    await h.done();
+  });
+
   test("a muted target is unmuted for the clip and muted again after, with its volume", async () => {
     const list = home();
     list[0]!.muted = true;

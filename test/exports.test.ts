@@ -116,6 +116,7 @@ const PUBLIC: Record<string, string[]> = {
   ],
   "./weather/ftp": ["ftpFetch"],
   "./cast": [
+    "CAST_WAV",
     "cast",
     "castDevices",
     "castForm",
@@ -124,6 +125,7 @@ const PUBLIC: Record<string, string[]> = {
     "castHomeDevices",
     "castStatus",
     "castText",
+    "castWav",
     "configSchema",
     "manifest",
     "resolvedFrom",

@@ -6,6 +6,8 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **cast:** WAV speech. `announce` rewrites a clip of WAV bytes as 48 kHz, 16-bit, stereo PCM before serving it, in plain TypeScript, so a bot's TTS WAV needs no ffmpeg; a dry run says so. A 24 kHz mono WAV failed on audio-only Nest speakers (2026-11-09); whether the rewritten one plays there is not yet tried. `castWav` and `CAST_WAV` are exported for a clip served by URL.
+
 - **cast, spotify:** dry run. Every Cast and Spotify write takes `{ dryRun: true }`: it checks as a real write does, sends nothing, and says what it would send (`wouldSend`). Cast's `setVolume`, `setMuted` and `stop` now resolve `{ wouldSend }` under a dry run and `undefined` otherwise; a dry `announce` also names in `notRestored` the app it would interrupt, and serves nothing. Spotify's `duck` and `interrupt` run `fn` and say in `why` what they would have done. `home cast …` and `home spotify …` take `--dry-run`. New types: `CastRequest`, `CastDryRun`, `CastWriteOptions`, `SpotifyRequest`, `SpotifyWriteOptions`.
 
 ## [0.2.1] - 2026-11-12

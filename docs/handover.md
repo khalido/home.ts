@@ -24,7 +24,7 @@ On Bun on a Pi 5, one long-lived `loadHome`; four chat tools planned: `home_stat
 ## Next, each KO's call
 
 1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. A resume while already active is never capped.
-2. **Dry run on Cast and Spotify: built, unreleased** (Cast live on a Nest Hub; Spotify on a fake socket only, since Soloist runs on the Pi). Release as 0.2.2 and tell chota, which asked for it.
+2. **Unreleased: Cast and Spotify dry run, and WAV speech for Cast** (chota's ask: `announce` rewrites WAV as 48 kHz 16-bit stereo). WAV needs one live announce on an audio-only speaker, with KO's OK; if it still fails, MP3 means an LGPL encoder, KO's call. Dry run (Cast live on a Nest Hub; Spotify on a fake socket only, since Soloist runs on the Pi). Release as 0.2.2 and tell chota, which asked for it.
 3. **Spotify account** (#2): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.
 4. **Auth leftovers:** an `auth` detail that names the env variable to fix; the `use-home` skill saying to `home.add` again after a re-key.
 5. **`fx.yml`:** the gate is who triggers, not whose text is read; put a spend cap on the gateway key. Private: never a public issue.
