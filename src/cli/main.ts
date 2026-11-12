@@ -57,9 +57,13 @@ const VERBS: Record<
   },
   daikin: { verbs: daikinVerbs, usage: DAIKIN_USAGE, options: [DRY_RUN] },
   enphase: { verbs: enphaseVerbs, usage: "usage: home enphase login" },
-  cast: { verbs: castVerbs, usage: CAST_USAGE, options: CAST_OPTIONS },
+  cast: {
+    verbs: castVerbs,
+    usage: CAST_USAGE,
+    options: [...CAST_OPTIONS, DRY_RUN],
+  },
   up: { verbs: upVerbs, usage: UP_USAGE, options: UP_OPTIONS },
-  spotify: { verbs: spotifyVerbs, usage: SPOTIFY_USAGE },
+  spotify: { verbs: spotifyVerbs, usage: SPOTIFY_USAGE, options: [DRY_RUN] },
   printers: {
     verbs: printersVerbs,
     usage: PRINTERS_USAGE,

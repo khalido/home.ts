@@ -56,6 +56,9 @@ export type {
   AnnounceResult,
   CastActions,
   CastClip,
+  CastDryRun,
+  CastRequest,
+  CastWriteOptions,
   ServeClip,
 } from "./writes.ts";
 

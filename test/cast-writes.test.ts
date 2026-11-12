@@ -758,6 +758,134 @@ describe("volume, mute, stop", () => {
   });
 });
 
+describe("dry run", () => {
+  /** What changed something: not a read, not a connection handshake. */
+  const writesOnly = (h: {
+    net: { sent: { ns: string; p: { type: string } }[] };
+  }) =>
+    h.net.sent.filter(
+      (x) =>
+        x.ns !== "connection" &&
+        x.ns !== "heartbeat" &&
+        x.p.type !== "GET_STATUS",
+    );
+
+  test("volume, mute and stop find and check the target, read what they need, and send no write", async () => {
+    const list = home();
+    list[1]!.app = SPOTIFY;
+    const h = await connected(list);
+    const dry = { dryRun: true };
+    expect(await h.c.setVolume("Downstairs", 0.25, dry)).toEqual({
+      wouldSend: [
+        {
+          device: "Downstairs",
+          channel: "receiver",
+          payload: { type: "SET_VOLUME", volume: { level: 0.25 } },
+        },
+      ],
+    });
+    expect((await h.c.setMuted("kitchen", true, dry))!.wouldSend).toHaveLength(
+      1,
+    );
+    expect(await h.c.stop("lounge", dry)).toEqual({
+      wouldSend: [
+        {
+          device: "Lounge",
+          channel: "receiver",
+          payload: { type: "STOP", sessionId: SPOTIFY.sessionId },
+        },
+      ],
+    });
+    expect(await h.c.stop("Kitchen", dry)).toEqual({ wouldSend: [] }); // idle
+    expect(writesOnly(h)).toEqual([]);
+    await expect(h.c.setVolume("Kitchen", 2, dry)).rejects.toThrow(
+      "volume is 0 to 1",
+    );
+    await expect(h.c.setVolume("Attic", 0.2, dry)).rejects.toThrow(
+      'no Cast device or group "Attic"',
+    );
+    await h.done();
+  });
+
+  test("announce says what it would send and what it could not put back, and sends nothing but reads", async () => {
+    const list = home();
+    list[1]!.app = SPOTIFY;
+    let served = 0;
+    const h = await connected(
+      list,
+      {},
+      {
+        serve: async () => (served++, { url: CLIP, close() {} }),
+      },
+    );
+    const r = await h.c.announce(
+      "Lounge",
+      { bytes: new Uint8Array(1234), type: "audio/mp4" },
+      { volume: 0.5, dryRun: true },
+    );
+    expect(r).toMatchObject({
+      played: false,
+      why: "dry run",
+      restored: [],
+      notRestored: [
+        {
+          name: "Lounge",
+          why: "Spotify would be interrupted and cannot be resumed from here",
+        },
+      ],
+    });
+    expect(r.wouldSend!.map((x) => `${x.channel} ${x.payload.type}`)).toEqual([
+      "receiver SET_VOLUME",
+      "receiver LAUNCH",
+      "media LOAD",
+      "receiver STOP",
+      "receiver SET_VOLUME",
+    ]);
+    expect(JSON.stringify(r.wouldSend![2])).toContain(
+      "1234 bytes of audio/mp4, served on the LAN",
+    );
+    expect(served).toBe(0); // a dry run serves nothing
+    expect(writesOnly(h)).toEqual([]);
+    await h.done();
+  });
+
+  test("a group's dry announce puts back the group's level, then each member's on its own socket; a member that is down is a gap", async () => {
+    const list = home();
+    const h = await connected(list);
+    h.net.drop("Lounge");
+    await until(
+      () =>
+        h.parts.at(-1)?.state?.devices[list[1]!.id]?.status === "disconnected",
+    );
+    const r = await h.c.announce(
+      "Downstairs",
+      { url: CLIP },
+      { volume: 0.4, dryRun: true },
+    );
+    expect(
+      r.wouldSend!.map(
+        (x) =>
+          `${x.device} ${x.payload.type} ${JSON.stringify(x.payload.volume ?? "")}`,
+      ),
+    ).toEqual([
+      'Downstairs SET_VOLUME {"level":0.4}',
+      'Downstairs LAUNCH ""',
+      'Downstairs LOAD ""',
+      'Downstairs STOP ""',
+      'Downstairs SET_VOLUME {"level":0.4}', // the group's own level, as it was
+      'Kitchen SET_VOLUME {"level":0.3}',
+    ]);
+    expect(r.notRestored).toEqual([
+      {
+        name: "Lounge",
+        why: "not connected, so its volume stays as the announcement set it",
+      },
+    ]);
+    expect(writesOnly(h)).toEqual([]);
+    await h.done();
+  });
+});
+
 describe("serveClip", () => {
   test("serves the bytes with their type and length to every GET (a probe first is fine) and HEAD, until closed", async () => {
     const bytes = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);

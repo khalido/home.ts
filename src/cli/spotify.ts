@@ -7,7 +7,7 @@ import {
   type SpotifyState,
   spotifyText,
 } from "../connectors/spotify/index.ts";
-import { env, fail, usage, type Verbs } from "./context.ts";
+import { env, fail, type Options, usage, type Verbs } from "./context.ts";
 
 /** SOLOIST_MAX_VOLUME as a number 0–100, or undefined when unset. */
 function maxVolume(): number | undefined {
@@ -55,23 +55,27 @@ async function withSpotify<T>(
   }
 }
 
-/** What a write left, in a line: the speaker as Soloist then reported it, or that it has not reported the change yet. */
-const said = ({ state, confirmed }: Applied) =>
+/** What a write left, in a line: the speaker as Soloist then reported it, that it has not reported the change yet, or what a dry run would send. */
+const said = ({ state, confirmed, wouldSend }: Applied) =>
   console.log(
-    confirmed
-      ? spotifyText(state)
-      : `sent; Soloist has not reported it yet (${spotifyText(state)})`,
+    wouldSend
+      ? `dry run, nothing sent: ${wouldSend.length ? `would send ${wouldSend.map((r) => JSON.stringify(r)).join(", then ")}` : "nothing to send"} (now ${spotifyText(state)})`
+      : confirmed
+        ? spotifyText(state)
+        : `sent; Soloist has not reported it yet (${spotifyText(state)})`,
   );
 
+const dry = (o: Options) => ({ dryRun: !!o.dryRun });
+
 export const spotifyVerbs: Verbs = {
-  activate: () => withSpotify((s) => s.activate()).then(said),
-  pause: () => withSpotify((s) => s.pause()).then(said),
-  next: () => withSpotify((s) => s.next()).then(said),
-  play: ([link]) => withSpotify((s) => s.play(link)).then(said),
-  async volume([value]) {
+  activate: (_, o) => withSpotify((s) => s.activate(dry(o))).then(said),
+  pause: (_, o) => withSpotify((s) => s.pause(dry(o))).then(said),
+  next: (_, o) => withSpotify((s) => s.next(dry(o))).then(said),
+  play: ([link], o) => withSpotify((s) => s.play(link, dry(o))).then(said),
+  async volume([value], o) {
     const n = Number(value);
     if (value === undefined || value.trim() === "" || !(n >= 0 && n <= 100))
       usage(SPOTIFY_USAGE);
-    said(await withSpotify((s) => s.setVolume(n)));
+    said(await withSpotify((s) => s.setVolume(n, dry(o))));
   },
 };

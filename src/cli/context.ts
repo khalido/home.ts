@@ -38,7 +38,7 @@ export const usage = (message: string): never => fail(message, "usage");
 /** The options cac parses: the global ones, and each command's own. */
 export type Options = {
   json?: boolean;
-  /** `--dry-run`: Hue and Daikin writes check and say what they would send, and send nothing. */
+  /** `--dry-run`: Hue, Daikin, Cast, Spotify and printer writes check and say what they would send, and send nothing. */
   dryRun?: boolean;
   config?: string;
   write?: string | true;

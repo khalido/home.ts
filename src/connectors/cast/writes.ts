@@ -43,12 +43,27 @@ const REFUSALS = new Set([
 export type CastClip =
   { url: string; type?: string } | { bytes: Uint8Array; type: string };
 
-/** What `announce` did: whether the clip played to its end, why not, and what it put back or could not. */
+/** One Cast message, as a dry run reports it: the device it goes to, the channel (`receiver` or the app's `media`) and the payload. */
+export type CastRequest = {
+  device: string;
+  channel: "receiver" | "media";
+  payload: Record<string, unknown>;
+};
+/** `dryRun`: run every check a real write runs (the target, its connection, the input) and the reads it makes first, send no write, and say what would go. */
+export type CastWriteOptions = { dryRun?: boolean };
+/** A dry run's answer: the messages in order; empty when there is nothing to send. */
+export type CastDryRun = { wouldSend: CastRequest[] };
+
+/**
+ * What `announce` did: whether the clip played to its end, why not, and what it put back or could not. A dry run has
+ * `played: false`, `why: "dry run"`, `wouldSend`, and in `notRestored` what the real one could not put back.
+ */
 export type AnnounceResult = {
   played: boolean;
   why?: string;
   restored: string[];
   notRestored: { name: string; why: string }[];
+  wouldSend?: CastRequest[];
 };
 
 /** Serves bytes once over HTTP on the LAN: `serveClip` from `@khalido/home/cast/serve`. `host` is the device that will fetch it. */
@@ -60,20 +75,32 @@ export type ServeClip = (
 
 /** The writes on `cast()`'s object. A target is a device's or group's name (any case) or its castId; volume is 0 to 1, as the snapshot's. */
 export type CastActions = {
-  setVolume(target: string, level: number): Promise<void>;
-  setMuted(target: string, muted: boolean): Promise<void>;
+  /** Resolves `undefined` once sent, or a `CastDryRun` under `dryRun`. */
+  setVolume(
+    target: string,
+    level: number,
+    options?: CastWriteOptions,
+  ): Promise<CastDryRun | undefined>;
+  setMuted(
+    target: string,
+    muted: boolean,
+    options?: CastWriteOptions,
+  ): Promise<CastDryRun | undefined>;
   /** Ends the running app (receiver STOP), which returns the device to its idle screen. Nothing running: nothing sent. */
-  stop(target: string): Promise<void>;
+  stop(
+    target: string,
+    options?: CastWriteOptions,
+  ): Promise<CastDryRun | undefined>;
   announce(
     target: string,
     clip: CastClip,
-    options?: { volume?: number; timeoutMs?: number },
+    options?: { volume?: number; timeoutMs?: number } & CastWriteOptions,
   ): Promise<AnnounceResult>;
   /** `announce` to several targets at once, one result per device, in the order given. A target that can't be reached is its own `played: false`. A group and one of its own members are not told apart. */
   announceAll(
     targets: string[],
     clip: CastClip,
-    options?: { volume?: number; timeoutMs?: number },
+    options?: { volume?: number; timeoutMs?: number } & CastWriteOptions,
   ): Promise<(AnnounceResult & { target: string })[]>;
 };
 
@@ -407,22 +434,44 @@ export function castActions(ctx: WriteContext): CastActions {
       );
   };
 
+  const toReceiver = (
+    d: CastDevice,
+    payload: Record<string, unknown>,
+  ): CastRequest => ({ device: d.name, channel: "receiver", payload });
+  /** A dry SET_VOLUME: the target found and connected, nothing sent. */
+  const dryVolume = (
+    target: string,
+    volume: { level: number } | { muted: boolean },
+  ): CastDryRun => {
+    const d = find(target);
+    live(d);
+    return {
+      wouldSend: [toReceiver(d, { type: "SET_VOLUME", volume })],
+    };
+  };
+
   const actions: CastActions = {
-    async setVolume(target, level) {
+    async setVolume(target, level, options) {
       checkLevel(level);
+      if (options?.dryRun) return dryVolume(target, { level });
       await setVolume(target, { level });
     },
-    async setMuted(target, muted) {
+    async setMuted(target, muted, options) {
+      if (options?.dryRun) return dryVolume(target, { muted });
       await setVolume(target, { muted });
     },
-    async stop(target) {
-      const s = live(find(target));
+    async stop(target, options) {
+      const d = find(target);
+      const s = live(d);
       const app = (await receiver(s)).applications?.[0];
-      if (app && !app.isIdleScreen)
-        await receiver(s, {
-          type: "STOP",
-          ...(app.sessionId ? { sessionId: app.sessionId } : {}),
-        });
+      const stop = {
+        type: "STOP",
+        ...(app?.sessionId ? { sessionId: app.sessionId } : {}),
+      };
+      const running = app && !app.isIdleScreen;
+      if (options?.dryRun)
+        return { wouldSend: running ? [toReceiver(d, stop)] : [] };
+      if (running) await receiver(s, stop);
     },
 
     /**
@@ -456,6 +505,7 @@ export function castActions(ctx: WriteContext): CastActions {
         restored: [],
         notRestored: [],
       };
+      if (options.dryRun) return dryAnnounce();
       const serving = new AbortController();
       let served: { close(): void } | undefined;
       let volumeSet = false;
@@ -501,6 +551,59 @@ export function castActions(ctx: WriteContext): CastActions {
       }
       return result;
 
+      /** What the announce would send, from the reads above; what it could not put back goes in `notRestored`. */
+      function dryAnnounce(): AnnounceResult {
+        const to = (
+          device: { name: string },
+          payload: Record<string, unknown>,
+        ): CastRequest => ({
+          device: device.name,
+          channel: "receiver",
+          payload,
+        });
+        const media = (payload: Record<string, unknown>): CastRequest => ({
+          device: d.name,
+          channel: "media",
+          payload,
+        });
+        const sends: CastRequest[] = [];
+        if (options.volume !== undefined)
+          sends.push(
+            to(d, { type: "SET_VOLUME", volume: { level: options.volume } }),
+          );
+        if (unmute)
+          sends.push(to(d, { type: "SET_VOLUME", volume: { muted: false } }));
+        sends.push(
+          to(d, { type: "LAUNCH", appId: DEFAULT_MEDIA_RECEIVER }),
+          media({
+            type: "LOAD",
+            media: {
+              contentId:
+                "url" in clip
+                  ? clip.url
+                  : `(${clip.bytes.length} bytes of ${clip.type}, served on the LAN)`,
+              contentType: clip.type ?? "audio/mpeg",
+              streamType: "BUFFERED",
+            },
+            autoplay: true,
+          }),
+        );
+        if (priorMedia) sends.push(media({ type: "LOAD", ...priorMedia }));
+        else {
+          sends.push(to(d, { type: "STOP" }));
+          if (!idleApp(prior) && prior?.appId !== DEFAULT_MEDIA_RECEIVER)
+            result.notRestored.push({
+              name: d.name,
+              why: `${prior?.displayName ?? prior?.appId ?? "an app"} would be interrupted and cannot be resumed from here`,
+            });
+        }
+        for (const step of volumeSteps())
+          if ("gap" in step)
+            result.notRestored.push({ name: step.name, why: step.gap });
+          else for (const p of step.payloads) sends.push(to(step, p));
+        return { ...result, why: "dry run", wouldSend: sends };
+      }
+
       async function restoreApp() {
         try {
           // A LAUNCH that timed out may still have started: look before deciding nothing of ours runs.
@@ -538,70 +641,92 @@ export function castActions(ctx: WriteContext): CastActions {
         }
       }
 
-      async function restoreVolume() {
+      /**
+       * The volume put back after the clip, as steps: a group's own level first (it keeps one of its own, which its members'
+       * levels don't bring back: live, 2026-11-10, it stayed at the announcement's 30 with every member restored), so
+       * whatever it does to the members, their own levels land last; then each member's, or the target's, through its own
+       * socket. A step it can't take is a gap with the reason. `restoreVolume` takes them; a dry run reports them.
+       */
+      function volumeSteps(): (
+        | {
+            name: string;
+            socket: CastSession;
+            payloads: Record<string, unknown>[];
+            label: string;
+          }
+        | { name: string; gap: string }
+      )[] {
+        const steps: ReturnType<typeof volumeSteps> = [];
+        if (d.kind === "group" && options.volume !== undefined) {
+          const level = before.volume?.level;
+          steps.push(
+            level === undefined
+              ? { name: d.name, gap: "its volume before was not reported" }
+              : {
+                  name: d.name,
+                  socket: s,
+                  payloads: [{ type: "SET_VOLUME", volume: { level } }],
+                  label: `${d.name}: volume`,
+                },
+          );
+        }
         const each =
           d.kind === "group"
             ? members
-            : [
-                {
-                  id: d.id,
-                  name: d.name,
-                  level: before.volume?.level,
-                  muted: before.volume?.muted,
-                },
-              ];
-        // A group keeps a level of its own, which its members' levels don't bring back (live, 2026-11-10: it stayed at the
-        // announcement's 30 with every member restored). First, so whatever it does to the members, their own levels land last.
-        if (d.kind === "group" && options.volume !== undefined) {
-          const level = before.volume?.level;
-          if (level === undefined)
-            result.notRestored.push({
-              name: d.name,
-              why: "its volume before was not reported",
-            });
-          else
-            try {
-              await receiver(s, { type: "SET_VOLUME", volume: { level } });
-              result.restored.push(`${d.name}: volume`);
-            } catch (error) {
-              result.notRestored.push({
-                name: d.name,
-                why: `volume not restored: ${errorText(error)}`,
-              });
-            }
-        }
+            : options.volume !== undefined || unmute
+              ? [
+                  {
+                    id: d.id,
+                    name: d.name,
+                    level: before.volume?.level,
+                    muted: before.volume?.muted,
+                  },
+                ]
+              : [];
         for (const m of each) {
           const ms = m.id === d.id ? s : ctx.session(m.id);
           if (m.level === undefined)
-            result.notRestored.push({
+            steps.push({
               name: m.name,
-              why: "its volume before was not reported",
+              gap: "its volume before was not reported",
             });
           else if (!ms)
-            result.notRestored.push({
+            steps.push({
               name: m.name,
-              why: "not connected, so its volume stays as the announcement set it",
+              gap: "not connected, so its volume stays as the announcement set it",
             });
           else
-            try {
-              await receiver(ms, {
-                type: "SET_VOLUME",
-                volume: { level: m.level },
-              });
-              if (m.muted)
-                await receiver(ms, {
-                  type: "SET_VOLUME",
-                  volume: { muted: true },
-                });
-              result.restored.push(
-                `${m.name}: volume${m.muted ? ", muted" : ""}`,
-              );
-            } catch (error) {
-              result.notRestored.push({
-                name: m.name,
-                why: `volume not restored: ${errorText(error)}`,
-              });
-            }
+            steps.push({
+              name: m.name,
+              socket: ms,
+              payloads: [
+                { type: "SET_VOLUME", volume: { level: m.level } },
+                ...(m.muted
+                  ? [{ type: "SET_VOLUME", volume: { muted: true } }]
+                  : []),
+              ],
+              label: `${m.name}: volume${m.muted ? ", muted" : ""}`,
+            });
+        }
+        return steps;
+      }
+
+      async function restoreVolume() {
+        for (const step of volumeSteps()) {
+          if ("gap" in step) {
+            result.notRestored.push({ name: step.name, why: step.gap });
+            continue;
+          }
+          try {
+            for (const p of step.payloads)
+              await receiver(step.socket, p as { type: string });
+            result.restored.push(step.label);
+          } catch (error) {
+            result.notRestored.push({
+              name: step.name,
+              why: `volume not restored: ${errorText(error)}`,
+            });
+          }
         }
       }
     },

@@ -2158,3 +2158,67 @@ describe("stalls (Soloist issue #5)", () => {
     await h.stop();
   });
 });
+
+describe("dry run", () => {
+  const dry = { dryRun: true };
+
+  test("each write checks, sends nothing, and says what it would send", async () => {
+    const h = setup({ maxVolume: 60 });
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 40 });
+    sock.sent.length = 0;
+    expect(await h.s.pause(dry)).toMatchObject({
+      confirmed: false,
+      wouldSend: [{ command: "pause" }],
+    });
+    expect((await h.s.setVolume(90, dry)).wouldSend).toEqual([
+      { command: "set_volume", fields: { volume: 60 } }, // held to maxVolume, as the real one
+    ]);
+    expect((await h.s.setRepeat("track", dry)).wouldSend).toHaveLength(2);
+    expect((await h.s.activate(dry)).wouldSend).toEqual([]); // already active
+    await expect(h.s.seek(-1, dry)).rejects.toMatchObject({
+      code: "invalid",
+    });
+    await h.advance(1000);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("an inactive speaker's play would activate first; its setVolume is refused as the real one is", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "paused", item: TRACK });
+    sock.push({ type: "device_changed", is_active: false });
+    sock.sent.length = 0;
+    expect((await h.s.play(undefined, dry)).wouldSend).toEqual([
+      { command: "activate" },
+      { command: "play" },
+    ]);
+    await expect(h.s.setVolume(30, dry)).rejects.toMatchObject({
+      code: "inactive",
+    });
+    await h.advance(1000);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+
+  test("duck and interrupt run fn, leave the music alone, and say what they would have done", async () => {
+    const h = setup();
+    const sock = await h.online({ status: "playing", item: TRACK, volume: 62 });
+    sock.sent.length = 0;
+    expect(await h.s.duck(() => "said", { to: 20, dryRun: true })).toEqual({
+      value: "said",
+      music: "untouched",
+      why: "dry run: would lower the volume from 62 to 20, then put it back",
+    });
+    expect(await h.s.interrupt(() => 1, dry)).toEqual({
+      value: 1,
+      music: "untouched",
+      why: "dry run: would pause the music, then resume it",
+    });
+    expect((await h.s.duck(() => 0, { to: 80, dryRun: true })).why).toBe(
+      "dry run: it was already at 62, so the music would be left alone",
+    );
+    await h.advance(1000);
+    expect(sock.sent).toEqual([]);
+    await h.stop();
+  });
+});

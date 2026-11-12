@@ -96,8 +96,23 @@ export type SpotifyConfig = {
 /** Soloist's repeat modes. */
 export type Repeat = "off" | "context" | "track";
 
-/** What a write left: the state once Soloist reported the change (`confirmed`), or the state as it stood when `CONFIRM_MS` ran out without it. */
-export type Applied = { state: SpotifyState; confirmed: boolean };
+/** One WebSocket command, as a dry run reports it: Soloist's command name and its fields. */
+export type SpotifyRequest = {
+  command: string;
+  fields?: Record<string, unknown>;
+};
+/** `dryRun`: run every check a real write runs (connected, signed in, the input), send nothing, and say what would go. */
+export type SpotifyWriteOptions = { dryRun?: boolean };
+
+/**
+ * What a write left: the state once Soloist reported the change (`confirmed`), or the state as it stood when `CONFIRM_MS`
+ * ran out without it. A dry run resolves `confirmed: false` with `wouldSend`, the commands in order; an `activate` already done resolves `confirmed: true` with `wouldSend: []`.
+ */
+export type Applied = {
+  state: SpotifyState;
+  confirmed: boolean;
+  wouldSend?: SpotifyRequest[];
+};
 
 /**
  * What happened to the music around `duck` or `interrupt`'s `fn`: `untouched` (it was not playing, not connected, already
@@ -115,34 +130,41 @@ export type Aside<T> = { value: T; music: Music; why?: string };
  */
 export type SpotifyActions = {
   /** Make this the account's active Spotify device. Soloist drops volume changes until it is. It makes a new audio stream, so the volume can jump to the level last saved. */
-  activate(): Promise<Applied>;
+  activate(options?: SpotifyWriteOptions): Promise<Applied>;
   /** Play a Spotify link or URI (track, album, playlist, artist, episode, show), or resume what is loaded when none is given. */
-  play(linkOrUri?: string): Promise<Applied>;
-  pause(): Promise<Applied>;
-  resume(): Promise<Applied>;
-  next(): Promise<Applied>;
-  prev(): Promise<Applied>;
+  play(linkOrUri?: string, options?: SpotifyWriteOptions): Promise<Applied>;
+  pause(options?: SpotifyWriteOptions): Promise<Applied>;
+  resume(options?: SpotifyWriteOptions): Promise<Applied>;
+  next(options?: SpotifyWriteOptions): Promise<Applied>;
+  prev(options?: SpotifyWriteOptions): Promise<Applied>;
   /** Jump to a position in the current track, in ms. */
-  seek(ms: number): Promise<Applied>;
+  seek(ms: number, options?: SpotifyWriteOptions): Promise<Applied>;
   /** Set the volume 0–100, held to `maxVolume` and rounded to a whole percent: `state.volume` is what Soloist then reports. */
-  setVolume(volume: number): Promise<Applied>;
+  setVolume(volume: number, options?: SpotifyWriteOptions): Promise<Applied>;
   /** Add a track to the queue (Soloist queues tracks only); confirmed when it shows in `upNext`. */
-  queue(track: string): Promise<Applied>;
-  setShuffle(on: boolean): Promise<Applied>;
+  queue(track: string, options?: SpotifyWriteOptions): Promise<Applied>;
+  setShuffle(on: boolean, options?: SpotifyWriteOptions): Promise<Applied>;
   /** Repeat off, the context (playlist, album) or the track: two commands, in the order Soloist's docs give, as one write. */
-  setRepeat(mode: Repeat): Promise<Applied>;
+  setRepeat(mode: Repeat, options?: SpotifyWriteOptions): Promise<Applied>;
   /**
    * Pause if playing, run `fn`, then resume, unless someone changed it meanwhile (resumed, stopped or skipped it from a
    * phone): then it is theirs and stays. The resume runs even if `fn` throws. Not playing or not connected: just `fn`.
    * One `interrupt` or `duck` at a time; a second waits for the first, so never call either from inside `fn` (it would wait
    * forever). Two announcements back to back belong in one `fn`, or the music comes back between them.
    */
-  interrupt<T>(fn: () => Promise<T> | T): Promise<Aside<T>>;
+  interrupt<T>(
+    fn: () => Promise<T> | T,
+    options?: SpotifyWriteOptions,
+  ): Promise<Aside<T>>;
   /**
    * Lower the volume to `to` while `fn` runs, then put the earlier volume back, unless someone set the volume meanwhile.
    * For a short announcement over the music. Not playing, not connected or already at `to` or below: just `fn`.
+   * With `dryRun`, `interrupt` and `duck` run `fn`, touch nothing, and say in `why` what they would have done.
    */
-  duck<T>(fn: () => Promise<T> | T, options: { to: number }): Promise<Aside<T>>;
+  duck<T>(
+    fn: () => Promise<T> | T,
+    options: { to: number } & SpotifyWriteOptions,
+  ): Promise<Aside<T>>;
 };
 
 /** How long a command waits for Soloist's answer. Loopback answers in milliseconds; a stated guess. */
@@ -332,11 +354,33 @@ export function spotify(
    * Soloist accepted the command that carried it (a merged write's may be another's: a pause merged into a later play never
    * confirms). A drop ends the wait early, unconfirmed.
    */
-  const change = async (slot: string, body: Body): Promise<Applied> => {
+  const change = async (
+    slot: string,
+    body: Body,
+    options: SpotifyWriteOptions = {},
+  ): Promise<Applied> => {
+    if (options.dryRun) return dry(body);
     const sent = await write(slot, body);
     const took = () => body.took?.(state, sent.before, sent.at) ?? true;
     await waitFor(() => took() || !isOpen(), CONFIRM_MS);
     return { state, confirmed: took() };
+  };
+  /** A dry run: `command`'s own checks (connected, signed in), then the commands `send` would send, in order. */
+  const dry = (body: Body): Applied => {
+    if (!socket || !isOpen() || socket.readyState !== OPEN) throw offline();
+    if (state.loggedIn === false)
+      throw new ConnectorError(WAITING, { code: "waiting" });
+    const one = (command: string, fields?: Record<string, unknown>) =>
+      fields ? { command, fields } : { command };
+    return {
+      state,
+      confirmed: false,
+      wouldSend: [
+        ...(body.activeFirst && inactive() ? [one("activate")] : []),
+        one(body.command, body.fields),
+        ...(body.then ? [one(body.then.command, body.then.fields)] : []),
+      ],
+    };
   };
   /** The track restarted: a new anchor near 0 when it had been 5 s or more in (a prev past the first seconds, a next on repeat-track). */
   const restarted = (s: SpotifyState, b: SpotifyState, at: number) =>
@@ -349,12 +393,16 @@ export function spotify(
     new ConnectorError(message, { code: "invalid" });
   const near = (volume: number | undefined, v: number) =>
     volume !== undefined && Math.abs(volume - v) <= VOLUME_SLACK;
-  const volumeTo = (v: number) =>
-    change("volume", {
-      command: "set_volume",
-      fields: { volume: v },
-      took: (s) => near(s.volume, v),
-    });
+  const volumeTo = (v: number, options?: SpotifyWriteOptions) =>
+    change(
+      "volume",
+      {
+        command: "set_volume",
+        fields: { volume: v },
+        took: (s) => near(s.volume, v),
+      },
+      options,
+    );
   /** Soloist accepts a `set_volume` while it isn't the active device and drops it (three times live, 2026-11-09). */
   const inactive = () =>
     isOpen() && state.loggedIn !== false && state.active === false;
@@ -637,6 +685,33 @@ export function spotify(
     return p;
   };
   type Left = Omit<Aside<never>, "value">;
+  /** Why `interrupt` would leave the music alone, if it would. */
+  const interruptSkip = () =>
+    notPlaying() ??
+    // "playing" while inactive is the account playing on another speaker (live, 2026-11-10): a pause would stop that one.
+    (inactive()
+      ? "it is not the active device, so the music playing is on another speaker"
+      : undefined);
+  /** Why `duck` would leave the volume alone, if it would. */
+  const duckSkip = (to: number) =>
+    notPlaying() ??
+    (inactive()
+      ? "it is not the active device, so its volume can't be changed"
+      : state.volume === undefined
+        ? "its volume is not known"
+        : state.volume <= to
+          ? `it was already at ${state.volume}`
+          : undefined);
+  /** A dry `interrupt` or `duck`: `fn` runs, the music is not touched, and `why` says what would have happened to it. */
+  const dryAside = async <T>(
+    fn: () => Promise<T> | T,
+    skip: string | undefined,
+    would: string,
+  ): Promise<Aside<T>> => ({
+    value: await fn(),
+    music: "untouched",
+    why: `dry run: ${skip ? `${skip}, so the music would be left alone` : `would ${would}`}`,
+  });
   const putBack = (r: Applied, what: string): Left =>
     r.confirmed
       ? { music: "restored" }
@@ -646,69 +721,96 @@ export function spotify(
         };
 
   const actions: SpotifyActions = {
-    async activate() {
+    async activate(options) {
       if (isOpen() && state.loggedIn !== false && state.active === true)
-        return { state, confirmed: true }; // a second activate might make a new stream
-      return change("activate", {
-        command: "activate",
-        took: (s) => s.active === true,
-      });
+        return {
+          state,
+          confirmed: true,
+          ...(options?.dryRun ? { wouldSend: [] } : {}),
+        }; // a second activate might make a new stream
+      return change(
+        "activate",
+        { command: "activate", took: (s) => s.active === true },
+        options,
+      );
     },
     // A `play` while inactive didn't take live; going active first is untested for this. `resume` worked inactive, so it doesn't.
-    async play(linkOrUri) {
+    async play(linkOrUri, options) {
       if (linkOrUri === undefined)
-        return change("transport", {
-          command: "play",
-          activeFirst: true,
-          took: (s) => s.status === "playing",
-        });
+        return change(
+          "transport",
+          {
+            command: "play",
+            activeFirst: true,
+            took: (s) => s.status === "playing",
+          },
+          options,
+        );
       const uri = toSpotifyUri(linkOrUri);
       if (!uri) throw invalid(`not a Spotify link or URI: ${linkOrUri}`);
-      return change("transport", {
-        command: "play",
-        fields: { uri },
-        activeFirst: true,
-        took: (s) =>
-          s.status === "playing" &&
-          (s.track?.uri === uri || s.context?.uri === uri),
-      });
+      return change(
+        "transport",
+        {
+          command: "play",
+          fields: { uri },
+          activeFirst: true,
+          took: (s) =>
+            s.status === "playing" &&
+            (s.track?.uri === uri || s.context?.uri === uri),
+        },
+        options,
+      );
     },
-    pause: () =>
-      change("transport", {
-        command: "pause",
-        took: (s) => s.status === "paused",
-      }),
-    resume: () =>
-      change("transport", {
-        command: "play",
-        took: (s) => s.status === "playing",
-      }),
+    pause: (options) =>
+      change(
+        "transport",
+        { command: "pause", took: (s) => s.status === "paused" },
+        options,
+      ),
+    resume: (options) =>
+      change(
+        "transport",
+        { command: "play", took: (s) => s.status === "playing" },
+        options,
+      ),
     // The end of the queue goes idle; repeat-track restarts it.
-    next: () =>
-      change(`once-${++once}`, {
-        command: "skip_next",
-        took: (s, b, at) =>
-          newTrack(s, b) ||
-          (s.status === "idle" && b.status !== "idle") ||
-          restarted(s, b, at),
-      }),
-    prev: () =>
-      change(`once-${++once}`, {
-        command: "skip_prev",
-        took: (s, b, at) => newTrack(s, b) || restarted(s, b, at),
-      }),
-    async seek(ms) {
+    next: (options) =>
+      change(
+        `once-${++once}`,
+        {
+          command: "skip_next",
+          took: (s, b, at) =>
+            newTrack(s, b) ||
+            (s.status === "idle" && b.status !== "idle") ||
+            restarted(s, b, at),
+        },
+        options,
+      ),
+    prev: (options) =>
+      change(
+        `once-${++once}`,
+        {
+          command: "skip_prev",
+          took: (s, b, at) => newTrack(s, b) || restarted(s, b, at),
+        },
+        options,
+      ),
+    async seek(ms, options) {
       if (!Number.isFinite(ms) || ms < 0)
         throw invalid(`a position in ms, 0 or more, not ${ms}`);
-      return change("seek", {
-        command: "seek",
-        fields: { position_ms: ms },
-        took: (s, b) =>
-          s.position !== b.position &&
-          Math.abs((s.position?.ms ?? -Infinity) - ms) < 2000,
-      });
+      return change(
+        "seek",
+        {
+          command: "seek",
+          fields: { position_ms: ms },
+          took: (s, b) =>
+            s.position !== b.position &&
+            Math.abs((s.position?.ms ?? -Infinity) - ms) < 2000,
+        },
+        options,
+      );
     },
-    async setVolume(volume) {
+    async setVolume(volume, options) {
       if (!Number.isFinite(volume) || volume < 0 || volume > 100)
         throw invalid(`volume is 0–100, not ${volume}`);
       if (inactive())
@@ -718,48 +820,60 @@ export function spotify(
         );
       return volumeTo(
         Math.round(cap === undefined ? volume : Math.min(volume, cap)),
+        options,
       );
     },
-    async queue(track) {
+    async queue(track, options) {
       const uri = toSpotifyUri(track);
       if (!uri?.startsWith("spotify:track:"))
         throw invalid(`only a Spotify track can be queued, not ${track}`);
-      return change(`once-${++once}`, {
-        command: "add_to_queue",
-        fields: { uri },
-        took: (s) => !!s.upNext?.some((t) => t.uri === uri),
-      });
+      return change(
+        `once-${++once}`,
+        {
+          command: "add_to_queue",
+          fields: { uri },
+          took: (s) => !!s.upNext?.some((t) => t.uri === uri),
+        },
+        options,
+      );
     },
-    setShuffle: (on) =>
-      change("shuffle", {
-        command: "set_shuffle",
-        fields: { enabled: on },
-        took: (s) => s.shuffle === on,
-      }),
-    async setRepeat(mode) {
+    setShuffle: (on, options) =>
+      change(
+        "shuffle",
+        {
+          command: "set_shuffle",
+          fields: { enabled: on },
+          took: (s) => s.shuffle === on,
+        },
+        options,
+      ),
+    async setRepeat(mode, options) {
       // developer.spotify.com/documentation/soloist/reference/websocket-api: clear the other mode first, then set this one.
       if (!Object.hasOwn(REPEAT_ORDER, mode))
         throw invalid(`repeat is off, context or track, not ${mode}`);
       const [first, second] = REPEAT_ORDER[mode];
-      return change("repeat", {
-        command: first[0],
-        fields: { enabled: first[1] },
-        then: { command: second[0], fields: { enabled: second[1] } },
-        took: (s) => s.repeat === mode,
-      });
+      return change(
+        "repeat",
+        {
+          command: first[0],
+          fields: { enabled: first[1] },
+          then: { command: second[0], fields: { enabled: second[1] } },
+          took: (s) => s.repeat === mode,
+        },
+        options,
+      );
     },
-    interrupt(fn) {
+    interrupt(fn, options) {
+      if (options?.dryRun)
+        return dryAside(fn, interruptSkip(), "pause the music, then resume it");
       let track: string | undefined;
       let shown = false; // the pause showed
       return aside(
         "interrupt",
         fn,
         async () => {
-          const no = notPlaying();
+          const no = interruptSkip();
           if (no) return no;
-          // "playing" while inactive is the account playing on another speaker (live, 2026-11-10): a pause would stop that one.
-          if (inactive())
-            return "it is not the active device, so the music playing is on another speaker";
           track = state.track?.uri;
           try {
             shown = (await actions.pause()).confirmed; // a pause that never shows still runs fn: what interrupts matters more
@@ -788,22 +902,24 @@ export function spotify(
         },
       );
     },
-    duck(fn, { to }) {
+    duck(fn, { to, dryRun }) {
       if (!Number.isFinite(to) || to < 0 || to > 100)
         return Promise.reject(invalid(`duck's volume is 0–100, not ${to}`));
+      if (dryRun)
+        return dryAside(
+          fn,
+          duckSkip(to),
+          `lower the volume from ${state.volume} to ${Math.round(to)}, then put it back`,
+        );
       let earlier = 0;
       let shown = false; // the lowered volume showed
       return aside(
         "duck",
         fn,
         async () => {
-          const no = notPlaying();
+          const no = duckSkip(to);
           if (no) return no;
-          if (inactive())
-            return "it is not the active device, so its volume can't be changed";
-          if (state.volume === undefined) return "its volume is not known";
-          if (state.volume <= to) return `it was already at ${state.volume}`;
-          earlier = state.volume;
+          earlier = state.volume!;
           try {
             shown = (await volumeTo(Math.round(to))).confirmed;
           } catch (error) {

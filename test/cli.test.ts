@@ -30,18 +30,17 @@ describe("home output contract", () => {
     expect(home(["printers", "cancel", "7", "--dry-run"])).toMatchObject({
       code: 2,
     });
-    expect(home(["hue", "room", "--dry-run"]).err).not.toMatch(
-      /unknown option/i,
-    );
+    for (const args of [
+      ["hue", "room"],
+      ["cast", "volume"],
+      ["spotify", "pause"],
+      ["printers", "print"],
+    ])
+      expect(home([...args, "--dry-run"]).err).not.toMatch(/unknown option/i);
   });
 
   test("--dry-run is refused on a command whose writes don't read it, before anything runs", () => {
-    for (const args of [
-      ["cast", "volume", "Kitchen", "30"],
-      ["spotify", "pause"],
-      ["discover", "--write", "x.jsonc"],
-      ["pair"],
-    ]) {
+    for (const args of [["discover", "--write", "x.jsonc"], ["pair"]]) {
       const r = home([...args, "--dry-run"]);
       expect(r.code).toBe(2);
       expect(r.err).toMatch(/dryRun|dry run/i);

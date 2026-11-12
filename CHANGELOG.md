@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+
+- **cast, spotify:** dry run. Every Cast and Spotify write takes `{ dryRun: true }`: it checks as a real write does, sends nothing, and says what it would send (`wouldSend`). Cast's `setVolume`, `setMuted` and `stop` now resolve `{ wouldSend }` under a dry run and `undefined` otherwise; a dry `announce` also names in `notRestored` the app it would interrupt, and serves nothing. Spotify's `duck` and `interrupt` run `fn` and say in `why` what they would have done. `home cast …` and `home spotify …` take `--dry-run`. New types: `CastRequest`, `CastDryRun`, `CastWriteOptions`, `SpotifyRequest`, `SpotifyWriteOptions`.
+
 ## [0.2.1] - 2026-11-12
 
 ### Added

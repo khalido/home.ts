@@ -13,6 +13,7 @@ import {
   resolvedFrom,
 } from "../connectors/cast/index.ts";
 import { findCast } from "../connectors/cast/state.ts";
+import type { CastDryRun, CastRequest } from "../connectors/cast/writes.ts";
 import { serveClip } from "../connectors/cast/serve.ts";
 import { tlsConnect } from "../connectors/cast/tls.ts";
 import { addressBook } from "../discover.ts";
@@ -114,14 +115,32 @@ export const CAST_OPTIONS: [string, string, { type: unknown[] }?][] = [
 /** How long a write waits for the device to report the change before saying it was only sent. */
 const SHOWN_MS = 2000;
 
-/** One write, then the device's line once it reports what was asked, or that it has not yet. */
+/** A dry run's messages, one line each: `would send <device> <channel> <payload>`. */
+const dryLines = (sends: CastRequest[], who = "") =>
+  sends.length
+    ? sends.forEach((r) =>
+        console.log(
+          `${who}would send ${r.device} ${r.channel} ${JSON.stringify(r.payload)}`,
+        ),
+      )
+    : console.log(`${who}nothing to send`);
+
+/** One write, then the device's line once it reports what was asked, or that it has not yet. Dry: what would be sent. */
 const wrote = (
   name: string,
-  write: (c: ReturnType<typeof castNow>) => Promise<void>,
+  write: (
+    c: ReturnType<typeof castNow>,
+    options: { dryRun: boolean },
+  ) => Promise<CastDryRun | undefined>,
   shown: (d: CastDevice) => boolean,
+  dryRun: boolean,
 ) =>
   withCast(async (c, state) => {
-    await write(c);
+    const dry = await write(c, { dryRun });
+    if (dry) {
+      console.log("dry run, nothing sent:");
+      return dryLines(dry.wouldSend);
+    }
     const now = () => {
       const s = state();
       const d = s && findCast(s.devices, name);
@@ -140,29 +159,32 @@ const wrote = (
   });
 
 export const castVerbs: Verbs = {
-  async volume([name, value]) {
+  async volume([name, value], o) {
     if (!name) usage(CAST_USAGE);
     const level = percentLevel(value);
     await wrote(
       name!,
-      (c) => c.setVolume(name!, level),
+      (c, dry) => c.setVolume(name!, level, dry),
       (d) => d.volume !== undefined && Math.abs(d.volume - level) < 0.006,
+      !!o.dryRun,
     );
   },
-  async mute([name, value]) {
+  async mute([name, value], o) {
     if (!name || (value !== "on" && value !== "off")) usage(CAST_USAGE);
     await wrote(
       name!,
-      (c) => c.setMuted(name!, value === "on"),
+      (c, dry) => c.setMuted(name!, value === "on", dry),
       (d) => d.muted === (value === "on"),
+      !!o.dryRun,
     );
   },
-  async stop([name]) {
+  async stop([name], o) {
     if (!name) usage(CAST_USAGE);
     await wrote(
       name!,
-      (c) => c.stop(name!),
+      (c, dry) => c.stop(name!, dry),
       (d) => d.idle === true,
+      !!o.dryRun,
     );
   },
   async announce(_, o) {
@@ -209,13 +231,21 @@ export const castVerbs: Verbs = {
       type = "audio/mp4";
     }
     const results = await withCast((c) =>
-      c.announceAll(to, { bytes, type }, { volume }),
+      c.announceAll(to, { bytes, type }, { volume, dryRun: !!o.dryRun }),
     );
-    if (results.some((r) => !r.played)) process.exitCode = 1; // docs/cli.md: 1 is a failure, so a script can tell
+    const failed = results.some((r) => (o.dryRun ? !r.wouldSend : !r.played));
+    if (failed) process.exitCode = 1; // docs/cli.md: 1 is a failure, so a script can tell
     if (o.json) return printJson(to.length === 1 ? results[0] : results);
     const named = results.length > 1;
+    if (o.dryRun) console.log("dry run, nothing sent:");
     for (const r of results) {
       const who = named ? `${r.target}: ` : "";
+      if (r.wouldSend) {
+        dryLines(r.wouldSend, who);
+        for (const n of r.notRestored)
+          console.log(`${who}would not restore: ${n.name}: ${n.why}`);
+        continue;
+      }
       console.log(`${who}${r.played ? "played" : `not played: ${r.why}`}`);
       if (r.restored.length)
         console.log(`${who}restored: ${r.restored.join(", ")}`);
