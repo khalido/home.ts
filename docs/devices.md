@@ -1,10 +1,43 @@
-# Devices worth buying
+# Devices
 
-2026-10-16. Australian prices are rough and mostly unverified; check the shop before buying. The connector survey (what the library could cover) is in [ideas.md](ideas.md); this page is about what to put in the house.
+What this library works with, what is under consideration, and what comes later; then notes on what to buy. Prices are Australian, rough and mostly unverified (2026-10-16 onward); check the shop. The connector survey is in [ideas.md](ideas.md).
 
-The test for each device: does it work locally, does Google Home see it, what does it cost in AU, how long does the battery last, and could this library read it. The library has no Matter or MQTT connector today. A Matter device is only readable here once a Matter controller exists (see [Matter in one paragraph](#matter-in-one-paragraph)). A device with a local HTTP API (Shelly) is readable with a small connector.
+## Works with this library
 
-## Buy first
+Each has a connector; its README says what has run on a real device.
+
+| Device or service                                                                                            | Connector                                        | Reads                                                         | Writes                                       | Live on a real device |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------- | -------------------------------------------- | --------------------- |
+| Philips Hue bridge, its lights, rooms, zones, scenes and motion sensors                                      | [hue](../src/connectors/hue/README.md)           | state, pushed                                                 | lights, rooms, scenes, all off               | yes                   |
+| Daikin AC with the dsiot local API (Alira X and others)                                                      | [daikin](../src/connectors/daikin/README.md)     | power, mode, setpoint, room and outdoor temperature, humidity | power, mode, setpoint                        | yes                   |
+| Enphase IQ Gateway (Envoy)                                                                                   | [enphase](../src/connectors/enphase/README.md)   | solar, use, grid                                              | none                                         | yes                   |
+| Google Cast: Nest Mini, Nest Audio, Google Home, Nest Hub and Hub Max, Chromecast, Google TV, speaker groups | [cast](../src/connectors/cast/README.md)         | what is playing, volume                                       | announce (MP3, AAC, WAV), volume, mute, stop | yes                   |
+| AirPrint printers (Brother HL-L2350DW tried)                                                                 | [printers](../src/connectors/printers/README.md) | state, toner, paper                                           | print a PDF, identify, cancel                | yes                   |
+| Spotify Soloist, a headless Spotify Connect speaker on a Pi                                                  | [spotify](../src/connectors/spotify/README.md)   | what is playing, volume                                       | play, pause, volume, queue, duck, interrupt  | yes                   |
+| Amber Electric (prices)                                                                                      | [amber](../src/connectors/amber/README.md)       | import and feed-in prices, forecast                           | none                                         | yes                   |
+| Up Bank (spending)                                                                                           | [up](../src/connectors/up/README.md)             | spending by category                                          | categories, tags                             | yes                   |
+| Weather: BOM, Open-Meteo, Google Weather                                                                     | [weather](../src/connectors/weather/README.md)   | now, forecast, rain soon, the sun                             | none                                         | yes                   |
+
+## Under consideration
+
+Each would be one connector over a local API, the shape the library already has. None is bought or built yet.
+
+- **ESPHome devices.** ESP32 boards running ESPHome firmware: plugs, sensors, relays. Each has its own local HTTP API with a live event stream (`web_server`), so the library would read and switch them directly, with no Home Assistant and no MQTT broker. They don't join the Hue bridge or appear in Google Home by themselves; some ship a Matter version that does. Candidates: Athom plugs with energy monitoring (sold for Australia), Apollo MSR-2 presence and AIR-1 air quality. Unverified: AU prices, and how the event stream behaves over hours. Source: the Gemini research pass, 2026-11-13; [ESPHome web server](https://esphome.io/components/web_server/).
+- **Shelly plugs and energy meters.** Local JSON-RPC with push, energy per plug; the best template for an energy connector ([ideas.md](ideas.md)).
+- **AirGradient ONE.** Indoor CO2, PM2.5, temperature and humidity over a local `/measures/current`; it would give `ventilation` an indoor reading in every room, not just where the AC is. Unverified in AU.
+- **An EV charger** (Tesla Wall Connector, OpenEVSE): charge when solar is high, with Enphase and Amber. Only with a car.
+- **Software, the way Soloist is:** Pi-hole or AdGuard (DNS health, pause blocking for 15 minutes); OwnTone or Snapcast (AirPlay and synced music in every room); Music Assistant. Each is a daemon on the Pi with a local API.
+
+## Future
+
+Waiting on something else first.
+
+- **Matter and Thread sensors** (IKEA TIMMERFLOTTE, MYGGBETT, KLIPPBOK, Aqara, Eve): cheap, local, and in Google Home, but readable here only once a Matter controller exists ([matter.md](matter.md)). Notes on each are below.
+- **Presence** (Aqara FP2, FP300; Apollo MSR-2 if ESPHome lands): rooms where people sit still.
+- **Garage door** (OpenGarage, ratgdo), **irrigation** (OpenSprinkler), **blinds**, **ceiling fans** (Tuya local key or an RF bridge): only with the hardware.
+- **An e-ink house display** (TRMNL): a screen for `houseSummary` on the wall.
+
+## Buy first (notes, 2026-10-16)
 
 1. **Shelly Plus Plug S or PM Mini Gen3** (about A$35–45, unverified). Local JSON-RPC, push, energy per plug. The best template for an energy connector, already in ideas.md.
 2. **Shelly EM Gen3 or Pro 3EM** (about A$60–200, unverified) if the board has room. A second, independent view of the house against Enphase. Local API.
