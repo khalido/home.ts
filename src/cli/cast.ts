@@ -79,7 +79,7 @@ async function withCast<T>(
 }
 
 export const CAST_USAGE =
-  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name>';
+  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name>';
 
 /** A 0–100 argument as the 0–1 a Cast device takes. */
 function percentLevel(value: string | undefined): number {
@@ -109,6 +109,10 @@ export const CAST_OPTIONS: [string, string, { type: unknown[] }?][] = [
   ],
   ["--say <text>", "announce: words spoken by macOS `say`", { type: [String] }],
   ["--file <path>", "announce: an audio file to play", { type: [String] }],
+  [
+    "--wav",
+    "announce: with --say, speak into a 24 kHz mono WAV, as a TTS gives (announce converts it); else AAC",
+  ],
   ["--volume <0-100>", "announce: the volume for the clip"],
 ];
 
@@ -200,7 +204,7 @@ export const castVerbs: Verbs = {
       ),
     );
     if (bare) usage(CAST_USAGE);
-    if (!to.length || !say === !file) usage(CAST_USAGE);
+    if (!to.length || !say === !file || (o.wav && !say)) usage(CAST_USAGE); // --wav shapes --say's speech, not a file
     const volume =
       o.volume === undefined ? undefined : percentLevel(text(o.volume));
     let type: string;
@@ -214,12 +218,24 @@ export const castVerbs: Verbs = {
       bytes = readFileSync(expandHome(file));
     } else {
       // AAC in an MP4 container, which the Default Media Receiver plays (say's default AIFF it does not). Without
-      // --data-format=aac, m4af holds uncompressed PCM (afinfo, macOS 27.0).
-      const tmp = join(tmpdir(), `home-say-${randomUUID()}.m4a`);
+      // --data-format=aac, m4af holds uncompressed PCM (afinfo, macOS 27.0). --wav: 24 kHz mono 16-bit WAV, the shape a
+      // TTS service gives, to test the path a bot takes (announce rewrites it as 48 kHz stereo).
+      const wav = !!o.wav;
+      const tmp = join(
+        tmpdir(),
+        `home-say-${randomUUID()}.${wav ? "wav" : "m4a"}`,
+      );
       try {
         const said = spawnSync(
           "say",
-          ["-o", tmp, "--file-format=m4af", "--data-format=aac", say!],
+          [
+            "-o",
+            tmp,
+            ...(wav
+              ? ["--file-format=WAVE", "--data-format=LEI16@24000"]
+              : ["--file-format=m4af", "--data-format=aac"]),
+            say!,
+          ],
           { stdio: ["ignore", "ignore", "pipe"] },
         );
         if (said.error || said.status !== 0)
@@ -228,7 +244,7 @@ export const castVerbs: Verbs = {
       } finally {
         rmSync(tmp, { force: true });
       }
-      type = "audio/mp4";
+      type = wav ? "audio/wav" : "audio/mp4";
     }
     const results = await withCast((c) =>
       c.announceAll(to, { bytes, type }, { volume, dryRun: !!o.dryRun }),

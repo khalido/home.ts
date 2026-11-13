@@ -47,6 +47,7 @@ export type Options = {
   say?: unknown;
   file?: unknown;
   volume?: number | string;
+  wav?: boolean;
 };
 
 /** An option's text as typed: cac turns a number-like value into a number, and `type: [String]` into an array. */

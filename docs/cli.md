@@ -22,7 +22,7 @@ home printers print <file.pdf> [printer]   # PDF as is, or rendered to PWG Raste
 home printers identify | cancel <job>       # the printer shows itself; stop a job
 home probe                    # read-only, no keys: Hue's public config, Daikin by UDP broadcast, the IQ Gateway's /info, each weather source, each Cast device's and printer's status
 home locate "<street address>" [--write [path]]  # latitude and longitude from OpenStreetMap's Nominatim; --write sets them in the config's location (and timezone, when absent, to this machine's)
-home cast announce --to <name> [--to <name>…] (--say "<text>" | --file <path>) [--volume 0-100]  # exit 1 if any didn't play; play a clip, then put back what was playing and the volume
+home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100]  # exit 1 if any didn't play; play a clip, then put back what was playing and the volume
 home cast volume <name> <0-100>
 home cast mute <name> on|off
 home cast stop <name>         # end the running app; the device returns to its idle screen

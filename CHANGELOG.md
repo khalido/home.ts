@@ -4,6 +4,10 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+
+- **cli:** `home cast announce --say "…" --wav` speaks into a 24 kHz mono WAV, as a TTS service gives, instead of AAC, to test the WAV path a bot takes.
+
 ## [0.2.2] - 2026-11-12
 
 ### Added

@@ -136,6 +136,20 @@ describe("home output contract", () => {
     expect(down.code).toBe(1);
   });
 
+  test("home cast announce --wav goes with --say, not --file", () => {
+    const r = home([
+      "cast",
+      "announce",
+      "--to",
+      "x",
+      "--file",
+      "a.mp3",
+      "--wav",
+    ]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("[--wav]");
+  });
+
   test("a wrong command is a usage error: exit 2, one line on stderr, nothing on stdout", () => {
     expect(home(["nope"])).toEqual({
       out: "",
