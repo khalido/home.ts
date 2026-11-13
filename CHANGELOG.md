@@ -4,11 +4,16 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-14
+
 ### Added
 
-- **The house in a paragraph:** `houseSummary(snapshot, config?)`: lights on by Hue room, the AC, what is playing, a printer that needs attention, energy, outside, the windows, and what isn't answering. `ventilation(snapshot)` says whether to open the windows, from the Daikin's room reading and the weather, by the rules in `VENTILATION`. `home summary` prints it.
+- **The house in a paragraph:** `houseSummary(snapshot, config?, { now? })` is one paragraph for a person or a bot. It covers lights on (by Hue room), the AC, what is playing, a printer that needs attention, energy, the temperature outside and rain soon, whether to open the windows, what is down by `health`'s rules, and what needs a new key. `ventilation(snapshot)` says whether to open the windows, from the Daikin's room reading and the weather, by the stated rules in `VENTILATION`. `home summary` prints it, and `--json` adds `ventilation`.
+- **cli:** `home cast announce --say "…" --wav` speaks into a 24 kHz mono WAV, the format a text-to-speech service gives, instead of AAC. It tests the WAV path a bot takes.
 
-- **cli:** `home cast announce --say "…" --wav` speaks into a 24 kHz mono WAV, as a TTS service gives, instead of AAC, to test the WAV path a bot takes.
+### Changed
+
+- **printers:** `printerText` now names every state reason that needs a person, including those with no suffix (`media-empty`), which IPP reads as errors. Before, it named only `-warning` and `-error` reasons.
 
 ## [0.2.2] - 2026-11-12
 
@@ -164,7 +169,8 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/khalido/home.ts/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/khalido/home.ts/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/khalido/home.ts/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/khalido/home.ts/compare/v0.1.3...v0.2.0
