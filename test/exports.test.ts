@@ -14,6 +14,7 @@ const PUBLIC: Record<string, string[]> = {
     "PUSH_DOWN_MS",
     "Room",
     "STALE_POLLS",
+    "VENTILATION",
     "asOf",
     "bestWindow",
     "blockText",
@@ -29,6 +30,7 @@ const PUBLIC: Record<string, string[]> = {
     "gridText",
     "health",
     "homeDevices",
+    "houseSummary",
     "loadHome",
     "parseJsonc",
     "rainSoon",
@@ -37,6 +39,7 @@ const PUBLIC: Record<string, string[]> = {
     "solarLevel",
     "spotifyElsewhere",
     "sunNow",
+    "ventilation",
   ],
   "./hue": [
     "CONFIRM_MS",

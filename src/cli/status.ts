@@ -13,6 +13,7 @@ import {
 } from "../connectors/weather/index.ts";
 import { ftpFetch } from "../connectors/weather/ftp.ts";
 import { HomeConfig, loadHome } from "../config.ts";
+import { houseSummary, ventilation } from "../house.ts";
 import { DEVICES, type HomeDevice, homeDevices } from "../devices.ts";
 import { energyNow, gridText } from "../energy.ts";
 import { FINDERS } from "../finders.ts";
@@ -232,18 +233,35 @@ const rowsOf = (path: string | undefined, only?: string) =>
     ? statusFromConfig(path, only)
     : statusFromEnv(only === undefined ? MANIFESTS : [manifestOf(only)!]);
 
-/**
- * `home devices`: every device the connectors read, one line each from `homeDevices`, with its room and name from the
- * config when there is one. A connector that isn't connected is named on stderr.
- */
-export async function devices(o: Options): Promise<void> {
+/** Every set-up connector's part, and the config when there is one: what `home devices` and `home summary` read. */
+async function partsOf(o: Options) {
   const path = configPathOf(o);
   const rows = await rowsOf(path);
   const parts: Record<string, Part> = {};
   for (const [name, r] of Object.entries(rows))
     if (r.status !== "not set up") parts[name] = r as Part;
-  // loadHome has already accepted the config, so a parse that fails here is not expected: list without rooms.
+  // loadHome has already accepted the config, so a parse that fails here is not expected: read without rooms.
   const config = path ? HomeConfig.safeParse(readConfig(path)).data : undefined;
+  return { rows, parts, config };
+}
+
+/** `home summary`: the house in one paragraph, and whether to open the windows. */
+export async function summary(o: Options): Promise<void> {
+  const { parts, config } = await partsOf(o);
+  if (o.json)
+    return printJson({
+      text: houseSummary(parts, config),
+      ventilation: ventilation(parts),
+    });
+  console.log(houseSummary(parts, config));
+}
+
+/**
+ * `home devices`: every device the connectors read, one line each from `homeDevices`, with its room and name from the
+ * config when there is one. A connector that isn't connected is named on stderr.
+ */
+export async function devices(o: Options): Promise<void> {
+  const { rows, parts, config } = await partsOf(o);
   const list = homeDevices(parts, config);
   // A connector that isn't connected may have no device to list: say so, off stdout.
   for (const [name, r] of Object.entries(rows))

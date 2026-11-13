@@ -29,6 +29,12 @@ export {
   type RoomDevices,
   spotifyElsewhere,
 } from "./devices.ts";
+export {
+  houseSummary,
+  type Ventilation,
+  VENTILATION,
+  ventilation,
+} from "./house.ts";
 export { asOf, type Clock, realClock } from "./clock.ts";
 export { type ConnectorCode, ConnectorError } from "./connector.ts";
 export {

@@ -23,6 +23,8 @@ On Bun on a Pi 5, one long-lived `loadHome`; four chat tools planned: `home_stat
 
 ## Next, each KO's call
 
+0. **Unreleased on main:** `houseSummary`, `ventilation` and `home summary` (2026-11-13), and `home cast announce --say --wav`. Ideas from a Gemini research pass (ESPHome over HTTP, Pi-hole, OwnTone/Snapcast, AirGradient, an EV charger) are in this conversation's notes, not yet in `docs/ideas.md`.
+
 1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. A resume while already active is never capped.
 2. **chota prints to the Brother through CUPS on the Pi** (KO, 2026-11-12): a driverless queue, Chromium PDF then `lp`; it needs neither `pwgRaster` nor `printJob`, so the duplex back-page ask is dropped. home.ts keeps reading the printer. `home cast announce --say … --wav` (chota's other ask) is on main, unreleased.
 3. **Spotify account** (#2): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.

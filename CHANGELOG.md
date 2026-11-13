@@ -6,6 +6,8 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
+- **The house in a paragraph:** `houseSummary(snapshot, config?)`: lights on by Hue room, the AC, what is playing, a printer that needs attention, energy, outside, the windows, and what isn't answering. `ventilation(snapshot)` says whether to open the windows, from the Daikin's room reading and the weather, by the rules in `VENTILATION`. `home summary` prints it.
+
 - **cli:** `home cast announce --say "…" --wav` speaks into a 24 kHz mono WAV, as a TTS service gives, instead of AAC, to test the WAV path a bot takes.
 
 ## [0.2.2] - 2026-11-12

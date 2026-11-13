@@ -22,7 +22,7 @@ import { locate } from "./locate.ts";
 import { PRINTERS_USAGE, printersVerbs } from "./printers.ts";
 import { probe } from "./probe.ts";
 import { SPOTIFY_USAGE, spotifyVerbs } from "./spotify.ts";
-import { devices, status } from "./status.ts";
+import { devices, status, summary } from "./status.ts";
 import { UP_OPTIONS, UP_USAGE, upVerbs } from "./up.ts";
 
 const HUE_HELP: Record<string, string> = {
@@ -92,6 +92,12 @@ cli
     "every device the connectors read, one line each: its state, its room, and why when it isn't available",
   )
   .action((o: Options) => devices(o));
+cli
+  .command(
+    "summary",
+    "the house in one paragraph: lights, AC, what's playing, energy, outside, whether to open the windows",
+  )
+  .action((o: Options) => summary(o));
 cli
   .command(
     "discover",

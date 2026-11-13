@@ -3,6 +3,7 @@
 ```sh
 home <connector> [--json]     # one connector's lines: amber, cast, daikin, enphase, hue, printers, spotify, up, weather
 home [status|doctor] [--json] # each integration: connected or not, which env names it still needs, rooms
+home summary [--json]        # the house in one paragraph: lights on by room, the AC, what's playing, energy, outside, whether to open the windows
 home devices [--json]         # every device the connectors read, one line each: its state, its room (with a config), and why when it isn't available
 home up transactions | categories | uncategorised | spend | categorise | tag | webhooks  # Up Bank's lists and reports; categorise and tag write
 home lights off               # one write to the whole-home group; prints how many lights are off, or how many the bridge still reports on

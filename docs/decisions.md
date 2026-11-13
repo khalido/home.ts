@@ -172,3 +172,9 @@ KO's decisions on this package, newest block last. They override every other doc
 - **PWG Raster, not URF.** PWG 5102.4 is a published standard; URF is Apple's and undocumented. 8-bit grey only, until a colour printer is here.
 - **Validate-Job before every Print-Job**, so a wrong attribute fails before paper moves; **`one-sided` sent explicitly**; **a timed-out Print-Job is never resent**, since the printer may have taken it.
 - **No write lane yet.** The writes are one-shot calls on an address, not methods on the integration: nothing calls them in a loop. When a consumer prints from a long-running process, put them on the integration with a lane, slot per job so two prints never merge.
+
+## The house in a paragraph (2026-11-13)
+
+- **`houseSummary` and `ventilation` read a snapshot, never write**, and live in `src/house.ts`, above the connectors: they join what several connectors say, as `energyNow` does for power and prices.
+- **The windows' rules are stated, not learned**: 20–24 °C is comfortable, outside must be 2 °C better, and 2 °C past that band closes them; rain within 30 minutes, or the AC on in any mode but fan, closes them. Humidity outside is said, not weighed. The Daikin's outdoor unit temperature is not used for outside: it sits in the sun and by the compressor. Change the numbers in `VENTILATION` rather than adding a setting.
+- **Lights are counted by Hue room**, since bulbs' own names ("Hue ambiance downlight 3") rarely say where they are.

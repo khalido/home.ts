@@ -14,7 +14,7 @@ The library never reads the environment or a file: callers pass addresses, keys 
 - **Cast** (`@khalido/home/cast`): `castStatus(state)` and `castFree(state, targets, { forms? })`, on the Cast part's state, say what is playing and where an announcement would disturb nothing; `castFreeSpeakers(state)` is the one call for every free speaker and display; `announce`, `announceAll`, `setVolume`, `setMuted`, `stop`. Its writes take `{ dryRun: true }`.
 - **Spotify Soloist** (`@khalido/home/spotify`): `play`, `pause`, `setVolume` and the rest resolve `{ state, confirmed }`; `duck` and `interrupt` wrap an announcement. Every write takes `{ dryRun: true }`. `speakerState(part)` is `elsewhere` when the music is on another Spotify device.
 - **Discovery** (`@khalido/home/finders`, Node-side): `FINDERS`, one finder per connector, and `fileCache`. **Node** needs the fetches in `@khalido/home/node`.
-- **The command:** `home`, `home devices`, `home <connector>`, and writes such as `home daikin cool`, `home room <name> on`, `home cast announce`.
+- **The command:** `home`, `home summary` (the house in a paragraph, with whether to open the windows), `home devices`, `home <connector>`, and writes such as `home daikin cool`, `home room <name> on`, `home cast announce`.
 
 ## Start here
 

@@ -159,6 +159,13 @@ export function ago(fromMs: number, toMs: number): string {
   return h < 48 ? `${h} h ago` : `${Math.floor(h / 24)} days ago`;
 }
 
+/**
+ * The state reasons that need a person: every one but `none` and a `-report` (information only). IPP reads a reason with
+ * no suffix (`media-empty`) as an error, so it counts, as `-warning` and `-error` do.
+ */
+export const printerAttention = (p: Pick<Printer, "reasons">): string[] =>
+  (p.reasons ?? []).filter((r) => r !== "none" && !r.endsWith("-report"));
+
 /** One printer in a few words: "Office: idle · Black Toner 40% · A4 ready", "Office: offline, last seen 2 h ago". */
 export function printerText(p: Printer): string {
   if (p.state === "offline") {
@@ -168,9 +175,7 @@ export function printerText(p: Printer): string {
         : `last seen ${ago(Date.parse(p.lastSeen), Date.parse(p.asOf))}`;
     return `${p.name}: offline, ${seen}`;
   }
-  const attention = (p.reasons ?? []).filter((r) =>
-    /-(error|warning)$/.test(r),
-  );
+  const attention = printerAttention(p);
   const media = [...new Set((p.media ?? []).map(mediaName))];
   const parts = [
     p.state ?? (p.stateCode === undefined ? "" : `state ${p.stateCode}`),
