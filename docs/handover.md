@@ -1,10 +1,11 @@
 # Handover
 
-2026-11-12. Read `AGENTS.md` first, then this.
+2026-11-14. Read `AGENTS.md` first, then this.
 
 ## Where things stand
 
-- **0.2.3 is live on npm as `latest`** (2026-11-14, approved by KO): `houseSummary`, `ventilation`, `home summary`, `--say --wav`. chota told, and asked to wire the Daikin and Hue through the library (it told KO it couldn't reach the aircon).
+- **0.2.4 is live on npm as `latest`** (2026-11-14): cast `launch`, `send` and `CastError` (a refusal's `reply` and `reason`, asked by chota). chota and jaldi told. 0.2.3 brought `houseSummary`, `ventilation`, `home summary`, `--say --wav`.
+- **The TV:** chota builds its own Cast receiver for the Living Room Google TV Streamer; home.ts is only the plumbing (decisions, "A page on the TV"). Its registered app answered `LAUNCH_ERROR` `NOT_FOUND` (unpublished, not yet visible to the device, 2026-11-14); the Default Media Receiver launched and stopped there. Our `launch` of an app of our own is untried live.
 - **Issues posted 2026-11-12:** [#1](https://github.com/khalido/home.ts/issues/1) Soloist upstream tracking, [#2](https://github.com/khalido/home.ts/issues/2) Spotify account, [#3](https://github.com/khalido/home.ts/issues/3) draw-home. The "untried on a real device" draft is in `drafts/issues.md`, not posted; the Enphase one was dropped (the gateway had moved address).
 - **Addresses:** Eero reservations (2026-11-12) for the gateway, Hue bridge, Daikin and printer; `IQ_GATEWAY_HOST` in `~/.zshrc.local` names the reserved address.
 - **Releases:** a GitHub release runs `publish.yml`, which stages; KO approves (`docs/publishing.md`, the `release` skill).
@@ -26,7 +27,7 @@ On Bun on a Pi 5, one long-lived `loadHome`; four chat tools planned: `home_stat
 0. **Ideas from the Gemini pass** (2026-11-13) are in `docs/devices.md` under consideration and future: ESPHome over HTTP first.
 
 1. **Spotify volume: hold the level, not a cap** (proposed 2026-11-10, not agreed). Remember the last level set or reported while steadily playing, and put it back when it moves during a start, a resume or going active. A resume while already active is never capped.
-2. **chota prints to the Brother through CUPS on the Pi** (KO, 2026-11-12): a driverless queue, Chromium PDF then `lp`; it needs neither `pwgRaster` nor `printJob`, so the duplex back-page ask is dropped. home.ts keeps reading the printer. `home cast announce --say … --wav` (chota's other ask) is on main, unreleased.
+2. **chota prints to the Brother through CUPS on the Pi** (KO, 2026-11-12): a driverless queue, Chromium PDF then `lp`; it needs neither `pwgRaster` nor `printJob`, so the duplex back-page ask is dropped. home.ts keeps reading the printer.
 3. **Spotify account** (#2): KO wants playlists and library; it reverses part of the 2026-11-08 call that search lives in chota-bot, so decide that first. Live testing needs KO's sign-in.
 4. **Auth leftovers:** an `auth` detail that names the env variable to fix; the `use-home` skill saying to `home.add` again after a re-key.
 5. **`fx.yml`:** the gate is who triggers, not whose text is read; put a spend cap on the gateway key. Private: never a public issue.
