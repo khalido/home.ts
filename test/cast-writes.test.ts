@@ -879,7 +879,7 @@ describe("launch, send", () => {
 
   test("an app the device can't see: a CastError with the receiver's reason", async () => {
     const h = await connected(home(), { launch: "NOT_FOUND" });
-    const error = await h.c.launch("Kitchen", "FCE23D20").catch((e) => e);
+    const error = await h.c.launch("Kitchen", "ABCD1234").catch((e) => e);
     expect(error).toBeInstanceOf(CastError);
     expect(error).toMatchObject({
       code: "refused",
