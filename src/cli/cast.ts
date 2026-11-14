@@ -79,7 +79,7 @@ async function withCast<T>(
 }
 
 export const CAST_USAGE =
-  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name>';
+  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name> | url <name> <url> | launch <name> <appId>';
 
 /** A 0–100 argument as the 0–1 a Cast device takes. */
 function percentLevel(value: string | undefined): number {
@@ -124,7 +124,7 @@ const dryLines = (sends: CastRequest[], who = "") =>
   sends.length
     ? sends.forEach((r) =>
         console.log(
-          `${who}would send ${r.device} ${r.channel} ${JSON.stringify(r.payload)}`,
+          `${who}would send ${r.device} ${r.namespace ?? r.channel} ${JSON.stringify(r.payload)}`,
         ),
       )
     : console.log(`${who}nothing to send`);
@@ -189,6 +189,31 @@ export const castVerbs: Verbs = {
       (c, dry) => c.stop(name!, dry),
       (d) => d.idle === true,
       !!o.dryRun,
+    );
+  },
+  // A web page through DashCast, or any Cast app by its id. `stop <name>` ends either.
+  async url([name, url, extra], o) {
+    if (!name || !url || extra) usage(CAST_USAGE);
+    const r = await withCast((c) =>
+      c.castUrl(name!, url!, { dryRun: !!o.dryRun }),
+    );
+    if ("wouldSend" in r) {
+      console.log("dry run, nothing sent:");
+      return dryLines(r.wouldSend);
+    }
+    console.log(`${name}: showing ${url} (DashCast, ${r.transportId})`);
+  },
+  async launch([name, appId, extra], o) {
+    if (!name || !appId || extra) usage(CAST_USAGE);
+    const r = await withCast((c) =>
+      c.launch(name!, appId!, { dryRun: !!o.dryRun }),
+    );
+    if ("wouldSend" in r) {
+      console.log("dry run, nothing sent:");
+      return dryLines(r.wouldSend);
+    }
+    console.log(
+      `${name}: running ${r.displayName ?? r.appId} (${r.transportId})`,
     );
   },
   async announce(_, o) {

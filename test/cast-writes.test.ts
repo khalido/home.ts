@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
 import { idleClock, manualClock } from "./clock.ts";
 import {
+  DASHCAST,
   cast,
   type CastConnect,
   type CastSnapshot,
@@ -177,7 +178,20 @@ function fakeHome(list: Fake[], script: Script = {}) {
             return reply(status(p.requestId));
           case "receiver LAUNCH":
             if (script.launch === "ignore") return;
-            ((f.app = DMR), (f.media = []));
+            f.app =
+              p.appId === DMR.appId
+                ? DMR
+                : {
+                    appId: p.appId,
+                    displayName: "An app",
+                    sessionId: "00000000-0000-4000-8000-0000000000e1",
+                    transportId: "web-9",
+                    namespaces: [
+                      { name: DASHCAST.namespace },
+                      { name: "urn:x-cast:test.house" },
+                    ],
+                  };
+            f.media = [];
             return reply(status(p.requestId));
           case "receiver STOP":
             ((f.app = BACKDROP), (f.media = undefined));
@@ -822,18 +836,128 @@ describe("volume, mute, stop", () => {
   });
 });
 
-describe("dry run", () => {
-  /** What changed something: not a read, not a connection handshake. */
-  const writesOnly = (h: {
-    net: { sent: { ns: string; p: { type: string } }[] };
-  }) =>
-    h.net.sent.filter(
-      (x) =>
-        x.ns !== "connection" &&
-        x.ns !== "heartbeat" &&
-        x.p.type !== "GET_STATUS",
-    );
+/** What changed something: not a read, not a connection handshake. */
+const writesOnly = (h: {
+  net: { sent: { ns: string; p: { type: string } }[] };
+}) =>
+  h.net.sent.filter(
+    (x) =>
+      x.ns !== "connection" &&
+      x.ns !== "heartbeat" &&
+      x.p.type !== "GET_STATUS",
+  );
 
+describe("launch, send, castUrl", () => {
+  test("launch starts an app by id and connects to it; one already running is reused", async () => {
+    const list = home();
+    const h = await connected(list);
+    expect(await h.c.launch("Kitchen", "abcd1234")).toEqual({
+      appId: "ABCD1234",
+      displayName: "An app",
+      sessionId: "00000000-0000-4000-8000-0000000000e1",
+      transportId: "web-9",
+    });
+    const launches = () =>
+      h.net.sent.filter((x) => x.p.type === "LAUNCH").length;
+    expect(launches()).toBe(1);
+    await h.c.launch("Kitchen", "ABCD1234");
+    expect(launches()).toBe(1);
+    expect(await h.c.launch("Kitchen", "ABCD1234", { dryRun: true })).toEqual({
+      wouldSend: [],
+    });
+    expect(
+      await h.c.launch("Lounge", "abcd1234", { dryRun: true }),
+    ).toMatchObject({
+      wouldSend: [{ payload: { type: "LAUNCH", appId: "ABCD1234" } }],
+    });
+    await expect(h.c.launch("Kitchen", "nope")).rejects.toThrow("8 hex digits");
+    await h.done();
+  });
+
+  test("send goes to the running app on its namespace; nothing listening is an error, sent nowhere", async () => {
+    const h = await connected(home());
+    await expect(
+      h.c.send("Kitchen", "urn:x-cast:test.house", { view: "bus" }),
+    ).rejects.toThrow(
+      "nothing running on Kitchen listens on urn:x-cast:test.house",
+    );
+    await h.c.launch("Kitchen", "ABCD1234");
+    const before = h.net.sent.length;
+    expect(
+      await h.c.send(
+        "Kitchen",
+        "urn:x-cast:test.house",
+        { view: "bus" },
+        { dryRun: true },
+      ),
+    ).toEqual({
+      wouldSend: [
+        {
+          device: "Kitchen",
+          channel: "app",
+          namespace: "urn:x-cast:test.house",
+          payload: { view: "bus" },
+        },
+      ],
+    });
+    expect(h.net.sent.slice(before).filter((x) => x.p.view)).toEqual([]);
+    await h.c.send("Kitchen", "urn:x-cast:test.house", { view: "bus" });
+    expect(h.net.sent.at(-1)).toMatchObject({
+      to: "Kitchen",
+      destination: "web-9",
+      p: { view: "bus" },
+    });
+    await expect(h.c.send("Kitchen", "house", {})).rejects.toThrow(
+      "urn:x-cast:",
+    );
+    await h.done();
+  });
+
+  test("castUrl launches DashCast and sends it the page; a dry run says both and sends neither", async () => {
+    const h = await connected(home());
+    const dry = await h.c.castUrl("Kitchen", "https://example.com/morning", {
+      reloadSeconds: 60,
+      dryRun: true,
+    });
+    expect(dry).toEqual({
+      wouldSend: [
+        {
+          device: "Kitchen",
+          channel: "receiver",
+          payload: { type: "LAUNCH", appId: DASHCAST.appId },
+        },
+        {
+          device: "Kitchen",
+          channel: "app",
+          namespace: DASHCAST.namespace,
+          payload: {
+            url: "https://example.com/morning",
+            force: false,
+            reload: true,
+            reload_time: 60_000,
+          },
+        },
+      ],
+    });
+    expect(writesOnly(h)).toEqual([]);
+    await h.c.castUrl("Kitchen", "https://example.com/morning");
+    expect(h.net.sent.at(-1)).toMatchObject({
+      ns: "dashcast",
+      destination: "web-9",
+      p: {
+        url: "https://example.com/morning",
+        reload: false,
+        reload_time: 0,
+      },
+    });
+    await expect(h.c.castUrl("Kitchen", "file:///x")).rejects.toThrow(
+      "a web page's URL",
+    );
+    await h.done();
+  });
+});
+
+describe("dry run", () => {
   test("volume, mute and stop find and check the target, read what they need, and send no write", async () => {
     const list = home();
     list[1]!.app = SPOTIFY;

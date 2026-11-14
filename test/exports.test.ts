@@ -120,6 +120,7 @@ const PUBLIC: Record<string, string[]> = {
   "./weather/ftp": ["ftpFetch"],
   "./cast": [
     "CAST_WAV",
+    "DASHCAST",
     "cast",
     "castDevices",
     "castForm",

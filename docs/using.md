@@ -72,6 +72,7 @@ A write changes someone's house: make one only when a person asked for it. Write
 | cast      | `.announce(target, clip, { volume? })`                                                                             | `{ played, why?, restored, notRestored }`                                                        |
 | cast      | `.announceAll(targets, clip, { volume? })`                                                                         | one of those per target, each with its `target`                                                  |
 | cast      | `.setVolume(target, 0–1)`, `.setMuted(target, on)`, `.stop(target)`                                                | nothing                                                                                          |
+| cast      | `.launch(target, appId)`, `.send(target, namespace, message)`, `.castUrl(target, url, { reloadSeconds? })`         | `{ appId, displayName?, sessionId?, transportId }`, the app running                              |
 | hue       | `.client.light(name, change, opts?)`, `.room(name, change, opts?)`, `.scene(name, room?, opts?)`, `.allOff(opts?)` | `{ state, confirmed }`, `state` the light, the room, or every light                              |
 | hue       | `.client.put(kind, id, body)`, `.client.recallScene(id)`                                                           | the bridge's answer, for what the typed writes don't cover                                       |
 

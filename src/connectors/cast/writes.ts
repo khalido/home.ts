@@ -47,13 +47,29 @@ export type CastClip =
 /** One Cast message, as a dry run reports it: the device it goes to, the channel (`receiver` or the app's `media`) and the payload. */
 export type CastRequest = {
   device: string;
-  channel: "receiver" | "media";
+  channel: "receiver" | "media" | "app";
+  /** With `channel: "app"`: the app's own namespace. */
+  namespace?: string;
   payload: Record<string, unknown>;
 };
 /** `dryRun`: run every check a real write runs (the target, its connection, the input) and the reads it makes first, send no write, and say what would go. */
 export type CastWriteOptions = { dryRun?: boolean };
 /** A dry run's answer: the messages in order; empty when there is nothing to send. */
 export type CastDryRun = { wouldSend: CastRequest[] };
+
+/** An app running on a device: what `launch` started, or what `send` reached. */
+export type CastApp = {
+  appId: string;
+  displayName?: string;
+  sessionId?: string;
+  transportId: string;
+};
+
+/** DashCast, a public receiver that shows a web page (pychromecast's app list); `castUrl` uses it. */
+export const DASHCAST = {
+  appId: "84912283",
+  namespace: "urn:x-cast:com.madmod.dashcast",
+} as const;
 
 /**
  * What `announce` did: whether the clip played to its end, why not, and what it put back or could not. A dry run has
@@ -97,6 +113,34 @@ export type CastActions = {
     clip: CastClip,
     options?: { volume?: number; timeoutMs?: number } & CastWriteOptions,
   ): Promise<AnnounceResult>;
+  /**
+   * Start a Cast app by its id (a registered receiver of your own, or a public one) and connect to it. An app already
+   * running is reused, not relaunched. Ends whatever else was running, as any Cast sender does. `stop` ends it.
+   */
+  launch(
+    target: string,
+    appId: string,
+    options?: CastWriteOptions,
+  ): Promise<CastApp | CastDryRun>;
+  /**
+   * A message to the app running on the target, on one of its own namespaces (`urn:x-cast:…`). Sent, not awaited: a
+   * custom app answers in its own way, if at all. Throws when no running app listens on that namespace.
+   */
+  send(
+    target: string,
+    namespace: string,
+    message: Record<string, unknown>,
+    options?: CastWriteOptions,
+  ): Promise<CastApp | CastDryRun>;
+  /**
+   * Show a web page on the target through DashCast: `launch`, then its load message. `reloadSeconds` reloads the page that
+   * often. The page loads in DashCast's frame, so a page that refuses framing, or plain HTTP from an HTTPS frame, may not show.
+   */
+  castUrl(
+    target: string,
+    url: string,
+    options?: { reloadSeconds?: number } & CastWriteOptions,
+  ): Promise<CastApp | CastDryRun>;
   /** `announce` to several targets at once, one result per device, in the order given. A target that can't be reached is its own `played: false`. A group and one of its own members are not told apart. */
   announceAll(
     targets: string[],
@@ -317,13 +361,18 @@ export function castActions(ctx: WriteContext): CastActions {
   };
 
   /** LAUNCH the Default Media Receiver and wait for a receiver status that shows it running with a transport. */
-  const launch = (s: CastSession): Promise<Application> => {
+  const launch = (
+    s: CastSession,
+    appId: string = DEFAULT_MEDIA_RECEIVER,
+  ): Promise<Application> => {
     const id = s.nextId();
     const app = waitFor(
       clock,
       s,
       ANSWER_MS,
-      "Default Media Receiver",
+      appId === DEFAULT_MEDIA_RECEIVER
+        ? "Default Media Receiver"
+        : `app ${appId}`,
       (raw) => {
         if (
           raw.requestId === id &&
@@ -336,16 +385,12 @@ export function castActions(ctx: WriteContext): CastActions {
         const r = ReceiverStatus.safeParse(raw);
         return r.success
           ? r.data.status?.applications?.find(
-              (a) => a.appId === DEFAULT_MEDIA_RECEIVER && a.transportId,
+              (a) => a.appId === appId && a.transportId,
             )
           : undefined;
       },
     );
-    s.send(NS.receiver, RECEIVER, {
-      type: "LAUNCH",
-      appId: DEFAULT_MEDIA_RECEIVER,
-      requestId: id,
-    });
+    s.send(NS.receiver, RECEIVER, { type: "LAUNCH", appId, requestId: id });
     return app;
   };
 
@@ -435,6 +480,43 @@ export function castActions(ctx: WriteContext): CastActions {
       );
   };
 
+  /**
+   * The app `appId` running on the target, launched unless it already is, and connected; under a dry run, what would be
+   * sent, with the device. A group is found again first, as for `announce`.
+   */
+  const start = async (
+    target: string,
+    appId: string,
+    options: CastWriteOptions,
+  ): Promise<
+    | { s: CastSession; d: CastDevice; app: Application }
+    | (CastDryRun & { d: CastDevice })
+  > => {
+    if (!/^[0-9A-F]{8}$/i.test(appId))
+      throw new RangeError(`a Cast app id is 8 hex digits, not "${appId}"`);
+    const id = appId.toUpperCase();
+    const d = find(target);
+    const s = d.kind === "group" ? await regroup(d) : live(d);
+    const running = (await receiver(s)).applications?.find(
+      (a) => a.appId?.toUpperCase() === id && a.transportId,
+    );
+    if (options.dryRun)
+      return {
+        d,
+        wouldSend: running
+          ? []
+          : [toReceiver(d, { type: "LAUNCH", appId: id })],
+      };
+    const app = running ?? (await launch(s, id));
+    s.connect(app.transportId!);
+    return { s, d, app };
+  };
+  const appOf = (a: Application): CastApp => ({
+    appId: a.appId!,
+    ...(a.displayName ? { displayName: a.displayName } : {}),
+    ...(a.sessionId ? { sessionId: a.sessionId } : {}),
+    transportId: a.transportId!,
+  });
   const toReceiver = (
     d: CastDevice,
     payload: Record<string, unknown>,
@@ -743,6 +825,73 @@ export function castActions(ctx: WriteContext): CastActions {
           }
         }
       }
+    },
+
+    async launch(target, appId, options = {}) {
+      const r = await start(target, appId, options);
+      return "wouldSend" in r ? { wouldSend: r.wouldSend } : appOf(r.app);
+    },
+
+    async send(target, namespace, message, options = {}) {
+      if (!namespace.startsWith("urn:x-cast:"))
+        throw new RangeError(
+          `a Cast namespace starts urn:x-cast:, not "${namespace}"`,
+        );
+      const d = find(target);
+      const s = live(d);
+      const apps = (await receiver(s)).applications ?? [];
+      const app = apps.find(
+        (a) => a.transportId && a.namespaces?.some((n) => n.name === namespace),
+      );
+      if (!app)
+        throw new Error(
+          `nothing running on ${d.name} listens on ${namespace}${apps.length ? ` (running: ${apps.map((a) => a.displayName ?? a.appId).join(", ")})` : ""}`,
+        );
+      if (options.dryRun)
+        return {
+          wouldSend: [
+            { device: d.name, channel: "app", namespace, payload: message },
+          ],
+        };
+      s.connect(app.transportId!);
+      s.send(namespace, app.transportId!, message);
+      return appOf(app);
+    },
+
+    async castUrl(target, url, options = {}) {
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new RangeError(`not a URL: ${url}`);
+      }
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:")
+        throw new RangeError(`a web page's URL, not ${parsed.protocol}`);
+      const seconds = options.reloadSeconds ?? 0;
+      if (!(Number.isFinite(seconds) && seconds >= 0))
+        throw new RangeError(`reloadSeconds is 0 or more, not ${seconds}`);
+      // The four keys pychromecast's DashCastController sends (MIT, facts only).
+      const load = {
+        url,
+        force: false,
+        reload: seconds > 0,
+        reload_time: seconds * 1000,
+      };
+      const r = await start(target, DASHCAST.appId, options);
+      if ("wouldSend" in r)
+        return {
+          wouldSend: [
+            ...r.wouldSend,
+            {
+              device: r.d.name,
+              channel: "app",
+              namespace: DASHCAST.namespace,
+              payload: load,
+            },
+          ],
+        };
+      r.s.send(DASHCAST.namespace, r.app.transportId!, load);
+      return appOf(r.app);
     },
 
     async announceAll(targets, given, options = {}) {
