@@ -4,10 +4,12 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-14
+
 ### Added
 
-- **cast:** apps. `launch(target, appId)` starts any Cast app (your own registered receiver, or a public one) and connects to it; `send(target, namespace, message)` talks to the running app on its own namespace. Both take `{ dryRun: true }`; `stop` ends the app. `home cast launch <name> <appId>`. New type: `CastApp`.
-- **cast:** `CastError`, a `ConnectorError` with `code: "refused"`, the receiver's `reply` (`LAUNCH_ERROR`, `LOAD_FAILED`, …) and its `reason` (`NOT_FOUND` for an app the device can't see). Every refusal a Cast write gets now throws one; the message is as before.
+- **cast:** apps. `launch(target, appId)` starts any Cast app (your own registered receiver, or a public one) and connects to it; `send(target, namespace, message)` talks to the running app on its own namespace. Both take `{ dryRun: true }`, and the existing `stop` ends the app. `home cast launch <name> <appId>`. New type: `CastApp`.
+- **cast:** `CastError`, a `ConnectorError` with `code: "refused"`, the receiver's `reply` (`LAUNCH_ERROR`, `LOAD_FAILED`, …) and its `reason` (`NOT_FOUND` for an app the device can't see). A refusal a Cast write gets is now one of these, with the same message as before.
 
 ## [0.2.3] - 2026-11-14
 
@@ -174,7 +176,8 @@ First release. Nine connectors: Hue, Daikin, Enphase, Google Cast, AirPrint prin
 - **Agent skills** in `skills/`: `use-home` (reading safely, connecting, the rules for writes) and `draw-home` (an SVG plan of a home and its rooms). `llms.txt` points agents at the docs.
 - **Node.** Hue and Enphase take the fetches in `@khalido/home/node`. The library runs on Bun 1.4+ and Node 24+; the `home` command needs Bun.
 
-[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/khalido/home.ts/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/khalido/home.ts/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/khalido/home.ts/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/khalido/home.ts/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/khalido/home.ts/compare/v0.2.0...v0.2.1
