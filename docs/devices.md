@@ -36,6 +36,7 @@ Waiting on something else first.
 - **Presence** (Aqara FP2, FP300; Apollo MSR-2 if ESPHome lands): rooms where people sit still.
 - **Garage door** (OpenGarage, ratgdo), **irrigation** (OpenSprinkler), **blinds**, **ceiling fans** (Tuya local key or an RF bridge): only with the hardware.
 - **An e-ink house display** (TRMNL): a screen for `houseSummary` on the wall.
+- **Home Assistant Connect AUX-2** (US$69, 2026-11-11, [post](https://www.home-assistant.io/blog/2026/11/11/no-device-left-behind-home-assistant-connect-aux-2/)): a PoE box with RS-232 ports, optical and analog audio, USB (RS-485 Modbus with an adapter, Z-Wave), Grove sensors and a Bluetooth proxy, built for Home Assistant and ESPHome. Worth it here only for a device that speaks RS-232 (an amplifier, a TV) or to put an old amp on the network as a speaker; a Pi with a USB serial adapter does the serial part. Whether it has an API usable without Home Assistant is not in the post; if it runs ESPHome, the ESPHome connector above would reach it. No IR.
 
 ## Buy first (notes, 2026-10-16)
 
