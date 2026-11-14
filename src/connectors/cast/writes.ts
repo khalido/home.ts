@@ -1,5 +1,5 @@
 import type { Clock } from "../../clock.ts";
-import { errorText } from "../../connector.ts";
+import { ConnectorError, errorText } from "../../connector.ts";
 import { type WriteLane, writeLane } from "../../lane.ts";
 import { CAST_WAV, castWav, isWav, type WavFormat, wavText } from "./wav.ts";
 import { NS } from "./codec.ts";
@@ -39,6 +39,24 @@ const REFUSALS = new Set([
   "INVALID_PLAYER_STATE",
   "INVALID_MEDIA_SESSION_ID",
 ]);
+
+/**
+ * A Cast device said no: `reply` is its refusal (`LAUNCH_ERROR`, `LOAD_FAILED`, …) and `reason` its own word when it
+ * gives one (`NOT_FOUND` for an app it can't see, `CANCELLED`, …). `code` is `refused`.
+ */
+export class CastError extends ConnectorError {
+  readonly reply: string;
+  readonly reason?: string;
+  constructor(request: string, raw: RawPayload) {
+    const reply = String(raw.type);
+    const reason = typeof raw.reason === "string" ? raw.reason : undefined;
+    super(`${request} refused: ${reply}${reason ? ` (${reason})` : ""}`, {
+      code: "refused",
+    });
+    this.reply = reply;
+    this.reason = reason;
+  }
+}
 
 /** What to play: a URL the device can fetch (type defaults to audio/mpeg), or bytes for `serve` to put on the LAN. */
 export type CastClip =
@@ -244,9 +262,7 @@ function request(
     (raw) => {
       if (raw.requestId !== id) return undefined;
       if (typeof raw.type === "string" && REFUSALS.has(raw.type))
-        throw new Error(
-          `${payload.type} refused: ${raw.type}${typeof raw.reason === "string" ? ` (${raw.reason})` : ""}`,
-        );
+        throw new CastError(payload.type, raw);
       return raw;
     },
   );
@@ -364,9 +380,7 @@ export function castActions(ctx: WriteContext): CastActions {
           typeof raw.type === "string" &&
           REFUSALS.has(raw.type)
         )
-          throw new Error(
-            `LAUNCH refused: ${raw.type}${typeof raw.reason === "string" ? ` (${raw.reason})` : ""}`,
-          );
+          throw new CastError("LAUNCH", raw);
         const r = ReceiverStatus.safeParse(raw);
         return r.success
           ? r.data.status?.applications?.find(

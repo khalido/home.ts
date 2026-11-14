@@ -7,6 +7,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 ### Added
 
 - **cast:** apps. `launch(target, appId)` starts any Cast app (your own registered receiver, or a public one) and connects to it; `send(target, namespace, message)` talks to the running app on its own namespace. Both take `{ dryRun: true }`; `stop` ends the app. `home cast launch <name> <appId>`. New type: `CastApp`.
+- **cast:** `CastError`, a `ConnectorError` with `code: "refused"`, the receiver's `reply` (`LAUNCH_ERROR`, `LOAD_FAILED`, …) and its `reason` (`NOT_FOUND` for an app the device can't see). Every refusal a Cast write gets now throws one; the message is as before.
 
 ## [0.2.3] - 2026-11-14
 

@@ -3,6 +3,7 @@ import type { Clock, Part } from "../src/index.ts";
 import { idleClock, manualClock } from "./clock.ts";
 import {
   cast,
+  CastError,
   type CastConnect,
   type CastSnapshot,
 } from "../src/connectors/cast/index.ts";
@@ -57,7 +58,7 @@ type Fake = {
   members?: string[];
 };
 type Script = {
-  launch?: "ignore";
+  launch?: "ignore" | "NOT_FOUND";
   load?: "finish" | "silent" | "ignore" | "error" | "stuck" | "unplayable";
   reload?: "error";
   durationS?: number;
@@ -177,6 +178,12 @@ function fakeHome(list: Fake[], script: Script = {}) {
             return reply(status(p.requestId));
           case "receiver LAUNCH":
             if (script.launch === "ignore") return;
+            if (script.launch === "NOT_FOUND")
+              return reply({
+                type: "LAUNCH_ERROR",
+                reason: "NOT_FOUND",
+                requestId: p.requestId,
+              });
             f.app =
               p.appId === DMR.appId
                 ? DMR
@@ -867,6 +874,19 @@ describe("launch, send", () => {
       wouldSend: [{ payload: { type: "LAUNCH", appId: "ABCD1234" } }],
     });
     await expect(h.c.launch("Kitchen", "nope")).rejects.toThrow("8 hex digits");
+    await h.done();
+  });
+
+  test("an app the device can't see: a CastError with the receiver's reason", async () => {
+    const h = await connected(home(), { launch: "NOT_FOUND" });
+    const error = await h.c.launch("Kitchen", "FCE23D20").catch((e) => e);
+    expect(error).toBeInstanceOf(CastError);
+    expect(error).toMatchObject({
+      code: "refused",
+      reply: "LAUNCH_ERROR",
+      reason: "NOT_FOUND",
+      message: "LAUNCH refused: LAUNCH_ERROR (NOT_FOUND)",
+    });
     await h.done();
   });
 
