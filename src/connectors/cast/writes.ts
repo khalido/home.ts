@@ -65,12 +65,6 @@ export type CastApp = {
   transportId: string;
 };
 
-/** DashCast, a public receiver that shows a web page (pychromecast's app list); `castUrl` uses it. */
-export const DASHCAST = {
-  appId: "84912283",
-  namespace: "urn:x-cast:com.madmod.dashcast",
-} as const;
-
 /**
  * What `announce` did: whether the clip played to its end, why not, and what it put back or could not. A dry run has
  * `played: false`, `why: "dry run"`, `wouldSend`, and in `notRestored` what the real one could not put back.
@@ -131,15 +125,6 @@ export type CastActions = {
     namespace: string,
     message: Record<string, unknown>,
     options?: CastWriteOptions,
-  ): Promise<CastApp | CastDryRun>;
-  /**
-   * Show a web page on the target through DashCast: `launch`, then its load message. `reloadSeconds` reloads the page that
-   * often. The page loads in DashCast's frame, so a page that refuses framing, or plain HTTP from an HTTPS frame, may not show.
-   */
-  castUrl(
-    target: string,
-    url: string,
-    options?: { reloadSeconds?: number } & CastWriteOptions,
   ): Promise<CastApp | CastDryRun>;
   /** `announce` to several targets at once, one result per device, in the order given. A target that can't be reached is its own `played: false`. A group and one of its own members are not told apart. */
   announceAll(
@@ -856,42 +841,6 @@ export function castActions(ctx: WriteContext): CastActions {
       s.connect(app.transportId!);
       s.send(namespace, app.transportId!, message);
       return appOf(app);
-    },
-
-    async castUrl(target, url, options = {}) {
-      let parsed: URL;
-      try {
-        parsed = new URL(url);
-      } catch {
-        throw new RangeError(`not a URL: ${url}`);
-      }
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:")
-        throw new RangeError(`a web page's URL, not ${parsed.protocol}`);
-      const seconds = options.reloadSeconds ?? 0;
-      if (!(Number.isFinite(seconds) && seconds >= 0))
-        throw new RangeError(`reloadSeconds is 0 or more, not ${seconds}`);
-      // The four keys pychromecast's DashCastController sends (MIT, facts only).
-      const load = {
-        url,
-        force: false,
-        reload: seconds > 0,
-        reload_time: seconds * 1000,
-      };
-      const r = await start(target, DASHCAST.appId, options);
-      if ("wouldSend" in r)
-        return {
-          wouldSend: [
-            ...r.wouldSend,
-            {
-              device: r.d.name,
-              channel: "app",
-              namespace: DASHCAST.namespace,
-              payload: load,
-            },
-          ],
-        };
-      r.s.send(DASHCAST.namespace, r.app.transportId!, load);
-      return appOf(r.app);
     },
 
     async announceAll(targets, given, options = {}) {

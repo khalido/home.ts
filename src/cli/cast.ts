@@ -79,7 +79,7 @@ async function withCast<T>(
 }
 
 export const CAST_USAGE =
-  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name> | url <name> <url> | launch <name> <appId>';
+  'usage: home cast announce --to <name> [--to <name>…] (--say "<text>" [--wav] | --file <path>) [--volume 0-100] | volume <name> <0-100> | mute <name> on|off | stop <name> | launch <name> <appId>';
 
 /** A 0–100 argument as the 0–1 a Cast device takes. */
 function percentLevel(value: string | undefined): number {
@@ -191,18 +191,7 @@ export const castVerbs: Verbs = {
       !!o.dryRun,
     );
   },
-  // A web page through DashCast, or any Cast app by its id. `stop <name>` ends either.
-  async url([name, url, extra], o) {
-    if (!name || !url || extra) usage(CAST_USAGE);
-    const r = await withCast((c) =>
-      c.castUrl(name!, url!, { dryRun: !!o.dryRun }),
-    );
-    if ("wouldSend" in r) {
-      console.log("dry run, nothing sent:");
-      return dryLines(r.wouldSend);
-    }
-    console.log(`${name}: showing ${url} (DashCast, ${r.transportId})`);
-  },
+  // Any Cast app by its id, a receiver of your own included. `stop <name>` ends it.
   async launch([name, appId, extra], o) {
     if (!name || !appId || extra) usage(CAST_USAGE);
     const r = await withCast((c) =>

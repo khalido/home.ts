@@ -6,7 +6,7 @@ All notable changes to home.ts (`@khalido/home` on npm), in [Keep a Changelog](h
 
 ### Added
 
-- **cast:** apps and pages. `launch(target, appId)` starts any Cast app (your own registered receiver, or a public one) and connects to it; `send(target, namespace, message)` talks to the running app on its own namespace; `castUrl(target, url, { reloadSeconds? })` shows a web page through the public DashCast receiver. Each takes `{ dryRun: true }`; `stop` ends the app. `home cast url <name> <url>` and `home cast launch <name> <appId>`. New: `CastApp`, `DASHCAST`.
+- **cast:** apps. `launch(target, appId)` starts any Cast app (your own registered receiver, or a public one) and connects to it; `send(target, namespace, message)` talks to the running app on its own namespace. Both take `{ dryRun: true }`; `stop` ends the app. `home cast launch <name> <appId>`. New type: `CastApp`.
 
 ## [0.2.3] - 2026-11-14
 

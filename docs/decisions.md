@@ -178,3 +178,8 @@ KO's decisions on this package, newest block last. They override every other doc
 - **`houseSummary` and `ventilation` read a snapshot, never write**, and live in `src/house.ts`, above the connectors: they join what several connectors say, as `energyNow` does for power and prices.
 - **The windows' rules are stated, not learned**: 20–24 °C is comfortable, outside must be 2 °C better, and 2 °C past that band closes them; rain within 30 minutes, or the AC on in any mode but fan, closes them. Humidity outside is said, not weighed. The Daikin's outdoor unit temperature is not used for outside: it sits in the sun and by the compressor. Change the numbers in `VENTILATION` rather than adding a setting.
 - **Lights are counted by Hue room**, since bulbs' own names ("Hue ambiance downlight 3") rarely say where they are.
+
+## A page on the TV (2026-11-14)
+
+- **No DashCast.** The public receiver that shows a URL in a frame was last updated in 2022; a page in its frame can't refuse framing, mixes HTTPS and HTTP badly, and gets no remote keys. A page on a TV is its own registered receiver.
+- **home.ts is the Cast plumbing, chota is the app.** home.ts launches an app by id, sends it messages and stops it, and gives the data (`houseSummary`, `homeDevices`, `castStatus`); chota builds, registers and hosts the receiver, its views and its schedule.

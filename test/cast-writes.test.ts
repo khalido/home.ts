@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import type { Clock, Part } from "../src/index.ts";
 import { idleClock, manualClock } from "./clock.ts";
 import {
-  DASHCAST,
   cast,
   type CastConnect,
   type CastSnapshot,
@@ -186,10 +185,7 @@ function fakeHome(list: Fake[], script: Script = {}) {
                     displayName: "An app",
                     sessionId: "00000000-0000-4000-8000-0000000000e1",
                     transportId: "web-9",
-                    namespaces: [
-                      { name: DASHCAST.namespace },
-                      { name: "urn:x-cast:test.house" },
-                    ],
+                    namespaces: [{ name: "urn:x-cast:test.house" }],
                   };
             f.media = [];
             return reply(status(p.requestId));
@@ -847,7 +843,7 @@ const writesOnly = (h: {
       x.p.type !== "GET_STATUS",
   );
 
-describe("launch, send, castUrl", () => {
+describe("launch, send", () => {
   test("launch starts an app by id and connects to it; one already running is reused", async () => {
     const list = home();
     const h = await connected(list);
@@ -909,49 +905,6 @@ describe("launch, send, castUrl", () => {
     });
     await expect(h.c.send("Kitchen", "house", {})).rejects.toThrow(
       "urn:x-cast:",
-    );
-    await h.done();
-  });
-
-  test("castUrl launches DashCast and sends it the page; a dry run says both and sends neither", async () => {
-    const h = await connected(home());
-    const dry = await h.c.castUrl("Kitchen", "https://example.com/morning", {
-      reloadSeconds: 60,
-      dryRun: true,
-    });
-    expect(dry).toEqual({
-      wouldSend: [
-        {
-          device: "Kitchen",
-          channel: "receiver",
-          payload: { type: "LAUNCH", appId: DASHCAST.appId },
-        },
-        {
-          device: "Kitchen",
-          channel: "app",
-          namespace: DASHCAST.namespace,
-          payload: {
-            url: "https://example.com/morning",
-            force: false,
-            reload: true,
-            reload_time: 60_000,
-          },
-        },
-      ],
-    });
-    expect(writesOnly(h)).toEqual([]);
-    await h.c.castUrl("Kitchen", "https://example.com/morning");
-    expect(h.net.sent.at(-1)).toMatchObject({
-      ns: "dashcast",
-      destination: "web-9",
-      p: {
-        url: "https://example.com/morning",
-        reload: false,
-        reload_time: 0,
-      },
-    });
-    await expect(h.c.castUrl("Kitchen", "file:///x")).rejects.toThrow(
-      "a web page's URL",
     );
     await h.done();
   });

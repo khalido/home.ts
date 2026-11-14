@@ -53,7 +53,6 @@ export type {
   Resolved,
 } from "./state.ts";
 export { CAST_WAV, castWav, type WavFormat } from "./wav.ts";
-export { DASHCAST } from "./writes.ts";
 export type {
   AnnounceResult,
   CastActions,
